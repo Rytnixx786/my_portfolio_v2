@@ -1,31 +1,10 @@
 "use client";
 
-import { Component, type ReactNode, type RefObject } from "react";
+import { type RefObject } from "react";
 import { Canvas } from "@react-three/fiber";
 import { PerformanceMonitor, View } from "@react-three/drei";
-import { Bloom, EffectComposer, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import type { DeviceTier } from "@/lib/device-tier";
-
-interface EffectBoundaryProps {
-  children: ReactNode;
-}
-
-class PostProcessingBoundary extends Component<
-  EffectBoundaryProps,
-  { failed: boolean }
-> {
-  state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  render() {
-    if (this.state.failed) return null;
-    return this.props.children;
-  }
-}
 
 interface Scene3DRootProps {
   effectiveTier: DeviceTier;
@@ -38,17 +17,17 @@ interface Scene3DRootProps {
 
 /**
  * Single root fixed WebGL <Canvas> (Section 7.3).
- * All 3D scenes across the site portal into this single GL context via drei <View.Port />.
+ * Keeps full-viewport compositor clean (no 100vw full-screen EffectComposer pass stalled on scroll)
+ * and layers cleanly beneath Navbar (z-40) and interactive DOM UI.
  */
 export function Scene3DRoot({
   effectiveTier,
-  reducedMotion,
   eventSource,
   onDowngrade,
   onContextLost,
   onContextRestored,
 }: Scene3DRootProps) {
-  const dpr: [number, number] = effectiveTier === "high" ? [1, 1.85] : [1, 1.35];
+  const dpr: [number, number] = effectiveTier === "high" ? [1, 1.75] : [1, 1.25];
 
   return (
     <Canvas
@@ -91,7 +70,7 @@ export function Scene3DRoot({
         width: "100vw",
         height: "100vh",
         pointerEvents: "none",
-        zIndex: 20,
+        zIndex: 5,
       }}
     >
       <PerformanceMonitor
@@ -104,22 +83,6 @@ export function Scene3DRoot({
       />
 
       <View.Port />
-
-      {effectiveTier === "high" && !reducedMotion && (
-        <PostProcessingBoundary>
-          <EffectComposer multisampling={0} enableNormalPass={false}>
-            <Bloom
-              mipmapBlur
-              luminanceThreshold={0.95}
-              luminanceSmoothing={0.25}
-              intensity={0.42}
-              radius={0.58}
-            />
-            <Vignette eskil={false} offset={0.2} darkness={0.42} />
-          </EffectComposer>
-        </PostProcessingBoundary>
-      )}
     </Canvas>
   );
 }
-

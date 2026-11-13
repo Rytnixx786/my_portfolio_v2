@@ -60,7 +60,7 @@ const CINCH_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
     vramOrCost: "0 W GPU",
     activeStages: ["breaker", "finops", "pii", "cache"],
     summary:
-      "In-process CPU ONNX semantic cache matches prior vector embedding at cosine >= 0.92 and returns response without touching GPU memory.",
+      "CPU ONNX vector cache hits at cosine >= 0.92, returning in 4.12 ms with zero GPU load.",
     payload: {
       route: "POST /v1/chat/completions",
       cache_hit: true,
@@ -81,7 +81,7 @@ const CINCH_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
     vramOrCost: "4.2 GiB VRAM",
     activeStages: ["breaker", "finops", "pii", "cache", "limiter", "vllm"],
     summary:
-      "Cache miss admits request through PID sliding-window queue onto Qwen2.5-7B AWQ Marlin INT4 engine with EBNF JSON grammar repair.",
+      "PID limiter schedules Qwen2.5-7B AWQ Marlin INT4 at 331.0 tok/s with grammar-repaired JSON.",
     payload: {
       model: "Qwen2.5-7B-Instruct-AWQ",
       quantization: "Marlin W4A16 INT4",
@@ -101,7 +101,7 @@ const CINCH_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
     vramOrCost: "Canary Probe 10s",
     activeStages: ["breaker"],
     summary:
-      "Circuit breaker trips OPEN after consecutive GPU worker OOM panics, failing fast in 45.56ms instead of stalling callers for 30s timeouts.",
+      "Breaker trips OPEN after 3 worker panics, failing fast in 45.56 ms instead of 30s hangs.",
     payload: {
       breaker_state: "OPEN -> HALF_OPEN",
       fast_fail_ms: 45.56,
@@ -121,7 +121,7 @@ const CINCH_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
     vramOrCost: "0 Tokens Burned",
     activeStages: ["breaker", "finops"],
     summary:
-      "Micro-dollar pre-flight accounting rejects requests once tenant quota caps out, returning structured HTTP 402 before allocation.",
+      "Pre-flight FinOps gate rejects capped tenants with HTTP 402 before GPU allocation.",
     payload: {
       tenant_id: "org_enterprise_04",
       budget_usd: 25.0,
@@ -153,7 +153,7 @@ const RAG_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
     vramOrCost: "RRF k=60 + NLI",
     activeStages: ["bm25", "dense", "rrf", "rerank", "nli", "synth"],
     summary:
-      "Hybrid BM25 and dense retrieval fuse via RRF (k=60), pass cross-encoder reranking and NLI verification, and emit inline-cited SSE tokens.",
+      "BM25 + dense vectors fuse via RRF (k=60), pass rerank + NLI check, and stream cited SSE tokens.",
     payload: {
       rrf_constant_k: 60,
       groundedness_score: 0.95,
@@ -173,7 +173,7 @@ const RAG_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
     vramOrCost: "Aborted Safely",
     activeStages: ["bm25", "dense", "rrf", "rerank", "nli"],
     summary:
-      "Cross-encoder ranks chunks, but the pre-generation NLI classifier detects contradiction below threshold and refuses cleanly.",
+      "Pre-generation NLI classifier catches low entailment and aborts generation cleanly.",
     payload: {
       top_chunk_cosine: 0.81,
       nli_entailment: 0.41,
@@ -192,7 +192,7 @@ const RAG_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
     vramOrCost: "Postgres Saved",
     activeStages: ["bm25", "dense", "rrf"],
     summary:
-      "LangGraph checkpoints state in PostgreSQL and suspends execution cleanly via Last-Event-ID until operator approves refined sub-queries.",
+      "LangGraph persists AsyncPostgresSaver checkpoints and pauses via Last-Event-ID for HITL review.",
     payload: {
       checkpointer: "AsyncPostgresSaver",
       interrupt_node: "human_approval",

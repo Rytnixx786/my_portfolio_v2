@@ -52,9 +52,8 @@ export function ContactSection() {
                 <span className="text-[#38BDF8]">DETERMINISTIC.</span>
               </h2>
 
-              <p className="mt-5 max-w-[54ch] font-sans text-base leading-relaxed text-[#9DA7B3] sm:text-lg">
-                Open to AI engineering, LLM serving, and backend infrastructure teams. Reach out
-                directly or inspect my verified benchmark console below.
+              <p className="mt-5 max-w-[46ch] font-sans text-base leading-relaxed text-[#9DA7B3] sm:text-lg">
+                Available for AI engineering, LLM serving, and backend teams.
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-3.5">

@@ -44,7 +44,7 @@ export function ExperienceSection() {
   return (
     <section
       id="experience"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-20 sm:py-28"
+      className="border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-20 sm:py-28"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         {/* Track Record + SVG Chronology Dial */}
@@ -61,8 +61,7 @@ export function ExperienceSection() {
                 </span>
               </h2>
               <p className="mt-4 max-w-sm font-sans text-base leading-relaxed text-[#9DA7B3]">
-                Production metering pipelines at FlyRank paired with systems-level CS coursework at
-                BRAC University.
+                Production metering at FlyRank paired with systems engineering at BRAC University.
               </p>
 
               {/* Lightweight Scroll-Synchronized SVG Chronology Gauge */}

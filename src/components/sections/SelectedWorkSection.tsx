@@ -72,9 +72,8 @@ export function SelectedWorkSection() {
               </h2>
             </div>
 
-            <p className="max-w-[48ch] font-sans text-base leading-relaxed text-[#9DA7B3]">
-              Three flagship builds highlighted first, plus full archive filtering across all six
-              case studies with interactive 3D mini-labs and stage graphs.
+            <p className="max-w-[42ch] font-sans text-base leading-relaxed text-[#9DA7B3]">
+              Flagship architectures first, with category filters and live 3D system topologies.
             </p>
           </div>
 
@@ -172,12 +171,12 @@ export function SelectedWorkSection() {
                           <p className="mt-1 font-mono text-xs uppercase tracking-[0.12em] text-[#38BDF8]">
                             {project.eyebrow}
                           </p>
-                          <p className="mt-3 max-w-[58ch] font-sans text-sm leading-relaxed text-[#9DA7B3] sm:text-base">
+                          <p className="mt-3 line-clamp-3 max-w-[54ch] font-sans text-sm leading-relaxed text-[#9DA7B3] sm:text-base">
                             {project.description}
                           </p>
 
-                          <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            {project.highlightMetrics.map((m) => (
+                          <dl className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                            {project.highlightMetrics.slice(0, 3).map((m) => (
                               <div
                                 key={m.label}
                                 className="rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] px-3 py-2.5"
@@ -240,8 +239,8 @@ export function SelectedWorkSection() {
             >
               <span>
                 {showAllSystems
-                  ? "Show top 3 featured systems"
-                  : `Show all ${projects.length} systems (+${hiddenCount}: MindStack, OFFBoarder, MaSheba AI)`}
+                  ? "Show top 3 featured"
+                  : `View all ${projects.length} systems (+${hiddenCount})`}
               </span>
             </button>
           </div>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Float, Html, OrbitControls, RoundedBox, Trail } from "@react-three/drei";
+import { Float, Html, OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { profile } from "@/data/site";
 import { HERO_ORBIT_HUES, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
@@ -37,8 +37,8 @@ function RipplingInferenceLattice({
   const { pointer } = useThree();
 
   const { geometry, uniforms } = useMemo(() => {
-    const cols = 22;
-    const rows = 14;
+    const cols = 16;
+    const rows = 10;
     const count = cols * rows;
     const positions = new Float32Array(count * 3);
     const scales = new Float32Array(count);
@@ -420,17 +420,17 @@ function HeroOrbitalScene({
               }}
               scale={scale}
             >
-              {isActive ? (
-                <Trail width={0.42} length={6} color={sys.hue} attenuation={(t) => t * t}>
-                  {nodeMesh}
-                </Trail>
-              ) : (
-                nodeMesh
+              {nodeMesh}
+              {isActive && (
+                <mesh rotation={[Math.PI / 2, 0, 0]}>
+                  <ringGeometry args={[0.24, 0.28, 32]} />
+                  <meshBasicMaterial color={sys.hue} side={THREE.DoubleSide} transparent opacity={0.85} />
+                </mesh>
               )}
 
               {(isActive || isHovered) && (
                 <Html position={[0, 0.34, 0]} center style={{ pointerEvents: "none" }}>
-                  <div className="whitespace-nowrap rounded-full border border-[rgba(240,246,252,0.18)] bg-[#0D1117]/95 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] shadow-lg backdrop-blur-md">
+                  <div className="whitespace-nowrap rounded-full border border-[rgba(240,246,252,0.18)] bg-[#0D1117]/95 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] shadow-lg">
                     <span style={{ color: sys.hue }}>{sys.code}</span>{" "}
                     <span className="font-semibold">{sys.label}</span>{" "}
                     <span className="text-[#9DA7B3]">· {sys.metric}</span>
@@ -471,8 +471,9 @@ export function HeroOrbitalCore3D({
   onSelectSystem,
 }: HeroOrbitalCore3DProps) {
   return (
-    <div className="relative h-[320px] w-full sm:h-[370px] lg:h-[400px]">
+    <div className="relative h-[320px] w-full sm:h-[380px] lg:h-[420px]">
       <ViewportCanvas
+        eager
         cameraPosition={[0, 0.25, 5.25]}
         fov={40}
         fallback={LazyPortraitFallback}

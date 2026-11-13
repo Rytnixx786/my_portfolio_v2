@@ -69,9 +69,9 @@ export function AboutSection() {
         </div>
 
         <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-start lg:gap-12">
-          {/* Left 5 Cols: CSS-Duotone Monochrome Portrait via optimized next/image */}
+          {/* Left 5 Cols: Monochrome Portrait */}
           <div className="min-w-0 lg:col-span-5">
-            <SectionReveal variant="parallax">
+            <SectionReveal>
               <div className="double-bezel-outer">
                 <div className="double-bezel-core overflow-hidden p-2.5 sm:p-3">
                   <div className="group relative aspect-[4/4.6] overflow-hidden rounded-[calc(1.75rem-0.85rem)] bg-[#0D1117]">

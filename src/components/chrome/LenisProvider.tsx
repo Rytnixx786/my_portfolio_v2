@@ -19,8 +19,8 @@ declare global {
 }
 
 /**
- * Coordinates Lenis smooth scrolling with GSAP ScrollTrigger ticks,
- * handles initial deep-link URL hashes, and recovers scroll after modal/drawer locks.
+ * Coordinates crisp Lenis wheel scrolling with GSAP ScrollTrigger ticks,
+ * leaving touch scroll native (syncTouch: false) and avoiding CSS scroll-behavior conflicts.
  */
 export function LenisProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -34,15 +34,21 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       lenis?: Lenis
     ) => {
       const el =
-        typeof target === "string" ? document.getElementById(target.replace(/^#/, "")) : target;
+        typeof target === "string"
+          ? document.getElementById(target.replace(/^#/, ""))
+          : target;
       if (!el) return;
 
       if (lenis && !reduced) {
         lenis.start();
         lenis.scrollTo(el, { offset: NAV_SCROLL_OFFSET, force: true });
       } else {
-        const top = el.getBoundingClientRect().top + window.scrollY + NAV_SCROLL_OFFSET;
-        window.scrollTo({ top: Math.max(0, top), behavior: reduced ? "auto" : "smooth" });
+        const top =
+          el.getBoundingClientRect().top + window.scrollY + NAV_SCROLL_OFFSET;
+        window.scrollTo({
+          top: Math.max(0, top),
+          behavior: "auto",
+        });
       }
     };
 
@@ -61,10 +67,10 @@ export function LenisProvider({ children }: { children: ReactNode }) {
     }
 
     const lenis = new Lenis({
-      duration: 1.0,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      lerp: 0.14,
       smoothWheel: true,
-      touchMultiplier: 1.4,
+      syncTouch: false,
+      wheelMultiplier: 1,
     });
 
     window.__portfolioLenis = lenis;
@@ -111,38 +117,17 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    if (document.fonts?.ready) {
-      document.fonts.ready.then(() => {
-        ScrollTrigger.refresh();
-      });
-    }
-
-    // Debounced ResizeObserver on <main> keeps ScrollTrigger aligned when collapsible panels open
-    let resizeTimer: number | null = null;
-    const mainEl = document.getElementById("main-content");
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined" && mainEl
-        ? new ResizeObserver(() => {
-            if (resizeTimer) window.clearTimeout(resizeTimer);
-            resizeTimer = window.setTimeout(() => {
-              ScrollTrigger.refresh();
-            }, 140);
-          })
-        : null;
-
-    if (mainEl && resizeObserver) {
-      resizeObserver.observe(mainEl);
-    }
-
+    let lastWidth = window.innerWidth;
     const onResize = () => {
-      ScrollTrigger.refresh();
+      if (window.innerWidth !== lastWidth) {
+        lastWidth = window.innerWidth;
+        ScrollTrigger.refresh();
+      }
     };
     window.addEventListener("resize", onResize, { passive: true });
 
     return () => {
       window.cancelAnimationFrame(refreshId);
-      if (resizeTimer) window.clearTimeout(resizeTimer);
-      resizeObserver?.disconnect();
       document.removeEventListener("click", onHashClick);
       window.removeEventListener("resize", onResize);
       gsap.ticker.remove(onTick);

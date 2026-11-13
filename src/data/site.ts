@@ -21,7 +21,7 @@ export const profile = {
   thesis: "I build the deterministic systems around stochastic models.",
   headline: "I build AI systems that stay verifiable after the demo ends.",
   summary:
-    "Computer Science candidate at BRAC University (2022 to 2026) and Back End AI Engineering Intern at FlyRank. I engineer quantized LLM serving gateways, stateful LangGraph orchestration, calibrated hybrid RAG, and regression-gated ML pipelines.",
+    "CS candidate at BRAC University (2022 to 2026) and Back End AI Intern at FlyRank. Building quantized LLM gateways, stateful LangGraph orchestration, grounded RAG, and CI-gated ML pipelines.",
   status: "Open to AI & Backend Engineering Roles",
   availabilityShort: "Dhaka, Bangladesh (UTC+6) · Open to Work",
 } as const;
@@ -39,18 +39,18 @@ export const nav = [
 export const principles = [
   {
     k: "01",
-    t: "Evidence before synthesis",
-    d: "If retrieval cannot substantiate an answer, the pipeline refuses cleanly. Calibrated refusal beats fluent fabrication.",
+    t: "Evidence first",
+    d: "When retrieval cannot substantiate a claim, refuse cleanly instead of guessing.",
   },
   {
     k: "02",
-    t: "Measure against a baseline",
-    d: "Every throughput, refusal, or coverage claim cites its unoptimized baseline, test harness, and failure boundary.",
+    t: "Timed baselines",
+    d: "Every latency, throughput, and refusal metric cites its unoptimized baseline.",
   },
   {
     k: "03",
-    t: "Gate every promotion",
-    d: "Models, prompts, and schema changes ship only after idempotent CI regression and slice checks pass.",
+    t: "CI promotion gates",
+    d: "Models and prompts ship only after automated regression and slice checks pass.",
   },
 ] as const;
 
@@ -60,21 +60,21 @@ export const measurementProtocol = [
     title: "Fixed Baselines",
     metric: "FP16 & single-pass controls",
     detail:
-      "Every optimization is timed against its unoptimized baseline on the same workload: FP16 vLLM (30.48 tok/s) and un-gated single-pass RAG (26.67% adversarial refusal).",
+      "Compared directly against 30.48 tok/s FP16 vLLM and 26.67% un-gated single-pass RAG refusal.",
   },
   {
     step: "02",
-    title: "Adversarial Refusal Suites",
+    title: "Adversarial Suites",
     metric: "Promptfoo + Ragas + pytest",
     detail:
-      "Retrieval and agent systems are evaluated against unanswerable and conflicting prompts inside CI rather than curated happy paths.",
+      "Tested in CI against unanswerable and contradictory prompts rather than happy paths.",
   },
   {
     step: "03",
-    title: "Fault Injection & Replay",
+    title: "Fault Injection",
     metric: "45.56ms breaker · WAL outbox",
     detail:
-      "Gateways, PostgreSQL checkpointers, and mobile outbox queues are exercised under worker OOM panics, dropped sockets, and offline reconnects.",
+      "Exercised under GPU OOM panics, dropped SSE sockets, and offline sync reconnects.",
   },
 ] as const;
 
@@ -85,7 +85,7 @@ export const focusAreas = [
     category: "Inference & Serving" as const,
     title: "LLM Serving & Gateway Control Planes",
     description:
-      "Self-hosted quantized inference with vLLM and AWQ Marlin INT4, PID concurrency regulation, sub-5ms ONNX semantic caching, 3-state circuit breakers, micro-dollar FinOps cutoffs, and Kubernetes HPA.",
+      "Quantized AWQ Marlin serving with PID admission control, 4.12ms ONNX semantic cache, 3-state circuit breaker, and FinOps cutoffs.",
     capabilities: [
       "vLLM + AWQ Marlin INT4",
       "In-process ONNX Semantic Cache",
@@ -100,7 +100,7 @@ export const focusAreas = [
     category: "Agents & RAG" as const,
     title: "Grounded RAG & Refusal Calibration",
     description:
-      "Evidence-first retrieval combining sparse BM25 and dense vector indices via Reciprocal Rank Fusion (k = 60), cross-encoder reranking, pre-generation NLI entailment gates, and CI-backed adversarial evaluation.",
+      "Hybrid BM25 and dense vector fusion via RRF (k = 60), cross-encoder reranking, and NLI entailment gates.",
     capabilities: [
       "Hybrid BM25 + Dense Vector Search",
       "Reciprocal Rank Fusion (k = 60)",
@@ -115,7 +115,7 @@ export const focusAreas = [
     category: "Agents & RAG" as const,
     title: "Durable Agent Orchestration",
     description:
-      "Cyclic stateful LangGraph workflows backed by PostgreSQL schema-level checkpointing, human-in-the-loop approval interrupts, Redis token-bucket rate limits, and resumable Last-Event-ID SSE streams.",
+      "Stateful LangGraph pipelines backed by PostgreSQL checkpoints, human approval interrupts, and Last-Event-ID SSE replay.",
     capabilities: [
       "LangGraph StateGraph Workflows",
       "AsyncPostgresSaver Checkpoints",
@@ -130,7 +130,7 @@ export const focusAreas = [
     category: "MLOps & Security" as const,
     title: "Backend Systems & Zero-Trust Boundaries",
     description:
-      "Observable asynchronous APIs with FastAPI, SQLAlchemy 2.0, PostgreSQL Row-Level Security, Segregation of Duties enforcement, chained SHA-256 audit ledgers, and idempotent Stripe usage metering.",
+      "Async FastAPI APIs enforcing PostgreSQL Row-Level Security, Segregation of Duties, chained SHA-256 audit logs, and Stripe metering.",
     capabilities: [
       "FastAPI Async & Pydantic v2",
       "PostgreSQL Row-Level Security",
@@ -145,7 +145,7 @@ export const focusAreas = [
     category: "Mobile & Systems" as const,
     title: "Offline-First Edge & Product Delivery",
     description:
-      "Resilient mobile and web surfaces built for disconnected environments using SQLite WAL outbox sync with microsecond logical clocks, on-device ONNX risk scoring (AUC 0.90), and strict performance budgets.",
+      "Offline-ready React Native and Next.js interfaces using SQLite WAL outbox queues and on-device ONNX inference (0.90 AUC).",
     capabilities: [
       "React Native & Expo Router",
       "SQLite WAL Outbox Sync",
