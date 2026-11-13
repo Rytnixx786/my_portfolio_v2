@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { answerPortfolioQuery, matchPortfolioQuery } from "@/lib/query-engine";
 import { CATEGORY_HUES } from "@/lib/palette";
+import { resolveEffectiveTier, resolveQualityReason } from "@/lib/device-tier";
 import { projects } from "@/data/projects";
 import { POST } from "@/app/api/query/route";
 
@@ -34,37 +35,53 @@ describe("query-engine grounded retrieval", () => {
   });
 });
 
-describe("palette and data integrity", () => {
+describe("palette, device tier, and project data integrity", () => {
   it("excludes violet/purple accents from category palette", () => {
     const hexes = Object.values(CATEGORY_HUES).map((h) => h.hex.toLowerCase());
     expect(hexes).not.toContain("#a855f7");
   });
 
-  it("provides Section 15 methodology and evaluation series on all 6 projects", () => {
+  it("provides Section 15 methodology, evals, and dash-free UI copy on all 6 projects", () => {
     expect(projects).toHaveLength(6);
     for (const project of projects) {
       expect(project.methodology.length).toBeGreaterThan(20);
       expect(project.evalSeries.length).toBeGreaterThanOrEqual(2);
       expect(project.failures.length).toBeGreaterThanOrEqual(1);
+      expect(project.reproduceCmd.length).toBeGreaterThan(3);
+      expect(/[\u2013\u2014]/.test(project.description)).toBe(false);
     }
+  });
+
+  it("resolves WebGL tiers and diagnostics accurately", () => {
+    expect(resolveEffectiveTier("auto", "high", false)).toBe("low");
+    expect(resolveEffectiveTier("2d", "high", true)).toBe("low");
+    expect(resolveEffectiveTier("balanced", "high", true)).toBe("mid");
+    expect(resolveQualityReason("high", "Hardware WebGL2 ready", false, false)).toBe(
+      "Manual High (AA + Shaders)"
+    );
   });
 });
 
 describe("/api/query handler", () => {
-  it("returns 400 on invalid JSON body or missing message", async () => {
+  it("returns 400 on invalid JSON body, missing message, or oversized payload", async () => {
     const badJsonReq = new Request("http://localhost:3100/api/query", {
       method: "POST",
       body: "{not-valid-json",
     });
-    const res1 = await POST(badJsonReq);
-    expect(res1.status).toBe(400);
+    expect((await POST(badJsonReq)).status).toBe(400);
 
     const emptyMsgReq = new Request("http://localhost:3100/api/query", {
       method: "POST",
       body: JSON.stringify({ message: "   " }),
     });
-    const res2 = await POST(emptyMsgReq);
-    expect(res2.status).toBe(400);
+    expect((await POST(emptyMsgReq)).status).toBe(400);
+
+    const hugeReq = new Request("http://localhost:3100/api/query", {
+      method: "POST",
+      headers: { "x-forwarded-for": "198.51.100.77" },
+      body: JSON.stringify({ message: "a".repeat(2500) }),
+    });
+    expect((await POST(hugeReq)).status).toBe(400);
   });
 
   it("streams grounded SSE responses when text/event-stream is requested", async () => {
@@ -85,4 +102,3 @@ describe("/api/query handler", () => {
     expect(bodyText).toContain("0.90 AUC");
   });
 });
-

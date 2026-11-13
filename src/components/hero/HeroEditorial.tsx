@@ -26,9 +26,9 @@ const LazyHeroOrbitalCore3D = dynamic(
 );
 
 const HERO_PROOF = [
-  { value: "331 tok/s", label: "Qwen2.5-7B INT4" },
-  { value: "95%", label: "Grounded RAG" },
-  { value: "92%+", label: "CI Test Gate" },
+  { value: "331 tok/s", label: "Qwen2.5-7B INT4", systemIdx: 0 },
+  { value: "95%", label: "Grounded RAG", systemIdx: 3 },
+  { value: "92%+", label: "CI Test Gate", systemIdx: 2 },
 ] as const;
 
 /**
@@ -95,18 +95,31 @@ export function HeroEditorial() {
               </Link>
             </div>
 
-            <dl className="mt-9 grid max-w-xl grid-cols-3 gap-4 border-t border-[rgba(240,246,252,0.08)] pt-6">
-              {HERO_PROOF.map((stat) => (
-                <div key={stat.label}>
-                  <dd className="font-display text-2xl font-bold leading-none text-[#E6EDF3] tabular-nums sm:text-3xl">
-                    {stat.value}
-                  </dd>
-                  <dt className="mt-1.5 font-mono text-xs text-[#8B949E]">
-                    {stat.label}
-                  </dt>
-                </div>
-              ))}
-            </dl>
+            <div className="mt-9 grid max-w-xl grid-cols-3 gap-3 border-t border-[rgba(240,246,252,0.08)] pt-6">
+              {HERO_PROOF.map((stat) => {
+                const isSelected = activeSystemIndex === stat.systemIdx;
+                return (
+                  <button
+                    key={stat.label}
+                    type="button"
+                    onClick={() => setActiveSystemIndex(stat.systemIdx)}
+                    aria-pressed={isSelected}
+                    className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                      isSelected
+                        ? "border-[#38BDF8]/40 bg-[#38BDF8]/10"
+                        : "border-transparent hover:border-[rgba(240,246,252,0.1)] hover:bg-[#161B22]/60"
+                    }`}
+                  >
+                    <span className="block font-display text-2xl font-bold leading-none text-[#E6EDF3] tabular-nums sm:text-3xl">
+                      {stat.value}
+                    </span>
+                    <span className="mt-1.5 block font-mono text-xs text-[#8B949E]">
+                      {stat.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Right 5 Cols: Interactive 3D Stage + Compact Switcher Bar */}

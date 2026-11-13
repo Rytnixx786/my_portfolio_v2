@@ -319,8 +319,14 @@ function HeroOrbitalScene({
   const coreRef = useRef<THREE.Group>(null);
   const nodesRef = useRef<Array<THREE.Group | null>>([]);
   const ripplesRef = useRef<Array<{ x: number; y: number; t: number }>>([]);
+  const activeIdxRef = useRef(activeSystemIndex);
+  const prevIdxRef = useRef(activeSystemIndex);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const { pointer, clock } = useThree();
+
+  useEffect(() => {
+    activeIdxRef.current = activeSystemIndex;
+  }, [activeSystemIndex]);
 
   const activeSystem = ORBITAL_SYSTEMS[activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
 
@@ -335,6 +341,14 @@ function HeroOrbitalScene({
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.05);
     const t = state.clock.elapsedTime;
+
+    if (prevIdxRef.current !== activeIdxRef.current) {
+      prevIdxRef.current = activeIdxRef.current;
+      const targetNode = nodesRef.current[activeIdxRef.current];
+      const rx = targetNode ? targetNode.position.x : 0;
+      const ry = targetNode ? targetNode.position.y : 0;
+      ripplesRef.current = [{ x: rx, y: ry, t }, ...ripplesRef.current.slice(0, 3)];
+    }
 
     if (coreRef.current) {
       const targetRotY = state.pointer.x * 0.24 + Math.sin(t * 0.42) * 0.14;

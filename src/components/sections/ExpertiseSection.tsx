@@ -2,9 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { useState, type KeyboardEvent } from "react";
-import { CaretDown, CheckCircle, Cpu, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
-import { focusAreas, stack } from "@/data/site";
-import { STACK_LAYER_HUES, getCategoryHue } from "@/lib/palette";
+import { Cpu, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
+import { stack } from "@/data/site";
+import { STACK_LAYER_HUES } from "@/lib/palette";
 import { SectionReveal } from "./SectionReveal";
 
 const LazyStackRack3D = dynamic(
@@ -22,7 +22,10 @@ const LazyStackRack3D = dynamic(
 function playMechanicalClick(muted: boolean) {
   if (muted || typeof window === "undefined") return;
   try {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
     const osc = ctx.createOscillator();
@@ -45,7 +48,6 @@ function playMechanicalClick(muted: boolean) {
 export function ExpertiseSection() {
   const [activeLayerIdx, setActiveLayerIdx] = useState(0);
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
-  const [expandedFocusId, setExpandedFocusId] = useState<string>(focusAreas[0].id);
   const [soundEnabled, setSoundEnabled] = useState(false);
 
   const activeLayer = stack[activeLayerIdx];
@@ -71,7 +73,7 @@ export function ExpertiseSection() {
   return (
     <section
       id="expertise"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-20 sm:py-28"
+      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-16 sm:py-22"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
@@ -161,7 +163,10 @@ export function ExpertiseSection() {
             >
               <div className="double-bezel-core space-y-5 p-5 sm:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em]" style={{ color: layerHue }}>
+                  <div
+                    className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em]"
+                    style={{ color: layerHue }}
+                  >
                     <Cpu className="h-4 w-4" weight="regular" aria-hidden="true" />
                     <span>
                       Layer {activeLayer.code} · {activeLayer.layer}
@@ -208,62 +213,6 @@ export function ExpertiseSection() {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Domain Focus Accordions */}
-          <div className="mt-14 space-y-3">
-            {focusAreas.map((area) => {
-              const expanded = expandedFocusId === area.id;
-              const hue = getCategoryHue(area.category);
-              return (
-                <div
-                  key={area.id}
-                  className="rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]"
-                >
-                  <button
-                    type="button"
-                    aria-expanded={expanded}
-                    onClick={() => setExpandedFocusId(expanded ? "" : area.id)}
-                    className="flex min-h-[56px] w-full items-center justify-between gap-4 px-5 py-4 text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-xs font-semibold" style={{ color: hue.labelText }}>
-                        {area.code}
-                      </span>
-                      <span className="font-display text-xl font-bold uppercase tracking-tight text-[#E6EDF3] sm:text-2xl">
-                        {area.title}
-                      </span>
-                    </div>
-                    <CaretDown
-                      className={`h-4 w-4 shrink-0 text-[#9DA7B3] transition-transform duration-300 ${
-                        expanded ? "rotate-180" : ""
-                      }`}
-                      weight="regular"
-                      aria-hidden="true"
-                    />
-                  </button>
-
-                  {expanded && (
-                    <div className="border-t border-[rgba(240,246,252,0.08)] px-5 pb-5 pt-4">
-                      <p className="max-w-[66ch] font-sans text-sm leading-relaxed text-[#9DA7B3] sm:text-base">
-                        {area.description}
-                      </p>
-                      <ul className="mt-4 flex flex-wrap gap-2">
-                        {area.capabilities.map((cap) => (
-                          <li
-                            key={cap}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117] px-3 py-1 font-mono text-xs text-[#E6EDF3]"
-                          >
-                            <CheckCircle className="h-3.5 w-3.5 text-[#10B981]" weight="regular" aria-hidden="true" />
-                            <span>{cap}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
           </div>
         </SectionReveal>
       </div>

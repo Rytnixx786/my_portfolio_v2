@@ -215,22 +215,20 @@ export function useCanRender3D() {
     ...ctx,
     canRender3D,
     isStaticPose: ctx.reducedMotion,
-    dprCap: ctx.effectiveTier === "high" ? 1.85 : 1.35,
+    dprCap: ctx.effectiveTier === "high" ? 1.75 : 1.25,
   };
 }
 
 /**
- * Coordinates body scroll lock + Lenis pause across drawers, dialogs, and mobile navigation.
+ * Coordinates body scroll lock across drawers, dialogs, and mobile navigation.
  */
 export function useBodyScrollLock(locked: boolean) {
   useEffect(() => {
     if (!locked) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    window.__portfolioLenis?.stop();
     return () => {
       document.body.style.overflow = prev;
-      window.__portfolioLenis?.start();
     };
   }, [locked]);
 }
