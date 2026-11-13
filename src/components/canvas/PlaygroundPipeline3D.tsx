@@ -30,9 +30,9 @@ const TOKEN_COUNT = 36;
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
 
 const PRESET_VANTAGES: Record<PlaygroundCameraPreset, [number, number, number]> = {
-  isometric: [2.2, 3.5, 6.6],
-  top: [0, 8.2, 1.9],
-  orbit: [2.4, 3.1, 6.2],
+  isometric: [3.1, 3.6, 6.1],
+  top: [0, 7.6, 2.2],
+  orbit: [3.6, 2.8, 5.5],
 };
 
 function CameraRigController({
@@ -46,8 +46,11 @@ function CameraRigController({
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const targetPosRef = useRef(new THREE.Vector3(...PRESET_VANTAGES.isometric));
   const lookTargetRef = useRef(new THREE.Vector3(0, 0.08, 0));
+  const offsetVec = useMemo(() => new THREE.Vector3(), []);
   const transitioningRef = useRef(true);
+  const transitionElapsedRef = useRef(0);
   const draggingRef = useRef(false);
+  const lastInteractElapsedRef = useRef(-10);
   const elapsedRef = useRef(0);
 
   useEffect(() => {
@@ -55,6 +58,12 @@ function CameraRigController({
     targetPosRef.current.set(vantage[0], vantage[1], vantage[2]);
     lookTargetRef.current.set(0, preset === "top" ? 0 : 0.08, 0);
     transitioningRef.current = true;
+    transitionElapsedRef.current = 0;
+    lastInteractElapsedRef.current = -10;
+
+    if (controlsRef.current) {
+      controlsRef.current.autoRotate = false;
+    }
 
     if (frameloop === "demand") {
       camera.position.copy(targetPosRef.current);
@@ -71,28 +80,55 @@ function CameraRigController({
     elapsedRef.current += dt;
     const controls = controlsRef.current;
     const cam = state.camera;
+    if (!controls) return;
 
     if (transitioningRef.current && !draggingRef.current) {
-      const alpha = 1 - Math.exp(-5.5 * dt);
+      transitionElapsedRef.current += dt;
+      controls.autoRotate = false;
+
+      const alpha = 1 - Math.exp(-6.5 * dt);
       cam.position.lerp(targetPosRef.current, alpha);
+      controls.target.lerp(lookTargetRef.current, alpha);
+      controls.update();
 
-      if (controls) {
-        controls.target.lerp(lookTargetRef.current, 1 - Math.exp(-6 * dt));
-      }
-
-      if (cam.position.distanceTo(targetPosRef.current) < 0.03) {
+      if (
+        cam.position.distanceTo(targetPosRef.current) < 0.08 ||
+        transitionElapsedRef.current > 0.7
+      ) {
+        cam.position.copy(targetPosRef.current);
+        controls.target.copy(lookTargetRef.current);
+        controls.update();
         transitioningRef.current = false;
       }
-    } else if (preset === "isometric" && !draggingRef.current && controls) {
-      // Gentle living telemetry parallax in isometric idle without fighting user drag
-      controls.target.set(
-        Math.sin(elapsedRef.current * 0.65) * 0.14,
-        0.08 + Math.cos(elapsedRef.current * 0.85) * 0.04,
-        0
-      );
+      return;
     }
 
-    controls?.update();
+    if (draggingRef.current) {
+      controls.autoRotate = false;
+      lastInteractElapsedRef.current = elapsedRef.current;
+      return;
+    }
+
+    // Resume smooth idle camera motion 2.2s after manual interaction ends (so station clicks never freeze presets)
+    const idleReady = elapsedRef.current - lastInteractElapsedRef.current > 2.2;
+
+    if (preset === "orbit") {
+      controls.autoRotate = idleReady;
+      controls.autoRotateSpeed = 1.65;
+      return;
+    }
+
+    controls.autoRotate = false;
+
+    if (idleReady) {
+      const angularVel =
+        preset === "isometric"
+          ? Math.cos(elapsedRef.current * 0.55) * 0.24
+          : 0.16;
+      offsetVec.copy(cam.position).sub(controls.target);
+      offsetVec.applyAxisAngle(UP_AXIS, angularVel * dt);
+      cam.position.copy(controls.target).add(offsetVec);
+    }
   });
 
   return (
@@ -102,18 +138,20 @@ function CameraRigController({
       enableZoom={false}
       enablePan={false}
       enableDamping
-      dampingFactor={0.055}
-      rotateSpeed={0.65}
+      dampingFactor={0.07}
+      rotateSpeed={0.68}
       autoRotate={preset === "orbit"}
-      autoRotateSpeed={0.75}
-      minPolarAngle={0.14}
-      maxPolarAngle={Math.PI * 0.47}
+      autoRotateSpeed={1.65}
+      minPolarAngle={0.22}
+      maxPolarAngle={Math.PI * 0.39}
       onStart={() => {
         draggingRef.current = true;
         transitioningRef.current = false;
+        lastInteractElapsedRef.current = elapsedRef.current;
       }}
       onEnd={() => {
         draggingRef.current = false;
+        lastInteractElapsedRef.current = elapsedRef.current;
       }}
       touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
     />
@@ -124,7 +162,6 @@ function buildScenarioCurve(scenarioId: string, lastActiveIdx: number): THREE.Ca
   const endX = STATION_X[Math.max(0, Math.min(5, lastActiveIdx))] ?? 4.0;
 
   if (scenarioId === "cache-hit") {
-    // Flows into 04 ONNX Cache (x = +0.8), then returns fast over an elevated emerald bypass arc
     return new THREE.CatmullRomCurve3([
       new THREE.Vector3(-4.2, 0.46, 0),
       new THREE.Vector3(-2.4, 0.46, 0),
@@ -139,7 +176,7 @@ function buildScenarioCurve(scenarioId: string, lastActiveIdx: number): THREE.Ca
   if (scenarioId === "breaker-open" || scenarioId === "budget-cutoff" || scenarioId === "nli-refusal") {
     return new THREE.CatmullRomCurve3([
       new THREE.Vector3(-4.2, 0.46, 0),
-      new THREE.Vector3(((-4.2 + endX) * 0.5), 0.46, 0),
+      new THREE.Vector3((-4.2 + endX) * 0.5, 0.46, 0),
       new THREE.Vector3(endX, 0.5, 0),
       new THREE.Vector3(endX + 0.35, 0.22, 0.55),
       new THREE.Vector3(endX + 0.55, -0.18, 0.95),
@@ -206,7 +243,7 @@ function InstancedPacketStream({
     elapsedRef.current += dt;
 
     const speed =
-      (scenarioId === "cache-hit" ? 0.34 : scenarioId === "hitl-replan" ? 0.24 : 0.28) *
+      (scenarioId === "cache-hit" ? 0.36 : scenarioId === "hitl-replan" ? 0.26 : 0.3) *
       rpsMultiplier;
 
     for (let i = 0; i < TOKEN_COUNT; i++) {
@@ -231,15 +268,13 @@ function InstancedPacketStream({
 
   return (
     <group>
-      {/* Smooth Illuminated Conduit Spine */}
       <mesh>
         <tubeGeometry args={[curve, 64, 0.022, 10, false]} />
         <meshBasicMaterial color={statusColor} transparent opacity={0.34} />
       </mesh>
 
-      {/* Directional Micro-Packet Capsules */}
       <instancedMesh ref={meshRef} args={[undefined, undefined, TOKEN_COUNT]}>
-        <capsuleGeometry args={[0.032, 0.11, 6, 12]} />
+        <capsuleGeometry args={[0.032, 0.11, 6, 10]} />
         <meshBasicMaterial color={statusColor} toneMapped={false} />
       </instancedMesh>
     </group>
@@ -284,7 +319,11 @@ function StationPedestal({
       );
     }
     if (ringRef.current) {
-      const targetScale = isFocused ? 1.15 : isActive ? 1.0 + Math.sin(elapsedRef.current * 3 + pulsePhase) * 0.08 : 0.7;
+      const targetScale = isFocused
+        ? 1.15
+        : isActive
+          ? 1.0 + Math.sin(elapsedRef.current * 3 + pulsePhase) * 0.08
+          : 0.7;
       const next = THREE.MathUtils.damp(ringRef.current.scale.x, targetScale, 8, dt);
       ringRef.current.scale.set(next, next, 1);
     }
@@ -292,7 +331,6 @@ function StationPedestal({
 
   return (
     <group position={[x, 0.12, 0]}>
-      {/* Ground Halo Ring */}
       <mesh ref={ringRef} position={[0, -0.34, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.52, 0.59, 32]} />
         <meshBasicMaterial
@@ -307,7 +345,7 @@ function StationPedestal({
         <RoundedBox
           args={[0.94, isActive ? 0.64 : 0.4, 0.94]}
           radius={0.08}
-          smoothness={4}
+          smoothness={3}
           onClick={(e) => {
             e.stopPropagation();
             onSelect?.();
@@ -331,7 +369,6 @@ function StationPedestal({
           />
         </RoundedBox>
 
-        {/* Top Telemetry Cap */}
         <mesh position={[0, isActive ? 0.335 : 0.215, 0]}>
           <boxGeometry args={[0.78, 0.04, 0.78]} />
           <meshBasicMaterial
@@ -394,7 +431,6 @@ function PipelineDioramaScene({
 
       <CameraRigController preset={cameraPreset} presetTrigger={presetTrigger} />
 
-      {/* Ground Telemetry Chassis */}
       <mesh position={[0, -0.35, 0]}>
         <boxGeometry args={[9.8, 0.08, 2.5]} />
         <meshStandardMaterial color="#141A23" roughness={0.6} metalness={0.25} />
@@ -402,7 +438,6 @@ function PipelineDioramaScene({
 
       <gridHelper args={[11, 20, "#243242", "#17202B"]} position={[0, -0.3, 0]} />
 
-      {/* Inactive Reference Rail */}
       <mesh position={[0, 0.44, 0]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.015, 0.015, 8.4, 10]} />
         <meshBasicMaterial
@@ -412,7 +447,6 @@ function PipelineDioramaScene({
         />
       </mesh>
 
-      {/* Station Pedestals */}
       {stages.map((stage, idx) => {
         const isActive = activeStages.includes(stage.id);
         const isFocused = focusedStageId === stage.id;
@@ -443,7 +477,7 @@ function PipelineDioramaScene({
 }
 
 /**
- * Interactive 3D pipeline diorama with smooth damping camera presets (Isometric, Top, Orbit),
+ * Interactive 3D pipeline diorama with smooth camera presets (Isometric, Top, Orbit),
  * directional telemetry capsules, and a zero-GPU interactive 2D vector schematic fallback.
  */
 export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {

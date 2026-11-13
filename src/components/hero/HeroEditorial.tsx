@@ -2,13 +2,14 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useRef, useState, type PointerEvent } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ArrowDownRight, ArrowUpRight, FilePdf } from "@phosphor-icons/react";
 import { profile } from "@/data/site";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { FloatingProjectStack3D } from "./FloatingProjectStack3D";
+import { HeroCursorField } from "./HeroCursorField";
 
 gsap.registerPlugin(useGSAP);
 
@@ -20,9 +21,9 @@ const LazyHeroOrbitalCore3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[320px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/60 sm:h-[380px] lg:h-[420px]">
+      <div className="flex h-[320px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/40 sm:h-[380px] lg:h-[420px]">
         <span className="font-mono text-xs uppercase tracking-[0.16em] text-[#8B949E]">
-          Loading 3D Core...
+          Initializing Orbital Stage...
         </span>
       </div>
     ),
@@ -37,7 +38,8 @@ const HERO_PROOF = [
 
 /**
  * Clean, spacious above-the-fold Hero section optimized for 1366x768+ laptops:
- * focused identity + 3 high-signal metrics paired with interactive 3D Orbital Core.
+ * focused identity + interactive cursor precision lattice + 3 high-signal metrics
+ * paired with an interactive 3D/2D Orbital Core.
  */
 export function HeroEditorial() {
   const [activeSystemIndex, setActiveSystemIndex] = useState(0);
@@ -59,27 +61,45 @@ export function HeroEditorial() {
     { scope: heroRef }
   );
 
+  const handleMetricMove = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === "touch") return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    event.currentTarget.style.setProperty("--mouse-x", `${event.clientX - rect.left}px`);
+    event.currentTarget.style.setProperty("--mouse-y", `${event.clientY - rect.top}px`);
+  };
+
   return (
     <section
       ref={heroRef}
       id="hero"
-      className="relative flex min-h-[100dvh] items-center border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] pt-24 pb-10 sm:pt-28 sm:pb-12"
+      className="relative z-[2] flex min-h-[100dvh] items-center overflow-hidden border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] pt-20 pb-10 sm:pt-24 sm:pb-12"
     >
-      <div className="relative mx-auto w-full max-w-[1400px] px-4 sm:px-8">
+      {/* Interactive Cursor-Reactive Precision Lattice Field */}
+      <HeroCursorField containerRef={heroRef} />
+
+      {/* Subtle Bottom Edge Vignette */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-28 bg-gradient-to-t from-[#0D1117] to-transparent"
+      />
+
+      <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 sm:px-8">
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-12">
           {/* Left 7 Cols: Focused Editorial Identity */}
-          <div className="lg:col-span-7">
+          <div className="min-w-0 lg:col-span-7">
             <p
               data-hero-stagger
-              className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3.5 py-1 font-mono text-xs uppercase tracking-[0.15em] text-[#7DD3FC]"
+              className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22]/75 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#9DA7B3] backdrop-blur-sm sm:text-[11px] sm:tracking-[0.15em]"
             >
-              <span className="h-2 w-2 rounded-full bg-[#10B981]" aria-hidden="true" />
-              <span>{profile.role} · FlyRank Intern · {profile.utc}</span>
+              <span className="h-2 w-2 shrink-0 rounded-full bg-[#10B981]" aria-hidden="true" />
+              <span>
+                {profile.role} · FlyRank Intern · {profile.utc}
+              </span>
             </p>
 
             <h1
               data-hero-stagger
-              className="mt-5 max-w-5xl font-display text-[clamp(3rem,6.5vw,5.4rem)] font-bold uppercase leading-[0.93] tracking-[-0.02em] text-[#E6EDF3]"
+              className="mt-5 max-w-5xl font-display text-[clamp(2.45rem,6.4vw,5.5rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
             >
               RELIABLE{" "}
               <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
@@ -111,7 +131,7 @@ export function HeroEditorial() {
                 href={profile.resume}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22] px-5 py-2.5 font-mono text-xs uppercase tracking-[0.14em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8]"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22]/90 px-5 py-2.5 font-mono text-xs uppercase tracking-[0.14em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8]"
               >
                 <FilePdf className="h-4 w-4 text-[#38BDF8]" weight="regular" aria-hidden="true" />
                 <span>Resume</span>
@@ -126,7 +146,7 @@ export function HeroEditorial() {
               </Link>
             </div>
 
-            <div className="mt-9 grid max-w-xl grid-cols-3 gap-3 border-t border-[rgba(240,246,252,0.08)] pt-6">
+            <div className="mt-9 grid max-w-xl grid-cols-3 gap-2 border-t border-[rgba(240,246,252,0.08)] pt-6 sm:gap-3">
               {HERO_PROOF.map((stat) => {
                 const isSelected = activeSystemIndex === stat.systemIdx;
                 return (
@@ -134,17 +154,24 @@ export function HeroEditorial() {
                     key={stat.label}
                     type="button"
                     onClick={() => setActiveSystemIndex(stat.systemIdx)}
+                    onPointerMove={handleMetricMove}
                     aria-pressed={isSelected}
-                    className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                    className={`spotlight-card relative min-w-0 overflow-hidden rounded-xl border px-2.5 py-2.5 text-left transition-all duration-200 sm:px-3.5 sm:py-3 ${
                       isSelected
-                        ? "border-[#38BDF8]/40 bg-[#38BDF8]/10"
-                        : "border-transparent hover:border-[rgba(240,246,252,0.1)] hover:bg-[#161B22]/60"
+                        ? "border-[#38BDF8]/45 bg-[#38BDF8]/10"
+                        : "border-[rgba(240,246,252,0.08)] bg-[#161B22]/45 hover:border-[rgba(240,246,252,0.18)] hover:bg-[#161B22]/80"
                     }`}
                   >
-                    <span className="block font-display text-2xl font-bold leading-none text-[#E6EDF3] tabular-nums sm:text-3xl">
+                    <span
+                      aria-hidden="true"
+                      className={`absolute inset-x-0 top-0 h-[2px] bg-[#38BDF8] transition-opacity duration-200 ${
+                        isSelected ? "opacity-100" : "opacity-0"
+                      }`}
+                    />
+                    <span className="block font-display text-xl font-bold leading-none text-[#E6EDF3] tabular-nums sm:text-3xl">
                       {stat.value}
                     </span>
-                    <span className="mt-1.5 block font-mono text-xs text-[#8B949E]">
+                    <span className="mt-1.5 block truncate font-mono text-[10px] text-[#8B949E] sm:text-[11px]">
                       {stat.label}
                     </span>
                   </button>
@@ -153,8 +180,8 @@ export function HeroEditorial() {
             </div>
           </div>
 
-          {/* Right 5 Cols: Interactive 3D Stage + Compact Switcher Bar */}
-          <div className="flex flex-col gap-3 lg:col-span-5">
+          {/* Right 5 Cols: Interactive 3D/2D Orbital Stage + Compact Switcher Bar */}
+          <div className="flex min-w-0 flex-col gap-3 lg:col-span-5">
             <LazyHeroOrbitalCore3D
               activeSystemIndex={activeSystemIndex}
               onSelectSystem={setActiveSystemIndex}

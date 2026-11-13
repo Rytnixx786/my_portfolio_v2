@@ -54,13 +54,22 @@ export function ViewportCanvas({
     const el = containerRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
 
+    const rect = el.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    if (rect.bottom >= -100 && rect.top <= vh + 100) {
+      setNearView(true);
+    }
+    if (rect.bottom >= -40 && rect.top <= vh + 40) {
+      setInView(true);
+    }
+
     const nearObserver = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           setNearView(entry.isIntersecting);
         }
       },
-      { rootMargin: "480px 0px" }
+      { rootMargin: "100px 0px" }
     );
 
     const activeObserver = new IntersectionObserver(

@@ -19,9 +19,11 @@ interface StackRack3DProps {
 function RackCameraFit({
   totalRows,
   draggingRef,
+  controlsRef,
 }: {
   totalRows: number;
   draggingRef: React.MutableRefObject<boolean>;
+  controlsRef: React.RefObject<React.ComponentRef<typeof OrbitControls> | null>;
 }) {
   const { camera, frameloop, invalidate } = useThree();
   const target = useMemo(
@@ -31,24 +33,34 @@ function RackCameraFit({
         : new THREE.Vector3(0, 2.55, 3.55),
     [totalRows]
   );
+  const lookTarget = useMemo(() => new THREE.Vector3(0, 0.08, 0), []);
   const settlingRef = useRef(true);
+  const elapsedRef = useRef(0);
 
   useEffect(() => {
     settlingRef.current = true;
+    elapsedRef.current = 0;
     if (frameloop === "demand") {
       camera.position.copy(target);
-      camera.lookAt(0, 0.08, 0);
+      if (controlsRef.current) {
+        controlsRef.current.target.copy(lookTarget);
+        controlsRef.current.update();
+      }
     }
     invalidate();
-  }, [camera, target, frameloop, invalidate]);
+  }, [camera, target, lookTarget, frameloop, invalidate, controlsRef]);
 
   useFrame((state, delta) => {
     if (!settlingRef.current || draggingRef.current) return;
     const dt = Math.min(delta, 0.05);
+    elapsedRef.current += dt;
     const cam = state.camera;
     cam.position.lerp(target, 1 - Math.exp(-6 * dt));
-    cam.lookAt(0, 0.08, 0);
-    if (cam.position.distanceTo(target) < 0.02) {
+    if (controlsRef.current) {
+      controlsRef.current.target.lerp(lookTarget, 1 - Math.exp(-6 * dt));
+      controlsRef.current.update();
+    }
+    if (cam.position.distanceTo(target) < 0.04 || elapsedRef.current > 0.7) {
       settlingRef.current = false;
     }
   });
@@ -168,7 +180,7 @@ function StackRack2DFallback({
   onSelectTool,
 }: StackRack3DProps & { accentHue: string }) {
   return (
-    <div className="relative flex h-full w-full flex-col justify-between bg-[#0D1117] p-4 pt-10">
+    <div className="relative flex h-full w-full flex-col justify-between bg-[#0D1117] p-3.5 pt-9 sm:p-4 sm:pt-10">
       {/* Subtle Architectural Matrix Dots */}
       <div
         aria-hidden="true"
@@ -181,10 +193,10 @@ function StackRack2DFallback({
       />
 
       <span className="pointer-events-none absolute right-3 top-2.5 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B949E]">
-        2D Safe · Keycap Matrix
+        2D Safe · Keycaps
       </span>
 
-      <div className="relative z-10 my-auto grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+      <div className="relative z-10 my-auto grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5">
         {tools.map((tool, idx) => {
           const isPicked = selectedTool === tool;
           return (
@@ -197,9 +209,9 @@ function StackRack2DFallback({
                 borderColor: isPicked ? accentHue : "rgba(240,246,252,0.12)",
                 boxShadow: isPicked
                   ? `0 0 0 1px ${accentHue}55, inset 0 2px 0 rgba(255,255,255,0.08)`
-                  : "0 4px 0 #090C10, inset 0 1px 0 rgba(255,255,255,0.06)",
+                  : "0 3px 0 #090C10, inset 0 1px 0 rgba(255,255,255,0.06)",
               }}
-              className={`group flex min-h-[54px] flex-col justify-between rounded-xl border bg-[#161B22] px-3 py-2 text-left transition-all duration-150 ${
+              className={`group flex min-h-[44px] flex-col justify-between rounded-xl border bg-[#161B22] px-2.5 py-1.5 text-left transition-all duration-150 sm:min-h-[50px] sm:px-3 sm:py-2 ${
                 isPicked
                   ? "translate-y-[2px] bg-[#1C2634]"
                   : "hover:border-[rgba(240,246,252,0.28)] hover:bg-[#1C222B]"
@@ -254,6 +266,7 @@ export function StackRack3D({
   const layerIdx = Math.max(0, Number.parseInt(layerCode, 10) - 1) % STACK_LAYER_HUES.length;
   const accentHue = STACK_LAYER_HUES[layerIdx] ?? STACK_LAYER_HUES[0];
   const draggingRef = useRef(false);
+  const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
 
   useEffect(() => {
     return () => {
@@ -274,7 +287,7 @@ export function StackRack3D({
   const baseD = totalRows * zSpacing + 0.55;
 
   return (
-    <div className="relative h-[225px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[255px]">
+    <div className="relative h-[290px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[265px]">
       <div className="pointer-events-none absolute left-3 top-2.5 z-30 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3]">
         <span className="font-semibold" style={{ color: accentHue }}>
           {layerCode}
@@ -297,7 +310,11 @@ export function StackRack3D({
         }
         className="h-full w-full"
       >
-        <RackCameraFit totalRows={totalRows} draggingRef={draggingRef} />
+        <RackCameraFit
+          totalRows={totalRows}
+          draggingRef={draggingRef}
+          controlsRef={controlsRef}
+        />
         <ambientLight intensity={0.62} />
         <hemisphereLight args={["#B8D9FF", "#0D1117", 1.0]} />
         <directionalLight position={[2, 7, 5]} intensity={1.3} color="#E6EDF3" />
@@ -322,11 +339,13 @@ export function StackRack3D({
         ))}
 
         <OrbitControls
+          ref={controlsRef}
+          target={[0, 0.08, 0]}
           enableZoom={false}
           enablePan={false}
           enableDamping
-          dampingFactor={0.055}
-          rotateSpeed={0.6}
+          dampingFactor={0.07}
+          rotateSpeed={0.62}
           minPolarAngle={0.45}
           maxPolarAngle={Math.PI * 0.42}
           onStart={() => {

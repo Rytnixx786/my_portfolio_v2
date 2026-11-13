@@ -185,8 +185,8 @@ function Globe2DFallback({
   const dhaka = { x: 184, y: 122 };
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center bg-[#0D1117] px-3 pb-10 pt-8">
-      <span className="pointer-events-none absolute right-2.5 top-2.5 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B949E]">
+    <div className="relative flex h-full w-full items-center justify-center bg-[#0D1117] px-3 pb-11 pt-9">
+      <span className="pointer-events-none absolute bottom-12 right-2.5 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B949E]">
         2D Safe · Graticule
       </span>
 
@@ -264,6 +264,12 @@ function Globe2DFallback({
                 )}
               </path>
 
+              {isSelected && (
+                <circle r="3.4" fill={region.hue}>
+                  <animateMotion dur="1.6s" repeatCount="indefinite" path={pathD} />
+                </circle>
+              )}
+
               <circle
                 cx={region.svgPos.x}
                 cy={region.svgPos.y}
@@ -339,8 +345,8 @@ export function TelemetryGlobe3D() {
           enableZoom={false}
           enablePan={false}
           enableDamping
-          dampingFactor={0.055}
-          rotateSpeed={0.6}
+          dampingFactor={0.07}
+          rotateSpeed={0.65}
           onStart={() => {
             draggingRef.current = true;
           }}

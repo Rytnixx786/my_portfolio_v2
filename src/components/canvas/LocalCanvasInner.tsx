@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { PerformanceMonitor } from "@react-three/drei";
 import * as THREE from "three";
 
 // Filter upstream @react-three/fiber internal THREE.Clock deprecation noise on Three r183+
@@ -33,8 +32,8 @@ function configureThreeConsole() {
 configureThreeConsole();
 
 /**
- * Ensures vertical touch scrolling never gets trapped by OrbitControls' default touch-action: none,
- * and triggers an immediate demand frame when activeLoop state flips.
+ * Triggers an immediate demand frame and keeps frameloop synchronized
+ * when activeLoop flips between paused (offscreen) and active (onscreen).
  */
 function CanvasLifecycle({ activeLoop }: { activeLoop: boolean }) {
   const setFrameloop = useThree((s) => s.setFrameloop);
@@ -61,7 +60,6 @@ export function LocalCanvasInner({
   dpr,
   antialias,
   activeLoop,
-  onDecline,
   onContextLost,
   onContextRestored,
 }: {
@@ -71,13 +69,11 @@ export function LocalCanvasInner({
   dpr: [number, number];
   antialias: boolean;
   activeLoop: boolean;
-  onDecline: () => void;
+  onDecline?: () => void;
   onContextLost: () => void;
   onContextRestored: () => void;
 }) {
   const unmountingRef = useRef(false);
-  const [dprClamped, setDprClamped] = useState(false);
-  const effectiveDpr: [number, number] = dprClamped ? [1, 1.15] : dpr;
 
   useLayoutEffect(() => {
     unmountingRef.current = false;
@@ -89,7 +85,7 @@ export function LocalCanvasInner({
   return (
     <Canvas
       className="r3f-local-canvas"
-      dpr={effectiveDpr}
+      dpr={dpr}
       frameloop={activeLoop ? "always" : "demand"}
       camera={{ position: cameraPosition, fov, near: 0.1, far: 100 }}
       gl={{
@@ -130,13 +126,6 @@ export function LocalCanvasInner({
         touchAction: "pan-y",
       }}
     >
-      <PerformanceMonitor
-        flipflops={3}
-        onDecline={() => {
-          setDprClamped(true);
-          onDecline();
-        }}
-      />
       {children}
       <CanvasLifecycle activeLoop={activeLoop} />
     </Canvas>

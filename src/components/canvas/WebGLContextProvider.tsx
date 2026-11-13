@@ -125,7 +125,7 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
     return resolveEffectiveTier(preference, hardwareTier, webglSupported);
   }, [hasMounted, preference, hardwareTier, webglSupported]);
 
-  const maxSlots = effectiveTier === "high" ? 8 : effectiveTier === "mid" ? 6 : 0;
+  const maxSlots = effectiveTier === "high" ? 3 : effectiveTier === "mid" ? 2 : 0;
 
   const activeSlotIds = useMemo<ReadonlySet<string>>(() => {
     if (maxSlots <= 0 || slotOrder.length === 0) {

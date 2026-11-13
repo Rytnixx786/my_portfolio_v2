@@ -287,6 +287,46 @@ function AresGateSculpture({
   );
 }
 
+function TopologySlotFallback({ slug }: { slug: string }) {
+  const accent =
+    slug === "cinch"
+      ? CATEGORY_HUES["Inference & Serving"].hex
+      : slug === "nexus-researcher"
+        ? CATEGORY_HUES["Agents & RAG"].hex
+        : CATEGORY_HUES["MLOps & Security"].hex;
+
+  return (
+    <div
+      className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[#0D1117] px-4"
+      style={{
+        backgroundImage:
+          "radial-gradient(rgba(240, 246, 252, 0.07) 1px, transparent 1px)",
+        backgroundSize: "20px 20px",
+      }}
+    >
+      <svg viewBox="0 0 280 96" className="w-full max-w-[260px]" aria-hidden="true">
+        <path
+          d="M 28 52 Q 86 18 140 48 T 252 44"
+          fill="none"
+          stroke={accent}
+          strokeOpacity="0.55"
+          strokeWidth="2"
+          strokeDasharray="5 5"
+        />
+        {[28, 96, 178, 252].map((cx, i) => (
+          <g key={cx} transform={`translate(${cx}, ${i % 2 === 0 ? 50 : 44})`}>
+            <circle r="10" fill="#161B22" stroke={accent} strokeWidth="1.5" />
+            <circle r="3.5" fill={accent} />
+          </g>
+        ))}
+      </svg>
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B949E]">
+        2D Topology · Scroll into view for live 3D
+      </span>
+    </div>
+  );
+}
+
 /**
  * Interactive 3D mini-labs mounted inside flagship Selected Work cards.
  */
@@ -302,7 +342,12 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
 
   return (
     <div className={`relative h-[225px] w-full overflow-hidden rounded-b-[calc(1.5rem-0.375rem)] sm:h-[260px] ${className}`}>
-      <ViewportCanvas cameraPosition={[0, 0.85, 3.65]} fov={38} className="h-full w-full">
+      <ViewportCanvas
+        cameraPosition={[0, 0.85, 3.65]}
+        fov={38}
+        fallback={<TopologySlotFallback slug={slug} />}
+        className="h-full w-full"
+      >
         <ambientLight intensity={0.5} />
         <hemisphereLight args={["#9CC9FF", "#0D1117", 0.75]} />
         <directionalLight position={[3, 4, 4]} intensity={1.2} color="#E6EDF3" />
@@ -325,8 +370,8 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
           enableZoom={false}
           enablePan={false}
           enableDamping
-          dampingFactor={0.055}
-          rotateSpeed={0.6}
+          dampingFactor={0.07}
+          rotateSpeed={0.65}
           onStart={() => {
             draggingRef.current = true;
           }}

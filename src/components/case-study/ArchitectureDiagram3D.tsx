@@ -273,8 +273,8 @@ function SpatialDagScene({
         minDistance={4.2}
         maxDistance={12}
         enableDamping
-        dampingFactor={0.055}
-        rotateSpeed={0.6}
+        dampingFactor={0.07}
+        rotateSpeed={0.65}
         onStart={() => {
           draggingRef.current = true;
           settlingRef.current = false;

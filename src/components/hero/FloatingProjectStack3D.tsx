@@ -33,7 +33,7 @@ export function FloatingProjectStack3D({
       role="region"
       aria-label="Flagship systems quick switcher"
     >
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1">
         {deck.map((item, idx) => {
           const isCurrent = idx === safeIndex;
           return (
