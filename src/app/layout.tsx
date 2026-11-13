@@ -160,7 +160,9 @@ export default function RootLayout({
           <LenisProvider>
             <Navbar />
             <CommandPalette />
-            <main id="main-content">{children}</main>
+            <main id="main-content" className="w-full max-w-full overflow-x-clip">
+              {children}
+            </main>
             <Footer />
             <QualityToggleHUD />
           </LenisProvider>

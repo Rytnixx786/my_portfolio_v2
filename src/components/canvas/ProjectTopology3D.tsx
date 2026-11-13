@@ -56,11 +56,11 @@ function CinchGpuSculpture({
           <mesh>
             <boxGeometry args={[1.38, 0.12, 0.92]} />
             <meshStandardMaterial
-              color={idx === 2 ? "#1C222B" : "#161B22"}
-              emissive={mode === "marlin" ? hue : "#000000"}
-              emissiveIntensity={mode === "marlin" ? 0.22 : 0}
-              roughness={0.35}
-              metalness={0.7}
+              color={idx === 2 ? "#283447" : "#1E2736"}
+              emissive={hue}
+              emissiveIntensity={mode === "marlin" ? 0.34 : 0.08}
+              roughness={0.42}
+              metalness={0.28}
             />
           </mesh>
           <mesh position={[0.66, 0, 0.42]}>
@@ -228,8 +228,8 @@ function AresGateSculpture({ threshold }: { threshold: number }) {
               color={col}
               emissive={col}
               emissiveIntensity={passed ? 0.35 : 0.9}
-              roughness={0.35}
-              metalness={0.6}
+              roughness={0.4}
+              metalness={0.28}
               toneMapped={passed}
             />
           </mesh>
@@ -258,11 +258,12 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
   const [aresThreshold, setAresThreshold] = useState(0.82);
 
   return (
-    <div className={`relative h-[225px] w-full sm:h-[260px] ${className}`}>
+    <div className={`relative h-[225px] w-full overflow-hidden rounded-b-[calc(1.5rem-0.375rem)] sm:h-[260px] ${className}`}>
       <ViewportCanvas cameraPosition={[0, 0.85, 3.65]} fov={38} className="h-full w-full">
-        <ambientLight intensity={0.65} />
-        <directionalLight position={[3, 4, 4]} intensity={1.15} color="#E6EDF3" />
-        <pointLight position={[-2.5, -1.5, 2.5]} intensity={0.85} color={UI_ACCENT} />
+        <ambientLight intensity={0.5} />
+        <hemisphereLight args={["#9CC9FF", "#0D1117", 0.75]} />
+        <directionalLight position={[3, 4, 4]} intensity={1.2} color="#E6EDF3" />
+        <pointLight position={[-2.5, -1.5, 2.5]} intensity={1.35} decay={0} color={UI_ACCENT} />
 
         {slug === "cinch" && <CinchGpuSculpture mode={cinchMode} />}
         {slug === "nexus-researcher" && (
@@ -274,7 +275,13 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
         )}
         {slug === "ares" && <AresGateSculpture threshold={aresThreshold} />}
 
-        <OrbitControls enableZoom={false} enablePan={false} enableDamping dampingFactor={0.08} />
+        <OrbitControls
+          enableZoom={false}
+          enablePan={false}
+          enableDamping
+          dampingFactor={0.08}
+          touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+        />
       </ViewportCanvas>
 
       {/* Bottom Mini-Lab Control Bar */}

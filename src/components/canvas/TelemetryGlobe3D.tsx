@@ -183,7 +183,7 @@ export function TelemetryGlobe3D() {
   const activeRegion = REGIONS.find((r) => r.id === selectedId) ?? REGIONS[0];
 
   return (
-    <div className="relative h-[265px] w-full sm:h-[295px]">
+    <div className="relative h-[265px] w-full overflow-hidden rounded-2xl sm:h-[295px]">
       <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 inline-flex items-center gap-2 rounded-full border border-[#10B981]/40 bg-[#0D1117]/90 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#10B981] backdrop-blur-md">
         <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]" aria-hidden="true" />
         <span>Dhaka · UTC+6</span>
@@ -195,9 +195,10 @@ export function TelemetryGlobe3D() {
         fallback={Globe2DFallback}
         className="h-full w-full"
       >
-        <ambientLight intensity={0.62} />
-        <directionalLight position={[4, 4, 4]} intensity={1.1} color="#E6EDF3" />
-        <pointLight position={[-3, 1.5, 2]} intensity={0.95} color={UI_ACCENT} />
+        <ambientLight intensity={0.5} />
+        <hemisphereLight args={["#9CC9FF", "#0D1117", 0.75]} />
+        <directionalLight position={[4, 4, 4]} intensity={1.15} color="#E6EDF3" />
+        <pointLight position={[-3, 1.5, 2]} intensity={1.35} decay={0} color={UI_ACCENT} />
 
         <GlobeAssembly selectedId={selectedId} onSelect={setSelectedId} />
 
@@ -206,6 +207,7 @@ export function TelemetryGlobe3D() {
           enablePan={false}
           enableDamping
           dampingFactor={0.07}
+          touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
         />
       </ViewportCanvas>
 

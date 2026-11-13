@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties, type PointerEvent } from "react";
 import Link from "next/link";
 import { ArrowUpRight, FunnelSimple } from "@phosphor-icons/react";
 import {
@@ -55,7 +55,7 @@ export function SelectedWorkSection() {
   return (
     <section
       id="work"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-20 sm:py-28"
+      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-24 sm:py-32"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
@@ -134,17 +134,34 @@ export function SelectedWorkSection() {
           </div>
         </SectionReveal>
 
-        <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="mt-10 grid grid-flow-dense grid-cols-1 gap-6 lg:grid-cols-12">
           {visibleProjects.map(({ project, num }, position) => {
             const isHeroFeature = position === 0;
             const spanClass = getCardSpanClass(position, visibleProjects.length);
             const hue = getCategoryHue(project.category);
 
+            const handleSpotlightMove = (event: PointerEvent<HTMLDivElement>) => {
+              if (event.pointerType === "touch") return;
+              const rect = event.currentTarget.getBoundingClientRect();
+              event.currentTarget.style.setProperty(
+                "--mouse-x",
+                `${event.clientX - rect.left}px`
+              );
+              event.currentTarget.style.setProperty(
+                "--mouse-y",
+                `${event.clientY - rect.top}px`
+              );
+            };
+
             return (
               <div key={project.slug} className={spanClass}>
                 <SectionReveal delayMs={Math.min(position * 60, 180)}>
                   <article className="double-bezel-outer group h-full transition-colors duration-300 hover:border-[rgba(240,246,252,0.22)]">
-                    <div className="double-bezel-core flex h-full flex-col justify-between p-5 sm:p-7">
+                    <div
+                      onPointerMove={handleSpotlightMove}
+                      style={{ "--spotlight-color": hue.softBg } as CSSProperties}
+                      className="double-bezel-core spotlight-card flex h-full flex-col justify-between overflow-hidden p-5 sm:p-7"
+                    >
                       <div className={isHeroFeature ? "grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-center" : "flex flex-col gap-6"}>
                         <div className={isHeroFeature ? "lg:col-span-6" : ""}>
                           <div className="flex flex-wrap items-center justify-between gap-2">

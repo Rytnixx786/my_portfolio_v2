@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
 import { ArrowUpRight, ChartBar, Terminal } from "@phosphor-icons/react";
 import { experience, lab, measurementProtocol } from "@/data/site";
 import { SectionReveal } from "./SectionReveal";
 
-gsap.registerPlugin(ScrollTrigger);
+gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 export function ExperienceSection() {
   const [activeLabIdx, setActiveLabIdx] = useState(0);
@@ -16,35 +17,33 @@ export function ExperienceSection() {
   const pinScopeRef = useRef<HTMLDivElement>(null);
   const dialRingRef = useRef<SVGCircleElement>(null);
 
-  useEffect(() => {
-    const scope = pinScopeRef.current;
-    const ring = dialRingRef.current;
-    if (!scope || !ring) return;
+  useGSAP(
+    () => {
+      const scope = pinScopeRef.current;
+      const ring = dialRingRef.current;
+      if (!scope || !ring) return;
 
-    const reduced =
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    if (reduced) return;
-
-    const ctx = gsap.context(() => {
-      gsap.to(ring, {
-        strokeDashoffset: 0,
-        ease: "none",
-        scrollTrigger: {
-          trigger: scope,
-          start: "top 80%",
-          end: "bottom 60%",
-          scrub: 0.4,
-        },
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.to(ring, {
+          strokeDashoffset: 0,
+          ease: "none",
+          scrollTrigger: {
+            trigger: scope,
+            start: "top 80%",
+            end: "bottom 60%",
+            scrub: 0.4,
+          },
+        });
       });
-    }, scope);
-
-    return () => ctx.revert();
-  }, []);
+    },
+    { scope: pinScopeRef }
+  );
 
   return (
     <section
       id="experience"
-      className="border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-20 sm:py-28"
+      className="border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-24 sm:py-32"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         {/* Track Record + SVG Chronology Dial */}
@@ -98,8 +97,16 @@ export function ExperienceSection() {
 
           <div className="space-y-4 lg:col-span-8">
             {experience.map((item) => (
-              <div key={item.org} className="double-bezel-outer">
-                <div className="double-bezel-core p-6 sm:p-7">
+              <div key={item.org} className="double-bezel-outer transition-colors duration-300 hover:border-[rgba(240,246,252,0.22)]">
+                <div
+                  onPointerMove={(e) => {
+                    if (e.pointerType === "touch") return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    e.currentTarget.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
+                    e.currentTarget.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
+                  }}
+                  className="double-bezel-core spotlight-card p-6 sm:p-7"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-mono text-xs uppercase tracking-[0.14em] text-[#38BDF8]">
                       {item.period} · {item.focus}

@@ -22,7 +22,7 @@ interface HeroOrbitalCore3DProps {
 }
 
 /**
- * Interactive particle lattice embedded behind the Orbital Core inside the same single View,
+ * Interactive particle lattice embedded behind the Orbital Core inside the same View,
  * responding smoothly to pointer proximity and click shockwaves (uRipples[4]).
  */
 function RipplingInferenceLattice({
@@ -51,7 +51,7 @@ function RipplingInferenceLattice({
         positions[i * 3] = u * 8.4;
         positions[i * 3 + 1] = v * 5.6;
         positions[i * 3 + 2] = -2.2;
-        scales[i] = ((c + r) % 3 === 0 ? 2.1 : 1.35);
+        scales[i] = (c + r) % 3 === 0 ? 2.1 : 1.35;
         i++;
       }
     }
@@ -158,16 +158,18 @@ function RipplingInferenceLattice({
 }
 
 /**
- * Portrait holographic slab with aspect-preserving object-cover UV math so the
- * square/portrait photograph never stretches across container geometries.
+ * Portrait holographic slab with SDF-rounded corners and aspect-preserving object-cover UV math
+ * so neither the portrait plane nor the perimeter glow ever pokes outside the rounded bezel.
  */
 function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
   const [imgAspect, setImgAspect] = useState(1);
   const shaderRef = useRef<THREE.ShaderMaterial>(null);
+  const rimRef = useRef<THREE.ShaderMaterial>(null);
   const textureRef = useRef<THREE.Texture | null>(null);
   const imgAspectRef = useRef(1);
   const accentHueRef = useRef(accentHue);
+  const { invalidate } = useThree();
 
   useEffect(() => {
     let active = true;
@@ -187,6 +189,7 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
         loaded.minFilter = THREE.LinearFilter;
         loaded.magFilter = THREE.LinearFilter;
         setTexture(loaded);
+        invalidate();
       },
       undefined,
       () => {
@@ -197,7 +200,7 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [invalidate]);
 
   useEffect(() => {
     return () => {
@@ -208,7 +211,13 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
   useEffect(() => {
     textureRef.current = texture;
     imgAspectRef.current = imgAspect;
-  }, [texture, imgAspect]);
+    if (shaderRef.current) {
+      shaderRef.current.uniforms.uMap.value = texture;
+      shaderRef.current.uniforms.uHasMap.value = texture ? 1.0 : 0.0;
+      shaderRef.current.uniforms.uImgAspect.value = imgAspect;
+    }
+    invalidate();
+  }, [texture, imgAspect, invalidate]);
 
   useEffect(() => {
     accentHueRef.current = accentHue;
@@ -220,39 +229,85 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
       uHasMap: { value: 0.0 },
       uTime: { value: 0 },
       uAccent: { value: new THREE.Color(HERO_ORBIT_HUES[0]) },
-      uPlaneAspect: { value: 1.98 / 2.26 },
+      uPlaneAspect: { value: 1.94 / 2.22 },
       uImgAspect: { value: 1.0 },
     }),
     []
   );
 
+  const rimUniforms = useMemo(
+    () => ({
+      uAccent: { value: new THREE.Color(HERO_ORBIT_HUES[0]) },
+      uTime: { value: 0 },
+    }),
+    []
+  );
+
   useFrame((state) => {
+    const t = state.clock.elapsedTime;
     if (shaderRef.current) {
-      shaderRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      shaderRef.current.uniforms.uTime.value = t;
       shaderRef.current.uniforms.uMap.value = textureRef.current;
       shaderRef.current.uniforms.uHasMap.value = textureRef.current ? 1.0 : 0.0;
       shaderRef.current.uniforms.uImgAspect.value = imgAspectRef.current;
       shaderRef.current.uniforms.uAccent.value.set(accentHueRef.current);
     }
+    if (rimRef.current) {
+      rimRef.current.uniforms.uTime.value = t;
+      rimRef.current.uniforms.uAccent.value.set(accentHueRef.current);
+    }
   });
 
   return (
     <group>
-      <RoundedBox args={[2.14, 2.42, 0.16]} radius={0.14} smoothness={4}>
-        <meshStandardMaterial color="#151B24" roughness={0.28} metalness={0.82} />
+      {/* Machined Rounded Bezel */}
+      <RoundedBox args={[2.14, 2.42, 0.16]} radius={0.14} smoothness={6}>
+        <meshStandardMaterial color="#18202B" roughness={0.3} metalness={0.55} />
       </RoundedBox>
 
-      {/* Luminous Perimeter Trim (HDR > 1 for selective Bloom) */}
+      {/* SDF Rounded Perimeter Glow Halo (no sharp rectangular corners) */}
       <mesh position={[0, 0, -0.02]}>
-        <planeGeometry args={[2.22, 2.5]} />
-        <meshBasicMaterial color={accentHue} transparent opacity={0.14} />
+        <planeGeometry args={[2.32, 2.6]} />
+        <shaderMaterial
+          ref={rimRef}
+          uniforms={rimUniforms}
+          transparent
+          depthWrite={false}
+          vertexShader={`
+            varying vec2 vUv;
+            void main() {
+              vUv = uv;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `}
+          fragmentShader={`
+            uniform vec3 uAccent;
+            uniform float uTime;
+            varying vec2 vUv;
+
+            float sdRoundedBox(vec2 p, vec2 b, float r) {
+              vec2 q = abs(p) - b + r;
+              return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+            }
+
+            void main() {
+              vec2 p = (vUv - 0.5) * vec2(2.32, 2.6);
+              float d = sdRoundedBox(p, vec2(1.08, 1.22), 0.15);
+              float ring = exp(-abs(d) * 34.0) * (0.42 + 0.12 * sin(uTime * 1.8));
+              if (ring < 0.01) discard;
+              gl_FragColor = vec4(uAccent, clamp(ring, 0.0, 0.45));
+            }
+          `}
+        />
       </mesh>
 
-      <mesh position={[0, 0, 0.092]}>
-        <planeGeometry args={[1.98, 2.26]} />
+      {/* Front Portrait Shader with SDF Rounded Cutout */}
+      <mesh position={[0, 0, 0.088]}>
+        <planeGeometry args={[1.94, 2.22]} />
         <shaderMaterial
           ref={shaderRef}
           uniforms={uniforms}
+          transparent
           vertexShader={`
             varying vec2 vUv;
             void main() {
@@ -269,6 +324,11 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
             uniform float uImgAspect;
             varying vec2 vUv;
 
+            float sdRoundedBox(vec2 p, vec2 b, float r) {
+              vec2 q = abs(p) - b + r;
+              return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+            }
+
             vec2 coverUv(vec2 uv, float planeAspect, float imgAspect) {
               vec2 s = vec2(1.0);
               if (imgAspect > planeAspect) {
@@ -280,34 +340,37 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
             }
 
             void main() {
+              vec2 p = (vUv - 0.5) * vec2(1.94, 2.22);
+              float d = sdRoundedBox(p, vec2(0.955, 1.095), 0.105);
+              float mask = 1.0 - smoothstep(-0.008, 0.008, d);
+              if (mask < 0.01) discard;
+
               vec3 col = vec3(0.086, 0.106, 0.133);
               if (uHasMap > 0.5) {
                 vec2 uvCover = coverUv(vUv, uPlaneAspect, uImgAspect);
                 vec4 texel = texture2D(uMap, uvCover);
                 col = texel.rgb;
-                float scan = sin(vUv.y * 160.0 - uTime * 2.0) * 0.012;
-                col += scan * uAccent * 0.5;
-                vec2 centered = vUv - 0.5;
-                float edge = smoothstep(0.35, 0.52, max(abs(centered.x), abs(centered.y)));
-                col = mix(col, mix(col, uAccent, 0.45), edge * 0.42);
+                float scan = sin(vUv.y * 160.0 - uTime * 2.0) * 0.01;
+                col += scan * uAccent * 0.45;
+                float rim = smoothstep(-0.08, 0.0, d);
+                col = mix(col, mix(col, uAccent, 0.45), rim * 0.5);
               }
-              gl_FragColor = vec4(col, 1.0);
+              gl_FragColor = vec4(col, mask);
             }
           `}
         />
       </mesh>
 
-      {/* Rear Telemetry Plate */}
-      <mesh position={[0, 0, -0.092]} rotation={[0, Math.PI, 0]}>
-        <planeGeometry args={[1.92, 2.2]} />
+      {/* Rear Telemetry Plate (rounded to match front bezel) */}
+      <RoundedBox args={[1.9, 2.18, 0.02]} radius={0.1} smoothness={4} position={[0, 0, -0.082]}>
         <meshStandardMaterial
           color="#10151C"
-          roughness={0.45}
-          metalness={0.55}
+          roughness={0.42}
+          metalness={0.45}
           emissive={accentHue}
           emissiveIntensity={0.08}
         />
-      </mesh>
+      </RoundedBox>
     </group>
   );
 }
@@ -378,10 +441,11 @@ function HeroOrbitalScene({
 
   return (
     <group onClick={handleStageClick}>
-      <ambientLight intensity={0.68} />
+      <ambientLight intensity={0.55} />
+      <hemisphereLight args={["#9CC9FF", "#0D1117", 0.75]} />
       <directionalLight position={[4, 5, 5]} intensity={1.35} color="#E6EDF3" />
-      <pointLight position={[-3.2, -1.8, 3.2]} intensity={1.15} color={activeSystem.hue} />
-      <pointLight position={[3.2, 2.2, -2.5]} intensity={0.85} color={STATE_HEALTHY} />
+      <pointLight position={[-3.2, -1.8, 3.2]} intensity={1.65} decay={0} color={activeSystem.hue} />
+      <pointLight position={[3.2, 2.2, -2.5]} intensity={1.15} decay={0} color={STATE_HEALTHY} />
 
       <RipplingInferenceLattice activeHue={activeSystem.hue} ripplesRef={ripplesRef} />
 
@@ -425,11 +489,11 @@ function HeroOrbitalScene({
             >
               <octahedronGeometry args={[0.17, 0]} />
               <meshStandardMaterial
-                color={isActive ? sys.hue : "#1C222B"}
+                color={isActive ? sys.hue : "#222B38"}
                 emissive={sys.hue}
                 emissiveIntensity={isActive ? 1.65 : isHovered ? 0.9 : 0.35}
                 roughness={0.25}
-                metalness={0.75}
+                metalness={0.45}
                 toneMapped={!isActive}
               />
             </mesh>
@@ -445,9 +509,9 @@ function HeroOrbitalScene({
             >
               {nodeMesh}
               {isActive && (
-                <mesh rotation={[Math.PI / 2, 0, 0]}>
-                  <ringGeometry args={[0.24, 0.28, 32]} />
-                  <meshBasicMaterial color={sys.hue} side={THREE.DoubleSide} transparent opacity={0.85} />
+                <mesh rotation={[Math.PI / 3, 0.28, 0]}>
+                  <torusGeometry args={[0.26, 0.013, 12, 36]} />
+                  <meshBasicMaterial color={sys.hue} transparent opacity={0.85} />
                 </mesh>
               )}
             </group>
@@ -462,6 +526,7 @@ function HeroOrbitalScene({
         dampingFactor={0.07}
         minPolarAngle={Math.PI * 0.32}
         maxPolarAngle={Math.PI * 0.68}
+        touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
       />
     </group>
   );
@@ -474,6 +539,7 @@ const LazyPortraitFallback = (
       alt={`${profile.name} portrait`}
       width={224}
       height={256}
+      priority
       className="h-56 w-48 rounded-2xl object-cover shadow-2xl sm:h-64 sm:w-56"
     />
   </div>
@@ -488,7 +554,7 @@ export function HeroOrbitalCore3D({
     ORBITAL_SYSTEMS[hoveredIdx ?? activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
 
   return (
-    <div className="relative h-[320px] w-full sm:h-[380px] lg:h-[420px]">
+    <div className="relative h-[320px] w-full overflow-hidden rounded-2xl sm:h-[380px] lg:h-[420px]">
       <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/90 px-3 py-1 font-mono text-xs text-[#E6EDF3] backdrop-blur-md">
         <span style={{ color: displaySys.hue }}>{displaySys.code}</span>
         <span className="font-semibold">{displaySys.label}</span>
@@ -497,7 +563,7 @@ export function HeroOrbitalCore3D({
 
       <ViewportCanvas
         eager
-        cameraPosition={[0, 0.25, 5.25]}
+        cameraPosition={[0, 0.25, 5.55]}
         fov={40}
         fallback={LazyPortraitFallback}
         className="h-full w-full"

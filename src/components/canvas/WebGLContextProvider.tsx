@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import {
   createContext,
   useCallback,
@@ -23,11 +22,6 @@ import {
 
 const STORAGE_KEY = "portfolio-v2-3d-quality";
 
-const LazyScene3DRoot = dynamic(
-  () => import("./Scene3DRoot").then((mod) => mod.Scene3DRoot),
-  { ssr: false }
-);
-
 interface WebGLContextValue {
   hasMounted: boolean;
   hardwareTier: DeviceTier;
@@ -38,6 +32,9 @@ interface WebGLContextValue {
   contextLost: boolean;
   qualityReason: string;
   eventSourceRef: React.RefObject<HTMLDivElement | null>;
+  activeSlotIds: ReadonlySet<string>;
+  requestSlot: (id: string, pinned?: boolean) => void;
+  releaseSlot: (id: string) => void;
   setPreference: (next: QualityPreference) => void;
   setContextLost: (lost: boolean) => void;
 }
@@ -52,13 +49,17 @@ const WebGLContext = createContext<WebGLContextValue>({
   contextLost: false,
   qualityReason: "Initializing",
   eventSourceRef: { current: null },
+  activeSlotIds: new Set(),
+  requestSlot: () => {},
+  releaseSlot: () => {},
   setPreference: () => {},
   setContextLost: () => {},
 });
 
 /**
- * Global WebGL quality + reduced-motion provider hosting the single root <Canvas> (<Scene3DRoot>).
- * WebGL runtime JS is lazy-loaded strictly on the client after hardware capability checks pass.
+ * Global WebGL quality, reduced-motion, and LRU WebGL context slot-pool provider.
+ * Caps active container-scoped <Canvas> instances (max 4 on high, 3 on mid) so
+ * WebGL scenes stay 100% locked to their DOM containers on scroll without hitting browser context limits.
  */
 export function WebGLContextProvider({ children }: { children: ReactNode }) {
   const [hasMounted, setHasMounted] = useState(false);
@@ -68,6 +69,7 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [webglSupported, setWebglSupported] = useState(false);
   const [contextLost, setContextLost] = useState(false);
+  const [slotOrder, setSlotOrder] = useState<Array<{ id: string; pinned: boolean }>>([]);
 
   const eventSourceRef = useRef<HTMLDivElement | null>(null);
 
@@ -123,13 +125,43 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
     return resolveEffectiveTier(preference, hardwareTier, webglSupported);
   }, [hasMounted, preference, hardwareTier, webglSupported]);
 
+  const maxSlots = effectiveTier === "high" ? 6 : effectiveTier === "mid" ? 4 : 0;
+
+  const activeSlotIds = useMemo<ReadonlySet<string>>(() => {
+    if (maxSlots <= 0 || slotOrder.length === 0) {
+      return new Set();
+    }
+    // Always preserve actively visible (in-view) slots before near-view preload slots
+    const pinned = slotOrder.filter((item) => item.pinned).slice(-maxSlots);
+    const remaining = maxSlots - pinned.length;
+    const preloads =
+      remaining > 0
+        ? slotOrder.filter((item) => !item.pinned).slice(-remaining)
+        : [];
+    return new Set([...pinned, ...preloads].map((item) => item.id));
+  }, [maxSlots, slotOrder]);
+
+  const requestSlot = useCallback((id: string, pinned = false) => {
+    setSlotOrder((prev) => {
+      const existing = prev.find((item) => item.id === id);
+      if (existing && existing.pinned === pinned && prev[prev.length - 1]?.id === id) {
+        return prev;
+      }
+      return [...prev.filter((item) => item.id !== id), { id, pinned }];
+    });
+  }, []);
+
+  const releaseSlot = useCallback((id: string) => {
+    setSlotOrder((prev) => {
+      if (!prev.some((item) => item.id === id)) return prev;
+      return prev.filter((item) => item.id !== id);
+    });
+  }, []);
+
   const qualityReason = useMemo(
     () => resolveQualityReason(preference, hardwareReason, reducedMotion, contextLost),
     [preference, hardwareReason, reducedMotion, contextLost]
   );
-
-  const mountRootCanvas =
-    hasMounted && webglSupported && effectiveTier !== "low" && !contextLost;
 
   const value = useMemo<WebGLContextValue>(
     () => ({
@@ -142,6 +174,9 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
       contextLost,
       qualityReason,
       eventSourceRef,
+      activeSlotIds,
+      requestSlot,
+      releaseSlot,
       setPreference,
       setContextLost,
     }),
@@ -154,6 +189,9 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
       webglSupported,
       contextLost,
       qualityReason,
+      activeSlotIds,
+      requestSlot,
+      releaseSlot,
       setPreference,
     ]
   );
@@ -161,17 +199,7 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
   return (
     <WebGLContext.Provider value={value}>
       <div ref={eventSourceRef} className="relative min-h-[100dvh]">
-        {mountRootCanvas && (
-          <LazyScene3DRoot
-            effectiveTier={effectiveTier}
-            reducedMotion={reducedMotion}
-            eventSource={eventSourceRef}
-            onDowngrade={() => setPreference("balanced")}
-            onContextLost={() => setContextLost(true)}
-            onContextRestored={() => setContextLost(false)}
-          />
-        )}
-        <div className="relative">{children}</div>
+        {children}
       </div>
     </WebGLContext.Provider>
   );

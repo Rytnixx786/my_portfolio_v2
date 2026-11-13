@@ -36,7 +36,7 @@ export function ContactSection() {
   return (
     <section
       id="contact"
-      className="overflow-x-clip bg-[#0D1117] pt-20 pb-16 sm:pt-28 sm:pb-20"
+      className="overflow-x-clip bg-[#0D1117] pt-24 pb-16 sm:pt-32 sm:pb-24"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>

@@ -1,14 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
 import { Briefcase, GraduationCap, MapPin } from "@phosphor-icons/react";
 import { principles, profile } from "@/data/site";
 import { SectionReveal } from "./SectionReveal";
 
-gsap.registerPlugin(ScrollTrigger);
+gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const MANIFESTO_WORDS = [
   "Models",
@@ -21,44 +22,65 @@ const MANIFESTO_WORDS = [
 ] as const;
 
 export function AboutSection() {
+  const sectionRef = useRef<HTMLElement>(null);
   const manifestoRef = useRef<HTMLHeadingElement>(null);
+  const portraitWrapRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const el = manifestoRef.current;
-    if (!el) return;
+  useGSAP(
+    () => {
+      const el = manifestoRef.current;
+      const portrait = portraitWrapRef.current;
+      if (!el) return;
 
-    const reduced =
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    if (reduced) return;
+      const words = el.querySelectorAll<HTMLElement>("[data-scrub-word]");
 
-    const words = el.querySelectorAll<HTMLElement>("[data-scrub-word]");
-    if (words.length === 0) return;
-
-    const ctx = gsap.context(() => {
-      gsap.fromTo(
-        words,
-        { opacity: 0.25 },
-        {
-          opacity: 1,
-          stagger: 0.12,
-          ease: "none",
-          scrollTrigger: {
-            trigger: el,
-            start: "top 85%",
-            end: "top 45%",
-            scrub: 0.5,
-          },
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        if (words.length > 0) {
+          gsap.fromTo(
+            words,
+            { opacity: 0.2 },
+            {
+              opacity: 1,
+              stagger: 0.1,
+              ease: "none",
+              scrollTrigger: {
+                trigger: el,
+                start: "top 92%",
+                end: "top 55%",
+                scrub: 0.4,
+              },
+            }
+          );
         }
-      );
-    }, el);
 
-    return () => ctx.revert();
-  }, []);
+        if (portrait) {
+          gsap.fromTo(
+            portrait,
+            { scale: 0.94 },
+            {
+              scale: 1,
+              ease: "none",
+              clearProps: "transform",
+              scrollTrigger: {
+                trigger: portrait,
+                start: "top 95%",
+                end: "top 55%",
+                scrub: 0.4,
+              },
+            }
+          );
+        }
+      });
+    },
+    { scope: sectionRef }
+  );
 
   return (
     <section
+      ref={sectionRef}
       id="about"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-20 sm:py-28"
+      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-24 sm:py-32"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(240,246,252,0.08)] pb-4 font-mono text-xs uppercase tracking-[0.14em] text-[#8B949E]">
@@ -70,7 +92,7 @@ export function AboutSection() {
 
         <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-start lg:gap-12">
           {/* Left 5 Cols: Monochrome Portrait */}
-          <div className="min-w-0 lg:col-span-5">
+          <div ref={portraitWrapRef} className="min-w-0 lg:col-span-5">
             <SectionReveal>
               <div className="double-bezel-outer">
                 <div className="double-bezel-core overflow-hidden p-2.5 sm:p-3">

@@ -211,6 +211,7 @@ export function SystemsPlayground() {
   const [rpsMultiplier, setRpsMultiplier] = useState<number>(1.0);
   const [piiGuardEnabled, setPiiGuardEnabled] = useState<boolean>(true);
   const [semanticCacheEnabled, setSemanticCacheEnabled] = useState<boolean>(true);
+  const [focusedStageId, setFocusedStageId] = useState<string | null>(null);
 
   const scenarios = tab === "cinch" ? CINCH_SCENARIOS : RAG_SCENARIOS;
   const stages = tab === "cinch" ? CINCH_STAGES : RAG_STAGES;
@@ -234,7 +235,7 @@ export function SystemsPlayground() {
   return (
     <section
       id="simulator"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-20 sm:py-28"
+      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-24 sm:py-32"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
@@ -424,19 +425,25 @@ export function SystemsPlayground() {
                 statusColor={activeScenario.statusColor}
                 cameraPreset={cameraPreset}
                 rpsMultiplier={rpsMultiplier}
+                onSelectStage={(stageId) =>
+                  setFocusedStageId((prev) => (prev === stageId ? null : stageId))
+                }
               />
 
               {/* Stage Contract Strip */}
               <ol className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
                 {stages.map((stage) => {
                   const isActive = effectiveStages.includes(stage.id);
+                  const isFocused = focusedStageId === stage.id;
                   return (
                     <li
                       key={stage.id}
-                      className={`rounded-xl border px-3 py-2.5 font-mono text-xs ${
-                        isActive
-                          ? "border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#E6EDF3]"
-                          : "border-[rgba(240,246,252,0.08)] bg-[#0D1117] text-[#8B949E]"
+                      className={`rounded-xl border px-3 py-2.5 font-mono text-xs transition-colors ${
+                        isFocused
+                          ? "border-[#38BDF8] bg-[#38BDF8]/18 text-[#F0F6FC] ring-1 ring-[#38BDF8]/40"
+                          : isActive
+                            ? "border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#E6EDF3]"
+                            : "border-[rgba(240,246,252,0.08)] bg-[#0D1117] text-[#8B949E]"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">

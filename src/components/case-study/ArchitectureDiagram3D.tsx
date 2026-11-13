@@ -61,7 +61,7 @@ function SpatialDagScene({
   const positioned = useMemo(() => {
     const count = nodes.length;
     return nodes.map((n, idx) => {
-      const x = (idx - (count - 1) / 2) * 1.48;
+      const x = (idx - (count - 1) / 2) * 1.36;
       const y = Math.sin(idx * 1.1) * 0.45;
       const z = idx % 2 === 0 ? 0.56 : -0.56;
       return {
@@ -119,9 +119,10 @@ function SpatialDagScene({
 
   return (
     <group>
-      <ambientLight intensity={0.65} />
+      <ambientLight intensity={0.5} />
+      <hemisphereLight args={["#9CC9FF", "#0D1117", 0.75]} />
       <directionalLight position={[5, 6, 5]} intensity={1.35} color="#E6EDF3" />
-      <pointLight position={[-4, 3, 4]} intensity={1.0} color={UI_ACCENT} />
+      <pointLight position={[-4, 3, 4]} intensity={1.4} decay={0} color={UI_ACCENT} />
 
       <gridHelper args={[14, 24, "#243040", "#171E28"]} position={[0, -1.25, 0]} />
 
@@ -168,11 +169,11 @@ function SpatialDagScene({
               >
                 <octahedronGeometry args={[0.38, 0]} />
                 <meshStandardMaterial
-                  color={isActive ? "#1D2A3A" : "#151B23"}
+                  color={isActive ? "#263950" : "#1E293B"}
                   emissive={hue}
-                  emissiveIntensity={isActive ? 0.72 : 0.22}
-                  roughness={0.32}
-                  metalness={0.72}
+                  emissiveIntensity={isActive ? 0.72 : 0.24}
+                  roughness={0.38}
+                  metalness={0.32}
                 />
               </mesh>
             ) : node.kind === "storage" ? (
@@ -184,11 +185,11 @@ function SpatialDagScene({
               >
                 <cylinderGeometry args={[0.36, 0.36, 0.46, 18]} />
                 <meshStandardMaterial
-                  color={isActive ? "#1D2A3A" : "#151B23"}
+                  color={isActive ? "#263950" : "#1E293B"}
                   emissive={hue}
-                  emissiveIntensity={isActive ? 0.72 : 0.22}
-                  roughness={0.35}
-                  metalness={0.68}
+                  emissiveIntensity={isActive ? 0.72 : 0.24}
+                  roughness={0.4}
+                  metalness={0.32}
                 />
               </mesh>
             ) : (
@@ -208,21 +209,23 @@ function SpatialDagScene({
                 }}
               >
                 <meshStandardMaterial
-                  color={isActive ? "#1E2B3D" : "#161B22"}
-                  roughness={0.32}
-                  metalness={0.78}
+                  color={isActive ? "#263950" : "#1E293B"}
+                  roughness={0.38}
+                  metalness={0.34}
                   emissive={hue}
-                  emissiveIntensity={isActive ? 0.68 : 0.14}
+                  emissiveIntensity={isActive ? 0.68 : 0.18}
                 />
               </RoundedBox>
             )}
 
             <SpriteLabel3D
               text={`${String(node.idx + 1).padStart(2, "0")} · ${node.label}`}
-              position={[0, 0.48, 0]}
+              position={[0, 0.5, 0]}
               active={isActive}
               accentColor={hue}
-              worldHeight={0.22}
+              worldHeight={0.23}
+              maxWorldWidth={1.38}
+              minHeightScale={0.78}
             />
           </group>
         );
@@ -236,6 +239,7 @@ function SpatialDagScene({
         maxDistance={12}
         enableDamping
         dampingFactor={0.07}
+        touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
       />
     </group>
   );
@@ -262,7 +266,7 @@ export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
         </span>
       </div>
 
-      <ViewportCanvas cameraPosition={[0, 2.6, 8.8]} fov={40} className="h-full w-full">
+      <ViewportCanvas cameraPosition={[0, 2.8, 9.8]} fov={42} className="h-full w-full">
         <SpatialDagScene {...props} />
       </ViewportCanvas>
     </div>

@@ -77,6 +77,7 @@ export function AskTerminal() {
             </div>
 
             <div
+              data-lenis-prevent
               className="max-h-64 space-y-3 overflow-y-auto rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] p-4 editorial-scroll"
               aria-live="polite"
             >

@@ -1,0 +1,101 @@
+"use client";
+
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
+import { PerformanceMonitor } from "@react-three/drei";
+import * as THREE from "three";
+
+/**
+ * Ensures vertical touch scrolling never gets trapped by OrbitControls' default touch-action: none,
+ * and triggers an immediate demand frame when activeLoop state flips.
+ */
+function CanvasLifecycle({ activeLoop }: { activeLoop: boolean }) {
+  const { invalidate } = useThree();
+
+  useEffect(() => {
+    invalidate();
+  }, [activeLoop, invalidate]);
+
+  return null;
+}
+
+export function LocalCanvasInner({
+  children,
+  cameraPosition,
+  fov,
+  dpr,
+  antialias,
+  activeLoop,
+  onDecline,
+  onContextLost,
+  onContextRestored,
+}: {
+  children: ReactNode;
+  cameraPosition: [number, number, number];
+  fov: number;
+  dpr: [number, number];
+  antialias: boolean;
+  activeLoop: boolean;
+  onDecline: () => void;
+  onContextLost: () => void;
+  onContextRestored: () => void;
+}) {
+  const unmountingRef = useRef(false);
+
+  useLayoutEffect(() => {
+    unmountingRef.current = false;
+    return () => {
+      unmountingRef.current = true;
+    };
+  }, []);
+
+  return (
+    <Canvas
+      className="r3f-local-canvas"
+      dpr={dpr}
+      frameloop={activeLoop ? "always" : "demand"}
+      camera={{ position: cameraPosition, fov, near: 0.1, far: 100 }}
+      gl={{
+        antialias,
+        alpha: true,
+        powerPreference: "default",
+        toneMapping: THREE.ACESFilmicToneMapping,
+        toneMappingExposure: 1.08,
+      }}
+      onCreated={(state) => {
+        const gl = state.gl;
+        gl.setClearColor(0x000000, 0);
+        const canvas = gl.domElement;
+
+        canvas.addEventListener(
+          "webglcontextlost",
+          (e) => {
+            e.preventDefault();
+            if (unmountingRef.current || !canvas.isConnected) return;
+            onContextLost();
+          },
+          false
+        );
+
+        canvas.addEventListener(
+          "webglcontextrestored",
+          () => {
+            if (unmountingRef.current || !canvas.isConnected) return;
+            onContextRestored();
+          },
+          false
+        );
+      }}
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "block",
+        touchAction: "pan-y",
+      }}
+    >
+      <PerformanceMonitor flipflops={3} onDecline={onDecline} />
+      {children}
+      <CanvasLifecycle activeLoop={activeLoop} />
+    </Canvas>
+  );
+}

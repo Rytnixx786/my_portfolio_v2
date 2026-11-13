@@ -25,7 +25,7 @@ const STATION_X = [-4.0, -2.4, -0.8, 0.8, 2.4, 4.0] as const;
 const TOKEN_COUNT = 64;
 
 function CameraTweenController({ preset }: { preset: PlaygroundCameraPreset }) {
-  const { camera } = useThree();
+  const { camera, frameloop, invalidate } = useThree();
   const targetPos = useMemo(() => new THREE.Vector3(0, 3.25, 6.25), []);
   const lookTarget = useMemo(() => new THREE.Vector3(0, -0.1, 0), []);
 
@@ -35,10 +35,18 @@ function CameraTweenController({ preset }: { preset: PlaygroundCameraPreset }) {
     } else if (preset === "top") {
       targetPos.set(0, 7.1, 1.35);
     }
-  }, [preset, targetPos]);
+    if (preset !== "orbit") {
+      if (frameloop === "demand") {
+        camera.position.copy(targetPos);
+        camera.lookAt(lookTarget);
+      }
+      invalidate();
+    }
+  }, [preset, targetPos, lookTarget, camera, frameloop, invalidate]);
 
   useFrame((_, delta) => {
     if (preset === "orbit") return;
+    if (camera.position.distanceTo(targetPos) < 0.005) return;
     const dt = Math.min(delta, 0.05);
     camera.position.lerp(targetPos, Math.min(1, dt * 4.5));
     camera.lookAt(lookTarget);
@@ -46,12 +54,14 @@ function CameraTweenController({ preset }: { preset: PlaygroundCameraPreset }) {
 
   return preset === "orbit" ? (
     <OrbitControls
+      target={[0, -0.1, 0]}
       enableZoom={false}
       enablePan={false}
       enableDamping
       dampingFactor={0.07}
       minPolarAngle={0.25}
       maxPolarAngle={Math.PI * 0.48}
+      touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
     />
   ) : null;
 }
@@ -155,20 +165,21 @@ function PipelineDioramaScene({
 
   return (
     <group ref={rigRef}>
-      <ambientLight intensity={0.62} />
-      <directionalLight position={[4, 6, 4]} intensity={1.3} color="#E6EDF3" />
-      <pointLight position={[-3.5, 2.2, 2.5]} intensity={1.1} color={UI_ACCENT} />
-      <pointLight position={[3.5, 2.2, 2.5]} intensity={0.95} color={statusColor} />
+      <ambientLight intensity={0.48} />
+      <hemisphereLight args={["#9CC9FF", "#0D1117", 0.85]} />
+      <directionalLight position={[4, 6, 4]} intensity={1.35} color="#E6EDF3" />
+      <pointLight position={[-3.5, 2.2, 2.5]} intensity={1.4} decay={0} color={UI_ACCENT} />
+      <pointLight position={[3.5, 2.2, 2.5]} intensity={1.3} decay={0} color={statusColor} />
 
       <CameraTweenController preset={cameraPreset} />
 
       {/* Ground Telemetry Rail */}
       <mesh position={[0, -0.35, 0]}>
         <boxGeometry args={[9.8, 0.08, 2.4]} />
-        <meshStandardMaterial color="#11161D" roughness={0.68} metalness={0.45} />
+        <meshStandardMaterial color="#141A23" roughness={0.62} metalness={0.25} />
       </mesh>
 
-      <gridHelper args={[10.5, 18, "#263242", "#18202B"]} position={[0, -0.3, 0]} />
+      <gridHelper args={[10.5, 18, "#2A384A", "#19222E"]} position={[0, -0.3, 0]} />
 
       {/* Main Rail Line */}
       <mesh position={[0, 0.42, 0]} rotation={[0, 0, Math.PI / 2]}>
@@ -176,7 +187,7 @@ function PipelineDioramaScene({
         <meshBasicMaterial
           color={isFaultBurst ? STATE_FAULT : isCacheBypass ? STATE_HEALTHY : UI_ACCENT}
           transparent
-          opacity={0.45}
+          opacity={0.5}
         />
       </mesh>
 
@@ -184,7 +195,7 @@ function PipelineDioramaScene({
       {stages.map((stage, idx) => {
         const isActive = activeStages.includes(stage.id);
         const x = STATION_X[idx] ?? idx * 1.5 - 3.75;
-        const pedestalColor = isActive ? statusColor : "#232B38";
+        const pedestalColor = isActive ? statusColor : "#2B3647";
 
         return (
           <group key={stage.id} position={[x, 0.14, 0]}>
@@ -204,11 +215,11 @@ function PipelineDioramaScene({
               }}
             >
               <meshStandardMaterial
-                color={isActive ? "#1C2430" : "#141920"}
-                roughness={0.35}
-                metalness={0.75}
+                color={isActive ? "#1D2634" : "#1C2432"}
+                roughness={0.38}
+                metalness={0.28}
                 emissive={pedestalColor}
-                emissiveIntensity={isActive ? 0.32 : 0.04}
+                emissiveIntensity={isActive ? 0.35 : 0.08}
               />
             </RoundedBox>
 
@@ -218,7 +229,7 @@ function PipelineDioramaScene({
                 color={pedestalColor}
                 toneMapped={!isActive}
                 transparent
-                opacity={isActive ? 0.95 : 0.4}
+                opacity={isActive ? 0.95 : 0.48}
               />
             </mesh>
 
@@ -227,7 +238,8 @@ function PipelineDioramaScene({
               position={[0, isActive ? 0.68 : 0.54, 0]}
               active={isActive}
               accentColor={statusColor}
-              worldHeight={0.22}
+              worldHeight={0.24}
+              maxWorldWidth={1.42}
             />
           </group>
         );

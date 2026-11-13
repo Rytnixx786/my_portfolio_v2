@@ -143,7 +143,10 @@ export function CommandPalette() {
           </div>
         </form>
 
-        <div className="max-h-[55vh] space-y-5 overflow-y-auto p-5 editorial-scroll">
+        <div
+          data-lenis-prevent
+          className="max-h-[55vh] space-y-5 overflow-y-auto p-5 editorial-scroll"
+        >
           <div>
             <p className="mb-2 font-mono text-xs uppercase tracking-[0.14em] text-[#8B949E]">
               Suggestions

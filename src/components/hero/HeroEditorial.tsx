@@ -2,11 +2,15 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
 import { ArrowDownRight, ArrowUpRight, FilePdf } from "@phosphor-icons/react";
 import { profile } from "@/data/site";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { FloatingProjectStack3D } from "./FloatingProjectStack3D";
+
+gsap.registerPlugin(useGSAP);
 
 const LazyHeroOrbitalCore3D = dynamic(
   () =>
@@ -37,9 +41,27 @@ const HERO_PROOF = [
  */
 export function HeroEditorial() {
   const [activeSystemIndex, setActiveSystemIndex] = useState(0);
+  const heroRef = useRef<HTMLElement>(null);
+
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.from("[data-hero-stagger]", {
+          y: 14,
+          duration: 0.65,
+          stagger: 0.06,
+          ease: "power3.out",
+          clearProps: "transform",
+        });
+      });
+    },
+    { scope: heroRef }
+  );
 
   return (
     <section
+      ref={heroRef}
       id="hero"
       className="relative flex min-h-[100dvh] items-center border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] pt-24 pb-10 sm:pt-28 sm:pb-12"
     >
@@ -47,23 +69,32 @@ export function HeroEditorial() {
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-12">
           {/* Left 7 Cols: Focused Editorial Identity */}
           <div className="lg:col-span-7">
-            <p className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3.5 py-1 font-mono text-xs uppercase tracking-[0.15em] text-[#7DD3FC]">
+            <p
+              data-hero-stagger
+              className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3.5 py-1 font-mono text-xs uppercase tracking-[0.15em] text-[#7DD3FC]"
+            >
               <span className="h-2 w-2 rounded-full bg-[#10B981]" aria-hidden="true" />
               <span>{profile.role} · FlyRank Intern · {profile.utc}</span>
             </p>
 
-            <h1 className="mt-5 font-display text-[clamp(3rem,6.5vw,5.4rem)] font-bold uppercase leading-[0.93] tracking-[-0.02em] text-[#E6EDF3]">
+            <h1
+              data-hero-stagger
+              className="mt-5 max-w-5xl font-display text-[clamp(3rem,6.5vw,5.4rem)] font-bold uppercase leading-[0.93] tracking-[-0.02em] text-[#E6EDF3]"
+            >
               RELIABLE{" "}
               <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
                 ai systems.
               </span>
             </h1>
 
-            <p className="mt-4 max-w-[46ch] font-sans text-base leading-relaxed text-[#9DA7B3] sm:text-lg">
+            <p
+              data-hero-stagger
+              className="mt-4 max-w-[46ch] font-sans text-base leading-relaxed text-[#9DA7B3] sm:text-lg"
+            >
               Quantized serving, grounded RAG, and fault-isolated backends.
             </p>
 
-            <div className="mt-7 flex flex-wrap items-center gap-3.5">
+            <div data-hero-stagger className="mt-7 flex flex-wrap items-center gap-3.5">
               <MagneticButton>
                 <a
                   href="#work"

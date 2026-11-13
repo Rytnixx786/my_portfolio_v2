@@ -227,8 +227,14 @@ export function useBodyScrollLock(locked: boolean) {
     if (!locked) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    window.dispatchEvent(
+      new CustomEvent("portfolio:scroll-lock", { detail: { locked: true } })
+    );
     return () => {
       document.body.style.overflow = prev;
+      window.dispatchEvent(
+        new CustomEvent("portfolio:scroll-lock", { detail: { locked: false } })
+      );
     };
   }, [locked]);
 }

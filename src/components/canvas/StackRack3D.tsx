@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { STACK_LAYER_HUES } from "@/lib/palette";
@@ -14,6 +14,25 @@ interface StackRack3DProps {
   tools: readonly string[];
   selectedTool: string | null;
   onSelectTool: (tool: string) => void;
+}
+
+function RackCameraFit({ totalRows }: { totalRows: number }) {
+  const { camera, invalidate } = useThree();
+  const target = useMemo(
+    () =>
+      totalRows >= 3
+        ? new THREE.Vector3(0, 3.0, 4.15)
+        : new THREE.Vector3(0, 2.55, 3.55),
+    [totalRows]
+  );
+
+  useEffect(() => {
+    camera.position.copy(target);
+    camera.lookAt(0, 0.08, 0);
+    invalidate();
+  }, [camera, target, invalidate]);
+
+  return null;
 }
 
 function KeycapNode({
@@ -41,7 +60,7 @@ function KeycapNode({
       rippleDelay > 0
         ? Math.sin(Math.max(0, state.clock.elapsedTime - rippleDelay) * 8) * 0.03
         : 0;
-    const targetY = (isSelected ? -0.15 : hovered ? -0.07 : 0) + wave;
+    const targetY = (isSelected ? -0.14 : hovered ? -0.07 : 0) + wave;
     groupRef.current.position.y +=
       (targetY - groupRef.current.position.y) * Math.min(1, dt * 12);
   });
@@ -49,20 +68,20 @@ function KeycapNode({
   return (
     <group position={position}>
       <mesh position={[0, -0.18, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.38, 0.46, 4]} />
+        <ringGeometry args={[0.42, 0.5, 4]} />
         <meshBasicMaterial
-          color={isSelected || hovered ? accentHue : "#222A36"}
+          color={isSelected || hovered ? accentHue : "#2C3748"}
           transparent
-          opacity={isSelected ? 0.95 : hovered ? 0.72 : 0.42}
+          opacity={isSelected ? 0.95 : hovered ? 0.72 : 0.55}
           toneMapped={!isSelected}
         />
       </mesh>
 
       <group ref={groupRef}>
         <RoundedBox
-          args={[1.04, 0.34, 0.78]}
+          args={[1.18, 0.34, 0.84]}
           radius={0.07}
-          smoothness={3}
+          smoothness={4}
           onClick={(e) => {
             e.stopPropagation();
             onSelect();
@@ -78,30 +97,32 @@ function KeycapNode({
           }}
         >
           <meshStandardMaterial
-            color={isSelected ? "#1D2838" : hovered ? "#1A222E" : "#151A22"}
-            roughness={0.34}
-            metalness={0.78}
-            emissive={isSelected ? accentHue : hovered ? accentHue : "#000000"}
-            emissiveIntensity={isSelected ? 0.45 : hovered ? 0.16 : 0}
+            color={isSelected ? "#264060" : hovered ? "#2C3B52" : "#222C3D"}
+            roughness={0.42}
+            metalness={0.22}
+            emissive={isSelected ? accentHue : hovered ? accentHue : "#162030"}
+            emissiveIntensity={isSelected ? 0.45 : hovered ? 0.22 : 0.1}
           />
         </RoundedBox>
 
         <mesh position={[0, 0.18, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.9, 0.64]} />
+          <planeGeometry args={[1.02, 0.68]} />
           <meshBasicMaterial
-            color={isSelected ? accentHue : "#8B949E"}
+            color={isSelected ? accentHue : "#9DA7B3"}
             transparent
-            opacity={isSelected ? 0.48 : hovered ? 0.25 : 0.06}
+            opacity={isSelected ? 0.42 : hovered ? 0.24 : 0.12}
             toneMapped={!isSelected}
           />
         </mesh>
 
         <SpriteLabel3D
           text={label}
-          position={[0, 0.34, 0]}
+          position={[0, 0.42, 0]}
           active={isSelected || hovered}
           accentColor={accentHue}
-          worldHeight={0.18}
+          worldHeight={0.25}
+          maxWorldWidth={1.58}
+          minHeightScale={0.82}
         />
       </group>
     </group>
@@ -109,8 +130,8 @@ function KeycapNode({
 }
 
 /**
- * Tactile 3D Stack Rack per architecture layer with per-layer hue underglow
- * and keyboard/click neighbor spring feedback.
+ * Tactile 3D Stack Rack per architecture layer with per-layer hue underglow,
+ * balanced row centering, and collision-free sprite labels.
  */
 export function StackRack3D({
   layerCode,
@@ -121,6 +142,9 @@ export function StackRack3D({
 }: StackRack3DProps) {
   const pulseTime = layerCode ? 0.1 : 0;
   const cols = tools.length <= 4 ? 2 : 3;
+  const totalRows = Math.ceil(tools.length / cols);
+  const xSpacing = 1.72;
+  const zSpacing = 1.18;
   const layerIdx = Math.max(0, Number.parseInt(layerCode, 10) - 1) % STACK_LAYER_HUES.length;
   const accentHue = STACK_LAYER_HUES[layerIdx] ?? STACK_LAYER_HUES[0];
 
@@ -133,11 +157,14 @@ export function StackRack3D({
   const positions = tools.map((_, idx) => {
     const col = idx % cols;
     const row = Math.floor(idx / cols);
-    const totalRows = Math.ceil(tools.length / cols);
-    const x = (col - (cols - 1) / 2) * 1.24;
-    const z = (row - (totalRows - 1) / 2) * 1.04;
+    const rowItems = Math.min(cols, tools.length - row * cols);
+    const x = (col - (rowItems - 1) / 2) * xSpacing;
+    const z = (row - (totalRows - 1) / 2) * zSpacing;
     return [x, 0, z] as [number, number, number];
   });
+
+  const baseW = cols * xSpacing + 0.55;
+  const baseD = totalRows * zSpacing + 0.55;
 
   return (
     <div className="relative h-[225px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[255px]">
@@ -148,14 +175,21 @@ export function StackRack3D({
         <span>{layerName}</span>
       </div>
 
-      <ViewportCanvas cameraPosition={[0, 2.75, 3.65]} fov={38} className="h-full w-full">
-        <ambientLight intensity={0.65} />
-        <directionalLight position={[3, 5, 4]} intensity={1.3} color="#E6EDF3" />
-        <pointLight position={[-2.5, 2, 2.5]} intensity={0.95} color={accentHue} />
+      <ViewportCanvas
+        cameraPosition={totalRows >= 3 ? [0, 3.0, 4.15] : [0, 2.55, 3.55]}
+        fov={40}
+        className="h-full w-full"
+      >
+        <RackCameraFit totalRows={totalRows} />
+        <ambientLight intensity={0.62} />
+        <hemisphereLight args={["#B8D9FF", "#0D1117", 1.0]} />
+        <directionalLight position={[2, 7, 5]} intensity={1.3} color="#E6EDF3" />
+        <pointLight position={[-3.2, 3.0, 2.8]} intensity={1.25} decay={0} color={accentHue} />
+        <pointLight position={[3.2, 3.0, 2.8]} intensity={0.95} decay={0} color="#38BDF8" />
 
         <mesh position={[0, -0.26, 0]}>
-          <boxGeometry args={[4.4, 0.14, 2.75]} />
-          <meshStandardMaterial color="#12171E" roughness={0.6} metalness={0.5} />
+          <boxGeometry args={[baseW, 0.14, baseD]} />
+          <meshStandardMaterial color="#17202C" roughness={0.58} metalness={0.18} />
         </mesh>
 
         {tools.map((tool, idx) => (
@@ -177,6 +211,7 @@ export function StackRack3D({
           dampingFactor={0.08}
           minPolarAngle={0.45}
           maxPolarAngle={Math.PI * 0.42}
+          touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
         />
       </ViewportCanvas>
     </div>

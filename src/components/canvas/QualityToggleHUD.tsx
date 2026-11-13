@@ -54,7 +54,7 @@ export function QualityToggleHUD() {
           <div className="flex items-center justify-between border-b border-[rgba(240,246,252,0.08)] px-2 pb-2 pt-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E]">
             <span>WebGL Stage</span>
             <span className={contextLost ? "text-[#F59E0B]" : "text-[#38BDF8]"}>
-              {contextLost ? "PAUSED" : webglSupported ? "1-CTX GPU" : "NO WEBGL"}
+              {contextLost ? "PAUSED" : webglSupported ? "LRU GPU POOL" : "NO WEBGL"}
             </span>
           </div>
 

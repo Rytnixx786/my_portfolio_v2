@@ -1,11 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 
-const LazyViewPortal = dynamic(
-  () => import("./ViewPortalInner").then((mod) => mod.ViewPortalInner),
+const LazyLocalCanvas = dynamic(
+  () => import("./LocalCanvasInner").then((mod) => mod.LocalCanvasInner),
   { ssr: false }
 );
 
@@ -21,9 +21,9 @@ interface ViewportCanvasProps {
 }
 
 /**
- * Viewport-aware single-context <View> container (Section 7.3).
- * Latches mounted once entered so textures & GLSL shaders never recompile when scrolling back,
- * while pausing frame ticks cleanly when off-screen.
+ * Container-scoped WebGL viewport managed by the global LRU context slot pool.
+ * Renders <Canvas> directly inside the card's overflow-hidden frame so 3D scenes
+ * stay 100% locked to scroll on the GPU compositor with zero displacement or spillover.
  */
 export function ViewportCanvas({
   children,
@@ -31,49 +31,111 @@ export function ViewportCanvas({
   className = "h-full w-full",
   cameraPosition = [0, 0, 5.5],
   fov = 42,
+  maxDpr,
   eager = false,
   style,
 }: ViewportCanvasProps) {
-  const { canRender3D, isStaticPose } = useCanRender3D();
+  const slotId = useId();
+  const {
+    canRender3D,
+    effectiveTier,
+    isStaticPose,
+    activeSlotIds,
+    requestSlot,
+    releaseSlot,
+    setContextLost,
+    setPreference,
+  } = useCanRender3D();
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(eager);
-  const [hasEntered, setHasEntered] = useState(eager);
+  const [nearView, setNearView] = useState(eager);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
 
-    const observer = new IntersectionObserver(
+    const nearObserver = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          const visible = entry.isIntersecting;
-          setInView(visible);
-          if (visible) {
-            setHasEntered(true);
-          }
+          setNearView(entry.isIntersecting);
         }
       },
-      { rootMargin: "280px 0px" }
+      { rootMargin: "260px 0px" }
     );
 
-    observer.observe(el);
-    return () => observer.disconnect();
+    const activeObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          setInView(entry.isIntersecting);
+        }
+      },
+      { rootMargin: "40px 0px" }
+    );
+
+    nearObserver.observe(el);
+    activeObserver.observe(el);
+
+    return () => {
+      nearObserver.disconnect();
+      activeObserver.disconnect();
+    };
   }, []);
+
+  useEffect(() => {
+    if (!canRender3D) {
+      releaseSlot(slotId);
+      return;
+    }
+    if (nearView) {
+      requestSlot(slotId, eager || inView);
+    } else {
+      releaseSlot(slotId);
+    }
+  }, [canRender3D, nearView, inView, eager, slotId, requestSlot, releaseSlot]);
+
+  useEffect(() => {
+    return () => {
+      releaseSlot(slotId);
+    };
+  }, [slotId, releaseSlot]);
+
+  const hasSlot = canRender3D && nearView && activeSlotIds.has(slotId);
+  const dpr: [number, number] =
+    maxDpr ?? (effectiveTier === "high" ? [1, 1.75] : [1, 1.5]);
 
   return (
     <div
       ref={containerRef}
-      className={`relative ${className}`}
+      data-slot-state={
+        hasSlot
+          ? "active"
+          : !canRender3D
+            ? "disabled"
+            : !nearView
+              ? "out-of-view"
+              : "pool-queued"
+      }
+      className={`relative overflow-hidden ${className}`}
       style={{ touchAction: "pan-y", ...style }}
     >
-      {canRender3D && hasEntered ? (
-        <LazyViewPortal
+      {hasSlot ? (
+        <LazyLocalCanvas
           cameraPosition={cameraPosition}
           fov={fov}
+          dpr={dpr}
+          antialias={effectiveTier !== "low"}
           activeLoop={!isStaticPose && inView}
+          onDecline={() => {
+            if (effectiveTier === "high") {
+              setPreference("balanced");
+            }
+          }}
+          onContextLost={() => setContextLost(true)}
+          onContextRestored={() => setContextLost(false)}
         >
           {children}
-        </LazyViewPortal>
+        </LazyLocalCanvas>
       ) : (
         fallback
       )}

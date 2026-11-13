@@ -221,7 +221,7 @@ export function ArchitectureDiagram({
                       fontSize="11"
                       fontFamily="var(--font-mono), monospace"
                     >
-                      STAGE {String(node.index + 1).padStart(2, "0")}
+                      {String(node.index + 1).padStart(2, "0")}
                     </text>
                     <text
                       x={14}
