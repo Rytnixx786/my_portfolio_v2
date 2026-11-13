@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html, OrbitControls, RoundedBox } from "@react-three/drei";
+import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import type { Project } from "@/data/projects";
 import {
@@ -11,6 +11,7 @@ import {
   STATE_WARN,
   UI_ACCENT,
 } from "@/lib/palette";
+import { SpriteLabel3D } from "@/components/canvas/SpriteLabel3D";
 import { ViewportCanvas } from "@/components/canvas/ViewportCanvas";
 
 interface ArchitectureDiagram3DProps {
@@ -50,6 +51,12 @@ function SpatialDagScene({
   const connections = architecture.connections;
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const pulseRefs = useRef<Array<THREE.Mesh | null>>([]);
+
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = "auto";
+    };
+  }, []);
 
   const positioned = useMemo(() => {
     const count = nodes.length;
@@ -210,17 +217,13 @@ function SpatialDagScene({
               </RoundedBox>
             )}
 
-            <Html position={[0, 0.46, 0]} center style={{ pointerEvents: "none" }}>
-              <span
-                className={`whitespace-nowrap rounded-md border px-2 py-0.5 font-mono text-xs ${
-                  isActive
-                    ? "border-[#38BDF8] bg-[#0D1117]/95 font-semibold text-[#E6EDF3]"
-                    : "border-[rgba(240,246,252,0.12)] bg-[#0D1117]/80 text-[#9DA7B3]"
-                }`}
-              >
-                {String(node.idx + 1).padStart(2, "0")} · {node.label}
-              </span>
-            </Html>
+            <SpriteLabel3D
+              text={`${String(node.idx + 1).padStart(2, "0")} · ${node.label}`}
+              position={[0, 0.48, 0]}
+              active={isActive}
+              accentColor={hue}
+              worldHeight={0.22}
+            />
           </group>
         );
       })}

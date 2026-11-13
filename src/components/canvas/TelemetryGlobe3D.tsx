@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html, OrbitControls } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { CATEGORY_HUES, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
 import { ViewportCanvas } from "./ViewportCanvas";
@@ -159,11 +159,6 @@ function GlobeAssembly({
           <sphereGeometry args={[0.115, 16, 16]} />
           <meshBasicMaterial color={STATE_HEALTHY} transparent opacity={0.28} />
         </mesh>
-        <Html position={[0, 0.24, 0]} center style={{ pointerEvents: "none" }}>
-          <div className="whitespace-nowrap rounded-full border border-[#10B981]/50 bg-[#0D1117]/95 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#10B981]">
-            Dhaka · UTC+6
-          </div>
-        </Html>
       </group>
     </group>
   );
@@ -189,6 +184,11 @@ export function TelemetryGlobe3D() {
 
   return (
     <div className="relative h-[265px] w-full sm:h-[295px]">
+      <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 inline-flex items-center gap-2 rounded-full border border-[#10B981]/40 bg-[#0D1117]/90 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#10B981] backdrop-blur-md">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]" aria-hidden="true" />
+        <span>Dhaka · UTC+6</span>
+      </div>
+
       <ViewportCanvas
         cameraPosition={[0, 0.3, 4.1]}
         fov={38}

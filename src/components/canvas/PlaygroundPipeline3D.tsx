@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Html, OrbitControls, RoundedBox } from "@react-three/drei";
+import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { STATE_FAULT, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
+import { SpriteLabel3D } from "./SpriteLabel3D";
 import { ViewportCanvas } from "./ViewportCanvas";
 
 export type PlaygroundCameraPreset = "isometric" | "top" | "orbit";
@@ -134,6 +135,12 @@ function PipelineDioramaScene({
   const isFaultBurst = scenarioId === "breaker-open" || scenarioId === "nli-refusal";
   const isCacheBypass = scenarioId === "cache-hit";
 
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = "auto";
+    };
+  }, []);
+
   useFrame((state) => {
     if (!rigRef.current) return;
     if (isFaultBurst) {
@@ -215,17 +222,13 @@ function PipelineDioramaScene({
               />
             </mesh>
 
-            <Html position={[0, isActive ? 0.68 : 0.54, 0]} center style={{ pointerEvents: "none" }}>
-              <span
-                className={`whitespace-nowrap rounded-md border px-2 py-0.5 font-mono text-xs uppercase tracking-[0.06em] ${
-                  isActive
-                    ? "border-[rgba(240,246,252,0.22)] bg-[#0D1117]/95 font-semibold text-[#E6EDF3]"
-                    : "border-[rgba(240,246,252,0.08)] bg-[#0D1117]/75 text-[#8B949E]"
-                }`}
-              >
-                {stage.label}
-              </span>
-            </Html>
+            <SpriteLabel3D
+              text={stage.label}
+              position={[0, isActive ? 0.68 : 0.54, 0]}
+              active={isActive}
+              accentColor={statusColor}
+              worldHeight={0.22}
+            />
           </group>
         );
       })}

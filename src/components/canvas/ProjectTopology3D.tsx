@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html, OrbitControls } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { CATEGORY_HUES, STATE_FAULT, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
 import { ViewportCanvas } from "./ViewportCanvas";
@@ -89,9 +89,16 @@ function CinchGpuSculpture({
 /**
  * Nexus Researcher 3D interactive mini-lab: click any LangGraph node or toggle HITL gate approval.
  */
-function NexusDagSculpture({ hitlApproved }: { hitlApproved: boolean }) {
+function NexusDagSculpture({
+  hitlApproved,
+  activeNodeIdx,
+  onSelectNode,
+}: {
+  hitlApproved: boolean;
+  activeNodeIdx: number;
+  onSelectNode: (idx: number, label: string) => void;
+}) {
   const groupRef = useRef<THREE.Group>(null);
-  const [activeNode, setActiveNode] = useState(2);
   const rose = CATEGORY_HUES["Agents & RAG"].hex;
 
   const nodes = useMemo(
@@ -123,6 +130,12 @@ function NexusDagSculpture({ hitlApproved }: { hitlApproved: boolean }) {
     return geom;
   }, [nodes]);
 
+  useEffect(() => {
+    return () => {
+      lineGeom.dispose();
+    };
+  }, [lineGeom]);
+
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
     if (groupRef.current) {
@@ -142,11 +155,12 @@ function NexusDagSculpture({ hitlApproved }: { hitlApproved: boolean }) {
 
       {nodes.map((node, idx) => {
         const isHitl = node.id === "HITL";
+        const isSelected = idx === activeNodeIdx;
         const color = isHitl
           ? hitlApproved
             ? STATE_HEALTHY
             : "#F59E0B"
-          : idx === activeNode
+          : isSelected
             ? UI_ACCENT
             : rose;
 
@@ -155,26 +169,19 @@ function NexusDagSculpture({ hitlApproved }: { hitlApproved: boolean }) {
             <mesh
               onClick={(e) => {
                 e.stopPropagation();
-                setActiveNode(idx);
+                onSelectNode(idx, node.id);
               }}
             >
-              <octahedronGeometry args={[idx === activeNode ? 0.22 : 0.16, 0]} />
+              <octahedronGeometry args={[isSelected ? 0.22 : 0.16, 0]} />
               <meshStandardMaterial
                 color={color}
                 emissive={color}
-                emissiveIntensity={idx === activeNode || isHitl ? 1.15 : 0.35}
+                emissiveIntensity={isSelected || isHitl ? 1.15 : 0.35}
                 roughness={0.3}
                 metalness={0.6}
-                toneMapped={idx !== activeNode}
+                toneMapped={!isSelected}
               />
             </mesh>
-            {idx === activeNode && (
-              <Html position={[0, 0.32, 0]} center style={{ pointerEvents: "none" }}>
-                <span className="rounded bg-[#0D1117]/95 px-2 py-0.5 font-mono text-xs text-[#E6EDF3]">
-                  {node.id}
-                </span>
-              </Html>
-            )}
           </group>
         );
       })}
@@ -244,6 +251,10 @@ function AresGateSculpture({ threshold }: { threshold: number }) {
 export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DProps) {
   const [cinchMode, setCinchMode] = useState<"cache" | "marlin" | "breaker">("cache");
   const [hitlApproved, setHitlApproved] = useState(true);
+  const [nexusNode, setNexusNode] = useState<{ idx: number; label: string }>({
+    idx: 2,
+    label: "HITL",
+  });
   const [aresThreshold, setAresThreshold] = useState(0.82);
 
   return (
@@ -254,7 +265,13 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
         <pointLight position={[-2.5, -1.5, 2.5]} intensity={0.85} color={UI_ACCENT} />
 
         {slug === "cinch" && <CinchGpuSculpture mode={cinchMode} />}
-        {slug === "nexus-researcher" && <NexusDagSculpture hitlApproved={hitlApproved} />}
+        {slug === "nexus-researcher" && (
+          <NexusDagSculpture
+            hitlApproved={hitlApproved}
+            activeNodeIdx={nexusNode.idx}
+            onSelectNode={(idx, label) => setNexusNode({ idx, label })}
+          />
+        )}
         {slug === "ares" && <AresGateSculpture threshold={aresThreshold} />}
 
         <OrbitControls enableZoom={false} enablePan={false} enableDamping dampingFactor={0.08} />
@@ -286,7 +303,9 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
 
         {slug === "nexus-researcher" && (
           <>
-            <span className="font-mono text-xs text-[#9DA7B3]">HITL Checkpoint:</span>
+            <span className="font-mono text-xs text-[#9DA7B3]">
+              Node: <strong className="text-[#E6EDF3]">{nexusNode.label}</strong>
+            </span>
             <button
               type="button"
               onClick={() => setHitlApproved((v) => !v)}

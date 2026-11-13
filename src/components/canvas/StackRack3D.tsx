@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html, OrbitControls, RoundedBox } from "@react-three/drei";
+import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { STACK_LAYER_HUES } from "@/lib/palette";
+import { SpriteLabel3D } from "./SpriteLabel3D";
 import { ViewportCanvas } from "./ViewportCanvas";
 
 interface StackRack3DProps {
@@ -95,17 +96,13 @@ function KeycapNode({
           />
         </mesh>
 
-        <Html position={[0, 0.25, 0]} center style={{ pointerEvents: "none" }}>
-          <span
-            className={`whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-xs font-medium tracking-tight ${
-              isSelected
-                ? "bg-[#0D1117]/95 font-semibold text-[#E6EDF3]"
-                : "text-[#C9D1D9]"
-            }`}
-          >
-            {label}
-          </span>
-        </Html>
+        <SpriteLabel3D
+          text={label}
+          position={[0, 0.34, 0]}
+          active={isSelected || hovered}
+          accentColor={accentHue}
+          worldHeight={0.18}
+        />
       </group>
     </group>
   );
@@ -126,6 +123,12 @@ export function StackRack3D({
   const cols = tools.length <= 4 ? 2 : 3;
   const layerIdx = Math.max(0, Number.parseInt(layerCode, 10) - 1) % STACK_LAYER_HUES.length;
   const accentHue = STACK_LAYER_HUES[layerIdx] ?? STACK_LAYER_HUES[0];
+
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = "auto";
+    };
+  }, []);
 
   const positions = tools.map((_, idx) => {
     const col = idx % cols;

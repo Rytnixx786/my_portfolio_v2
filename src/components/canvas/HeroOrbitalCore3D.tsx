@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Float, Html, OrbitControls, RoundedBox } from "@react-three/drei";
+import { Float, OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { profile } from "@/data/site";
 import { HERO_ORBIT_HUES, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
@@ -315,7 +315,8 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
 function HeroOrbitalScene({
   activeSystemIndex,
   onSelectSystem,
-}: HeroOrbitalCore3DProps) {
+  onHoverSystem,
+}: HeroOrbitalCore3DProps & { onHoverSystem: (index: number | null) => void }) {
   const coreRef = useRef<THREE.Group>(null);
   const nodesRef = useRef<Array<THREE.Group | null>>([]);
   const ripplesRef = useRef<Array<{ x: number; y: number; t: number }>>([]);
@@ -327,6 +328,12 @@ function HeroOrbitalScene({
   useEffect(() => {
     activeIdxRef.current = activeSystemIndex;
   }, [activeSystemIndex]);
+
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = "auto";
+    };
+  }, []);
 
   const activeSystem = ORBITAL_SYSTEMS[activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
 
@@ -407,10 +414,12 @@ function HeroOrbitalScene({
               onPointerOver={(e) => {
                 e.stopPropagation();
                 setHoveredIdx(idx);
+                onHoverSystem(idx);
                 document.body.style.cursor = "pointer";
               }}
               onPointerOut={() => {
                 setHoveredIdx(null);
+                onHoverSystem(null);
                 document.body.style.cursor = "auto";
               }}
             >
@@ -440,16 +449,6 @@ function HeroOrbitalScene({
                   <ringGeometry args={[0.24, 0.28, 32]} />
                   <meshBasicMaterial color={sys.hue} side={THREE.DoubleSide} transparent opacity={0.85} />
                 </mesh>
-              )}
-
-              {(isActive || isHovered) && (
-                <Html position={[0, 0.34, 0]} center style={{ pointerEvents: "none" }}>
-                  <div className="whitespace-nowrap rounded-full border border-[rgba(240,246,252,0.18)] bg-[#0D1117]/95 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] shadow-lg">
-                    <span style={{ color: sys.hue }}>{sys.code}</span>{" "}
-                    <span className="font-semibold">{sys.label}</span>{" "}
-                    <span className="text-[#9DA7B3]">· {sys.metric}</span>
-                  </div>
-                </Html>
               )}
             </group>
           );
@@ -484,8 +483,18 @@ export function HeroOrbitalCore3D({
   activeSystemIndex,
   onSelectSystem,
 }: HeroOrbitalCore3DProps) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const displaySys =
+    ORBITAL_SYSTEMS[hoveredIdx ?? activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
+
   return (
     <div className="relative h-[320px] w-full sm:h-[380px] lg:h-[420px]">
+      <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/90 px-3 py-1 font-mono text-xs text-[#E6EDF3] backdrop-blur-md">
+        <span style={{ color: displaySys.hue }}>{displaySys.code}</span>
+        <span className="font-semibold">{displaySys.label}</span>
+        <span className="text-[#9DA7B3]">· {displaySys.metric}</span>
+      </div>
+
       <ViewportCanvas
         eager
         cameraPosition={[0, 0.25, 5.25]}
@@ -496,6 +505,7 @@ export function HeroOrbitalCore3D({
         <HeroOrbitalScene
           activeSystemIndex={activeSystemIndex}
           onSelectSystem={onSelectSystem}
+          onHoverSystem={setHoveredIdx}
         />
       </ViewportCanvas>
     </div>
