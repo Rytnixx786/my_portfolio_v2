@@ -174,7 +174,7 @@ export function ArchitectureDiagram({
           ) : (
             <svg
               viewBox={`0 0 ${layout.svgW} ${layout.svgH}`}
-              className="hidden h-auto w-full select-none md:block"
+              className="block h-auto w-full select-none"
               aria-hidden="true"
             >
               {connections.map((conn) => {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Float, OrbitControls, RoundedBox } from "@react-three/drei";
+import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { profile } from "@/data/site";
 import { HERO_ORBIT_HUES, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
@@ -15,6 +15,9 @@ const ORBITAL_SYSTEMS = [
   { id: "ares", code: "03", label: "ARES", metric: "92%+ CI", hue: HERO_ORBIT_HUES[2] },
   { id: "mindstack", code: "04", label: "MindStack", metric: "95% Ground", hue: HERO_ORBIT_HUES[3] },
 ] as const;
+
+const ORBIT_RADIUS = 2.18;
+const INNER_ORBIT_RADIUS = 1.82;
 
 interface HeroOrbitalCore3DProps {
   activeSystemIndex: number;
@@ -33,7 +36,10 @@ function RipplingInferenceLattice({
   ripplesRef: React.MutableRefObject<Array<{ x: number; y: number; t: number }>>;
 }) {
   const matRef = useRef<THREE.ShaderMaterial>(null);
-  const activeHueRef = useRef(activeHue);
+  const activeColorRef = useRef(new THREE.Color(activeHue));
+  const targetColorRef = useRef(new THREE.Color(activeHue));
+  const elapsedRef = useRef(0);
+  const smoothPtrRef = useRef(new THREE.Vector2(0, 0));
   const { pointer } = useThree();
 
   const { geometry, uniforms } = useMemo(() => {
@@ -50,8 +56,8 @@ function RipplingInferenceLattice({
         const v = r / (rows - 1) - 0.5;
         positions[i * 3] = u * 8.4;
         positions[i * 3 + 1] = v * 5.6;
-        positions[i * 3 + 2] = -2.2;
-        scales[i] = (c + r) % 3 === 0 ? 2.1 : 1.35;
+        positions[i * 3 + 2] = -2.25;
+        scales[i] = (c + r) % 3 === 0 ? 2.0 : 1.3;
         i++;
       }
     }
@@ -79,7 +85,7 @@ function RipplingInferenceLattice({
   }, []);
 
   useEffect(() => {
-    activeHueRef.current = activeHue;
+    targetColorRef.current.set(activeHue);
   }, [activeHue]);
 
   useEffect(() => {
@@ -88,12 +94,28 @@ function RipplingInferenceLattice({
     };
   }, [geometry]);
 
-  useFrame((state) => {
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05);
+    elapsedRef.current += dt;
     if (!matRef.current) return;
-    const t = state.clock.elapsedTime;
-    matRef.current.uniforms.uTime.value = t;
-    matRef.current.uniforms.uAccentColor.value.set(activeHueRef.current);
-    matRef.current.uniforms.uPointer.value.set(pointer.x * 3.5, pointer.y * 2.4);
+
+    activeColorRef.current.lerp(targetColorRef.current, Math.min(1, dt * 6));
+    smoothPtrRef.current.x = THREE.MathUtils.damp(
+      smoothPtrRef.current.x,
+      pointer.x * 3.5,
+      7,
+      dt
+    );
+    smoothPtrRef.current.y = THREE.MathUtils.damp(
+      smoothPtrRef.current.y,
+      pointer.y * 2.4,
+      7,
+      dt
+    );
+
+    matRef.current.uniforms.uTime.value = elapsedRef.current;
+    matRef.current.uniforms.uAccentColor.value.copy(activeColorRef.current);
+    matRef.current.uniforms.uPointer.value.copy(smoothPtrRef.current);
     const arr = ripplesRef.current;
     for (let i = 0; i < 4; i++) {
       const r = arr[i];
@@ -121,22 +143,22 @@ function RipplingInferenceLattice({
           void main() {
             vec3 pos = position;
             float dPtr = distance(pos.xy, uPointer);
-            float attract = exp(-dPtr * 0.65) * 0.48;
+            float attract = exp(-dPtr * 0.65) * 0.44;
 
             float rippleEnergy = 0.0;
             for (int i = 0; i < 4; i++) {
               float age = uTime - uRipples[i].z;
               if (age > 0.0 && age < 2.2) {
                 float dR = abs(distance(pos.xy, uRipples[i].xy) - age * 3.4);
-                rippleEnergy += exp(-dR * 2.6) * (1.0 - age / 2.2) * 0.9;
+                rippleEnergy += exp(-dR * 2.6) * (1.0 - age / 2.2) * 0.85;
               }
             }
 
-            pos.z += sin(pos.x * 0.9 + uTime * 0.9) * 0.14 + attract + rippleEnergy * 0.45;
+            pos.z += sin(pos.x * 0.9 + uTime * 0.85) * 0.12 + attract + rippleEnergy * 0.4;
             vec4 mv = modelViewMatrix * vec4(pos, 1.0);
             gl_Position = projectionMatrix * mv;
-            gl_PointSize = max(1.5, aScale * (18.0 / max(1.0, -mv.z)) * (1.0 + attract + rippleEnergy));
-            vEnergy = clamp(0.2 + attract * 0.8 + rippleEnergy, 0.15, 1.0);
+            gl_PointSize = max(1.5, aScale * (17.0 / max(1.0, -mv.z)) * (1.0 + attract + rippleEnergy));
+            vEnergy = clamp(0.2 + attract * 0.75 + rippleEnergy, 0.15, 1.0);
           }
         `}
         fragmentShader={`
@@ -149,7 +171,7 @@ function RipplingInferenceLattice({
             if (d > 0.5) discard;
             float soft = smoothstep(0.5, 0.08, d);
             vec3 col = mix(uBaseColor, uAccentColor, smoothstep(0.25, 0.95, vEnergy));
-            gl_FragColor = vec4(col, soft * mix(0.24, 0.82, vEnergy));
+            gl_FragColor = vec4(col, soft * mix(0.22, 0.76, vEnergy));
           }
         `}
       />
@@ -158,17 +180,19 @@ function RipplingInferenceLattice({
 }
 
 /**
- * Portrait holographic slab with SDF-rounded corners and aspect-preserving object-cover UV math
- * so neither the portrait plane nor the perimeter glow ever pokes outside the rounded bezel.
+ * Machined obsidian portrait enclosure with SDF-rounded cutout and chamfered accent lip.
+ * Zero rectangular overhang planes.
  */
 function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
   const [imgAspect, setImgAspect] = useState(1);
   const shaderRef = useRef<THREE.ShaderMaterial>(null);
-  const rimRef = useRef<THREE.ShaderMaterial>(null);
+  const trimMatRef = useRef<THREE.MeshStandardMaterial>(null);
   const textureRef = useRef<THREE.Texture | null>(null);
   const imgAspectRef = useRef(1);
-  const accentHueRef = useRef(accentHue);
+  const currentAccentRef = useRef(new THREE.Color(accentHue));
+  const targetAccentRef = useRef(new THREE.Color(accentHue));
+  const elapsedRef = useRef(0);
   const { invalidate } = useThree();
 
   useEffect(() => {
@@ -220,7 +244,7 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
   }, [texture, imgAspect, invalidate]);
 
   useEffect(() => {
-    accentHueRef.current = accentHue;
+    targetAccentRef.current.set(accentHue);
   }, [accentHue]);
 
   const uniforms = useMemo(
@@ -235,75 +259,51 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
     []
   );
 
-  const rimUniforms = useMemo(
-    () => ({
-      uAccent: { value: new THREE.Color(HERO_ORBIT_HUES[0]) },
-      uTime: { value: 0 },
-    }),
-    []
-  );
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05);
+    elapsedRef.current += dt;
+    currentAccentRef.current.lerp(targetAccentRef.current, Math.min(1, dt * 6));
 
-  useFrame((state) => {
-    const t = state.clock.elapsedTime;
     if (shaderRef.current) {
-      shaderRef.current.uniforms.uTime.value = t;
+      shaderRef.current.uniforms.uTime.value = elapsedRef.current;
       shaderRef.current.uniforms.uMap.value = textureRef.current;
       shaderRef.current.uniforms.uHasMap.value = textureRef.current ? 1.0 : 0.0;
       shaderRef.current.uniforms.uImgAspect.value = imgAspectRef.current;
-      shaderRef.current.uniforms.uAccent.value.set(accentHueRef.current);
+      shaderRef.current.uniforms.uAccent.value.copy(currentAccentRef.current);
     }
-    if (rimRef.current) {
-      rimRef.current.uniforms.uTime.value = t;
-      rimRef.current.uniforms.uAccent.value.set(accentHueRef.current);
+    if (trimMatRef.current) {
+      trimMatRef.current.emissive.copy(currentAccentRef.current);
+      trimMatRef.current.color.copy(currentAccentRef.current);
     }
   });
 
   return (
     <group>
-      {/* Machined Rounded Bezel */}
-      <RoundedBox args={[2.14, 2.42, 0.16]} radius={0.14} smoothness={6}>
-        <meshStandardMaterial color="#18202B" roughness={0.3} metalness={0.55} />
+      {/* Outer Machined Obsidian Chassis */}
+      <RoundedBox args={[2.14, 2.42, 0.13]} radius={0.14} smoothness={8}>
+        <meshStandardMaterial color="#161E29" roughness={0.34} metalness={0.58} />
       </RoundedBox>
 
-      {/* SDF Rounded Perimeter Glow Halo (no sharp rectangular corners) */}
-      <mesh position={[0, 0, -0.02]}>
-        <planeGeometry args={[2.32, 2.6]} />
-        <shaderMaterial
-          ref={rimRef}
-          uniforms={rimUniforms}
-          transparent
-          depthWrite={false}
-          vertexShader={`
-            varying vec2 vUv;
-            void main() {
-              vUv = uv;
-              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-          `}
-          fragmentShader={`
-            uniform vec3 uAccent;
-            uniform float uTime;
-            varying vec2 vUv;
-
-            float sdRoundedBox(vec2 p, vec2 b, float r) {
-              vec2 q = abs(p) - b + r;
-              return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
-            }
-
-            void main() {
-              vec2 p = (vUv - 0.5) * vec2(2.32, 2.6);
-              float d = sdRoundedBox(p, vec2(1.08, 1.22), 0.15);
-              float ring = exp(-abs(d) * 34.0) * (0.42 + 0.12 * sin(uTime * 1.8));
-              if (ring < 0.01) discard;
-              gl_FragColor = vec4(uAccent, clamp(ring, 0.0, 0.45));
-            }
-          `}
+      {/* Recessed Accent Chamfer Lip */}
+      <RoundedBox args={[2.01, 2.29, 0.14]} radius={0.12} smoothness={6}>
+        <meshStandardMaterial
+          ref={trimMatRef}
+          color={accentHue}
+          emissive={accentHue}
+          emissiveIntensity={0.28}
+          roughness={0.35}
+          metalness={0.45}
         />
-      </mesh>
+      </RoundedBox>
+
+      {/* Inner Dark Well */}
+      <RoundedBox args={[1.97, 2.25, 0.145]} radius={0.11} smoothness={6}>
+        <meshStandardMaterial color="#0D1117" roughness={0.55} metalness={0.25} />
+      </RoundedBox>
 
       {/* Front Portrait Shader with SDF Rounded Cutout */}
-      <mesh position={[0, 0, 0.088]}>
-        <planeGeometry args={[1.94, 2.22]} />
+      <mesh position={[0, 0, 0.076]}>
+        <planeGeometry args={[1.92, 2.2]} />
         <shaderMaterial
           ref={shaderRef}
           uniforms={uniforms}
@@ -340,8 +340,8 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
             }
 
             void main() {
-              vec2 p = (vUv - 0.5) * vec2(1.94, 2.22);
-              float d = sdRoundedBox(p, vec2(0.955, 1.095), 0.105);
+              vec2 p = (vUv - 0.5) * vec2(1.92, 2.2);
+              float d = sdRoundedBox(p, vec2(0.95, 1.09), 0.105);
               float mask = 1.0 - smoothstep(-0.008, 0.008, d);
               if (mask < 0.01) discard;
 
@@ -350,10 +350,8 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
                 vec2 uvCover = coverUv(vUv, uPlaneAspect, uImgAspect);
                 vec4 texel = texture2D(uMap, uvCover);
                 col = texel.rgb;
-                float scan = sin(vUv.y * 160.0 - uTime * 2.0) * 0.01;
-                col += scan * uAccent * 0.45;
-                float rim = smoothstep(-0.08, 0.0, d);
-                col = mix(col, mix(col, uAccent, 0.45), rim * 0.5);
+                float rim = smoothstep(-0.065, 0.0, d);
+                col = mix(col, mix(col, uAccent, 0.35), rim * 0.4);
               }
               gl_FragColor = vec4(col, mask);
             }
@@ -361,8 +359,8 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
         />
       </mesh>
 
-      {/* Rear Telemetry Plate (rounded to match front bezel) */}
-      <RoundedBox args={[1.9, 2.18, 0.02]} radius={0.1} smoothness={4} position={[0, 0, -0.082]}>
+      {/* Rear Telemetry Plate */}
+      <RoundedBox args={[1.92, 2.2, 0.02]} radius={0.1} smoothness={4} position={[0, 0, -0.068]}>
         <meshStandardMaterial
           color="#10151C"
           roughness={0.42}
@@ -381,16 +379,30 @@ function HeroOrbitalScene({
   onHoverSystem,
 }: HeroOrbitalCore3DProps & { onHoverSystem: (index: number | null) => void }) {
   const coreRef = useRef<THREE.Group>(null);
+  const ringMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const innerRingRef = useRef<THREE.Mesh>(null);
   const nodesRef = useRef<Array<THREE.Group | null>>([]);
+  const gimbalsRef = useRef<Array<THREE.Mesh | null>>([]);
   const ripplesRef = useRef<Array<{ x: number; y: number; t: number }>>([]);
   const activeIdxRef = useRef(activeSystemIndex);
   const prevIdxRef = useRef(activeSystemIndex);
+  const hoveredIdxRef = useRef<number | null>(null);
+  const draggingRef = useRef(false);
+  const elapsedRef = useRef(0);
+  const currentRingColorRef = useRef(new THREE.Color(HERO_ORBIT_HUES[0]));
+  const targetRingColorRef = useRef(new THREE.Color(HERO_ORBIT_HUES[0]));
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-  const { pointer, clock } = useThree();
+  const { pointer } = useThree();
 
   useEffect(() => {
     activeIdxRef.current = activeSystemIndex;
+    const sys = ORBITAL_SYSTEMS[activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
+    targetRingColorRef.current.set(sys.hue);
   }, [activeSystemIndex]);
+
+  useEffect(() => {
+    hoveredIdxRef.current = hoveredIdx;
+  }, [hoveredIdx]);
 
   useEffect(() => {
     return () => {
@@ -401,16 +413,17 @@ function HeroOrbitalScene({
   const activeSystem = ORBITAL_SYSTEMS[activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
 
   const handleStageClick = () => {
-    const t = clock.elapsedTime;
+    if (draggingRef.current) return;
     ripplesRef.current = [
-      { x: pointer.x * 3.5, y: pointer.y * 2.4, t },
+      { x: pointer.x * 3.5, y: pointer.y * 2.4, t: elapsedRef.current },
       ...ripplesRef.current.slice(0, 3),
     ];
   };
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.05);
-    const t = state.clock.elapsedTime;
+    elapsedRef.current += dt;
+    const t = elapsedRef.current;
 
     if (prevIdxRef.current !== activeIdxRef.current) {
       prevIdxRef.current = activeIdxRef.current;
@@ -420,130 +433,310 @@ function HeroOrbitalScene({
       ripplesRef.current = [{ x: rx, y: ry, t }, ...ripplesRef.current.slice(0, 3)];
     }
 
+    currentRingColorRef.current.lerp(targetRingColorRef.current, Math.min(1, dt * 6));
+    if (ringMatRef.current) {
+      ringMatRef.current.color.copy(currentRingColorRef.current);
+    }
+
     if (coreRef.current) {
-      const targetRotY = state.pointer.x * 0.24 + Math.sin(t * 0.42) * 0.14;
-      const targetRotX = -state.pointer.y * 0.14;
-      coreRef.current.rotation.y += (targetRotY - coreRef.current.rotation.y) * Math.min(1, dt * 4);
-      coreRef.current.rotation.x += (targetRotX - coreRef.current.rotation.x) * Math.min(1, dt * 4);
+      const targetRotY = draggingRef.current
+        ? 0
+        : state.pointer.x * 0.16 + Math.sin(t * 0.45) * 0.06;
+      const targetRotX = draggingRef.current ? 0 : -state.pointer.y * 0.09;
+      const targetPosY = Math.sin(t * 1.15) * 0.06;
+
+      coreRef.current.rotation.y = THREE.MathUtils.damp(
+        coreRef.current.rotation.y,
+        targetRotY,
+        4.5,
+        dt
+      );
+      coreRef.current.rotation.x = THREE.MathUtils.damp(
+        coreRef.current.rotation.x,
+        targetRotX,
+        4.5,
+        dt
+      );
+      coreRef.current.position.y = THREE.MathUtils.damp(
+        coreRef.current.position.y,
+        targetPosY,
+        4,
+        dt
+      );
+    }
+
+    if (innerRingRef.current) {
+      innerRingRef.current.rotation.z = -t * 0.18;
     }
 
     ORBITAL_SYSTEMS.forEach((_, idx) => {
       const node = nodesRef.current[idx];
       if (!node) return;
-      const angle = t * 0.36 + (idx * Math.PI) / 2;
-      const radiusX = 2.02;
-      const radiusZ = 1.18;
-      node.position.x = Math.cos(angle) * radiusX;
-      node.position.z = Math.sin(angle) * radiusZ;
-      node.position.y = Math.sin(angle * 2 + idx) * 0.38;
+      const angle = t * 0.34 + (idx * Math.PI) / 2;
+      node.position.set(
+        Math.cos(angle) * ORBIT_RADIUS,
+        0,
+        Math.sin(angle) * ORBIT_RADIUS
+      );
+
+      const isActive = idx === activeIdxRef.current;
+      const isHovered = idx === hoveredIdxRef.current;
+      const targetScale = isActive ? 1.24 : isHovered ? 1.12 : 0.92;
+      const nextScale = THREE.MathUtils.damp(node.scale.x, targetScale, 8, dt);
+      node.scale.setScalar(nextScale);
+
+      const gimbal = gimbalsRef.current[idx];
+      if (gimbal) {
+        gimbal.rotation.x = t * 0.9 + idx;
+        gimbal.rotation.y = t * 0.65 + idx * 0.7;
+      }
     });
   });
 
   return (
     <group onClick={handleStageClick}>
-      <ambientLight intensity={0.55} />
-      <hemisphereLight args={["#9CC9FF", "#0D1117", 0.75]} />
+      <ambientLight intensity={0.58} />
+      <hemisphereLight args={["#9CC9FF", "#0D1117", 0.82]} />
       <directionalLight position={[4, 5, 5]} intensity={1.35} color="#E6EDF3" />
-      <pointLight position={[-3.2, -1.8, 3.2]} intensity={1.65} decay={0} color={activeSystem.hue} />
-      <pointLight position={[3.2, 2.2, -2.5]} intensity={1.15} decay={0} color={STATE_HEALTHY} />
+      <pointLight position={[-3.2, -1.8, 3.2]} intensity={1.55} decay={0} color={activeSystem.hue} />
+      <pointLight position={[3.2, 2.2, -2.5]} intensity={1.1} decay={0} color={STATE_HEALTHY} />
 
       <RipplingInferenceLattice activeHue={activeSystem.hue} ripplesRef={ripplesRef} />
 
       <group ref={coreRef}>
-        <Float speed={1.5} rotationIntensity={0.07} floatIntensity={0.22}>
-          <PortraitDepthSlab accentHue={activeSystem.hue} />
-        </Float>
+        <PortraitDepthSlab accentHue={activeSystem.hue} />
 
-        <mesh rotation={[Math.PI / 2 - 0.18, 0.12, 0]}>
-          <torusGeometry args={[2.06, 0.015, 16, 110]} />
-          <meshBasicMaterial color={activeSystem.hue} transparent opacity={0.48} />
-        </mesh>
+        {/* Synchronized Inclined Orbital Plane (dips below face in front, rises behind head in back) */}
+        <group rotation={[0.42, 0.14, -0.15]}>
+          {/* Primary Track Ring */}
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[ORBIT_RADIUS, 0.009, 16, 160]} />
+            <meshBasicMaterial
+              ref={ringMatRef}
+              color={activeSystem.hue}
+              transparent
+              opacity={0.56}
+            />
+          </mesh>
 
-        <mesh rotation={[Math.PI / 2 + 0.24, -0.2, 0.25]}>
-          <torusGeometry args={[1.66, 0.01, 14, 92]} />
-          <meshBasicMaterial color={UI_ACCENT} transparent opacity={0.22} />
-        </mesh>
+          {/* Secondary Inner Reference Ring */}
+          <mesh ref={innerRingRef} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[INNER_ORBIT_RADIUS, 0.005, 12, 128]} />
+            <meshBasicMaterial color={UI_ACCENT} transparent opacity={0.22} />
+          </mesh>
 
-        {ORBITAL_SYSTEMS.map((sys, idx) => {
-          const isActive = idx === activeSystemIndex;
-          const isHovered = idx === hoveredIdx;
-          const scale = isActive ? 1.24 : isHovered ? 1.14 : 0.94;
+          {/* Track-Locked Gimbaled Satellite Beacons */}
+          {ORBITAL_SYSTEMS.map((sys, idx) => {
+            const isActive = idx === activeSystemIndex;
+            const isHovered = idx === hoveredIdx;
 
-          const nodeMesh = (
-            <mesh
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectSystem(idx);
-              }}
-              onPointerOver={(e) => {
-                e.stopPropagation();
-                setHoveredIdx(idx);
-                onHoverSystem(idx);
-                document.body.style.cursor = "pointer";
-              }}
-              onPointerOut={() => {
-                setHoveredIdx(null);
-                onHoverSystem(null);
-                document.body.style.cursor = "auto";
-              }}
-            >
-              <octahedronGeometry args={[0.17, 0]} />
-              <meshStandardMaterial
-                color={isActive ? sys.hue : "#222B38"}
-                emissive={sys.hue}
-                emissiveIntensity={isActive ? 1.65 : isHovered ? 0.9 : 0.35}
-                roughness={0.25}
-                metalness={0.45}
-                toneMapped={!isActive}
-              />
-            </mesh>
-          );
-
-          return (
-            <group
-              key={sys.id}
-              ref={(el) => {
-                nodesRef.current[idx] = el;
-              }}
-              scale={scale}
-            >
-              {nodeMesh}
-              {isActive && (
-                <mesh rotation={[Math.PI / 3, 0.28, 0]}>
-                  <torusGeometry args={[0.26, 0.013, 12, 36]} />
-                  <meshBasicMaterial color={sys.hue} transparent opacity={0.85} />
+            return (
+              <group
+                key={sys.id}
+                ref={(el) => {
+                  nodesRef.current[idx] = el;
+                }}
+              >
+                <mesh
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectSystem(idx);
+                  }}
+                  onPointerOver={(e) => {
+                    e.stopPropagation();
+                    setHoveredIdx(idx);
+                    onHoverSystem(idx);
+                    document.body.style.cursor = "pointer";
+                  }}
+                  onPointerOut={() => {
+                    setHoveredIdx(null);
+                    onHoverSystem(null);
+                    document.body.style.cursor = "auto";
+                  }}
+                >
+                  <sphereGeometry args={[0.078, 24, 24]} />
+                  <meshStandardMaterial
+                    color={isActive ? sys.hue : "#232E3F"}
+                    emissive={sys.hue}
+                    emissiveIntensity={isActive ? 1.55 : isHovered ? 0.95 : 0.42}
+                    roughness={0.22}
+                    metalness={0.4}
+                    toneMapped={!isActive}
+                  />
                 </mesh>
-              )}
-            </group>
-          );
-        })}
+
+                <mesh
+                  ref={(el) => {
+                    gimbalsRef.current[idx] = el;
+                  }}
+                >
+                  <torusGeometry args={[0.138, 0.011, 16, 48]} />
+                  <meshBasicMaterial
+                    color={sys.hue}
+                    transparent
+                    opacity={isActive ? 0.92 : isHovered ? 0.72 : 0.45}
+                  />
+                </mesh>
+
+                {isActive && (
+                  <mesh rotation={[Math.PI / 2, 0, 0]}>
+                    <torusGeometry args={[0.19, 0.006, 12, 48]} />
+                    <meshBasicMaterial color={sys.hue} transparent opacity={0.6} />
+                  </mesh>
+                )}
+              </group>
+            );
+          })}
+        </group>
       </group>
 
       <OrbitControls
         enableZoom={false}
         enablePan={false}
         enableDamping
-        dampingFactor={0.07}
-        minPolarAngle={Math.PI * 0.32}
-        maxPolarAngle={Math.PI * 0.68}
+        dampingFactor={0.055}
+        rotateSpeed={0.55}
+        minPolarAngle={Math.PI * 0.35}
+        maxPolarAngle={Math.PI * 0.65}
+        minAzimuthAngle={-Math.PI * 0.32}
+        maxAzimuthAngle={Math.PI * 0.32}
+        onStart={() => {
+          draggingRef.current = true;
+        }}
+        onEnd={() => {
+          window.setTimeout(() => {
+            draggingRef.current = false;
+          }, 40);
+        }}
         touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
       />
     </group>
   );
 }
 
-const LazyPortraitFallback = (
-  <div className="flex h-full w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.1)] bg-[#161B22]">
-    <Image
-      src={profile.heroPortrait}
-      alt={`${profile.name} portrait`}
-      width={224}
-      height={256}
-      priority
-      className="h-56 w-48 rounded-2xl object-cover shadow-2xl sm:h-64 sm:w-56"
-    />
-  </div>
-);
+/**
+ * Interactive Zero-GPU 2D Telemetry Orbital Stage shown in 2D SAFE mode or without WebGL.
+ */
+function HeroOrbital2DFallback({
+  activeSystemIndex,
+  onSelectSystem,
+}: HeroOrbitalCore3DProps) {
+  const active = ORBITAL_SYSTEMS[activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
+  const nodePositions = [
+    { left: "12%", top: "30%" },
+    { left: "84%", top: "24%" },
+    { left: "84%", top: "74%" },
+    { left: "14%", top: "74%" },
+  ] as const;
+
+  return (
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.1)] bg-[#0D1117]">
+      {/* Subtle Architectural Coordinate Grid */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-45"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(56, 189, 248, 0.16) 1px, transparent 1px)",
+          backgroundSize: "22px 22px",
+        }}
+      />
+
+      {/* Ambient Single-Accent Radial Glow */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute h-64 w-64 rounded-full opacity-20 blur-3xl transition-colors duration-500"
+        style={{ backgroundColor: active.hue }}
+      />
+
+      {/* Precision Inclined Orbital Rings SVG */}
+      <svg
+        viewBox="0 0 420 340"
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        aria-hidden="true"
+      >
+        <g transform="translate(210 170) rotate(-11)">
+          <ellipse
+            cx="0"
+            cy="0"
+            rx="172"
+            ry="66"
+            fill="none"
+            stroke={active.hue}
+            strokeOpacity="0.42"
+            strokeWidth="1.4"
+          />
+          <ellipse
+            cx="0"
+            cy="0"
+            rx="142"
+            ry="48"
+            fill="none"
+            stroke="#38BDF8"
+            strokeOpacity="0.22"
+            strokeDasharray="4 5"
+            strokeWidth="1"
+          />
+        </g>
+      </svg>
+
+      {/* Machined Double-Bezel Portrait Frame */}
+      <div
+        className="relative z-10 rounded-[1.45rem] border bg-[#161B22] p-1.5 shadow-2xl transition-colors duration-300"
+        style={{ borderColor: `${active.hue}66` }}
+      >
+        <div className="relative h-52 w-44 overflow-hidden rounded-[1.1rem] border border-[rgba(240,246,252,0.1)] bg-[#0D1117] sm:h-60 sm:w-52">
+          <Image
+            src={profile.heroPortrait}
+            alt={`${profile.name} portrait`}
+            width={224}
+            height={256}
+            priority
+            className="h-full w-full object-cover object-top"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 rounded-[1.1rem] ring-1 ring-inset ring-white/10"
+          />
+        </div>
+      </div>
+
+      {/* Interactive 2D Orbital System Beacons */}
+      {ORBITAL_SYSTEMS.map((sys, idx) => {
+        const isActive = idx === activeSystemIndex;
+        const pos = nodePositions[idx];
+        return (
+          <button
+            key={sys.id}
+            type="button"
+            onClick={() => onSelectSystem(idx)}
+            aria-label={`Select ${sys.label} (${sys.metric})`}
+            aria-pressed={isActive}
+            style={{
+              left: pos.left,
+              top: pos.top,
+              borderColor: isActive ? sys.hue : "rgba(240,246,252,0.14)",
+              backgroundColor: isActive ? "rgba(22, 27, 34, 0.96)" : "rgba(13, 17, 23, 0.9)",
+            }}
+            className="absolute z-20 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[11px] text-[#E6EDF3] backdrop-blur-md transition-all duration-200 hover:scale-105"
+          >
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: sys.hue }}
+              aria-hidden="true"
+            />
+            <span className="font-semibold">{sys.label}</span>
+          </button>
+        );
+      })}
+
+      {/* 2D Safe Indicator */}
+      <span className="pointer-events-none absolute bottom-3 right-3 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B949E]">
+        2D Safe · Vector
+      </span>
+    </div>
+  );
+}
 
 export function HeroOrbitalCore3D({
   activeSystemIndex,
@@ -563,9 +756,14 @@ export function HeroOrbitalCore3D({
 
       <ViewportCanvas
         eager
-        cameraPosition={[0, 0.25, 5.55]}
+        cameraPosition={[0, 0.2, 5.55]}
         fov={40}
-        fallback={LazyPortraitFallback}
+        fallback={
+          <HeroOrbital2DFallback
+            activeSystemIndex={activeSystemIndex}
+            onSelectSystem={onSelectSystem}
+          />
+        }
         className="h-full w-full"
       >
         <HeroOrbitalScene

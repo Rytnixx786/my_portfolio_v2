@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { STATE_FAULT, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
+import { useCanRender3D } from "@/hooks/usePortfolioUtils";
+import { PlaygroundPipeline2D } from "@/components/sections/PlaygroundPipeline2D";
 import { SpriteLabel3D } from "./SpriteLabel3D";
 import { ViewportCanvas } from "./ViewportCanvas";
 
@@ -17,106 +19,209 @@ interface PlaygroundPipeline3DProps {
   activeStages: string[];
   statusColor: "#10B981" | "#38BDF8" | "#F59E0B" | "#EF4444";
   cameraPreset: PlaygroundCameraPreset;
+  presetTrigger?: number;
+  focusedStageId?: string | null;
   rpsMultiplier?: number;
   onSelectStage?: (stageId: string) => void;
 }
 
 const STATION_X = [-4.0, -2.4, -0.8, 0.8, 2.4, 4.0] as const;
-const TOKEN_COUNT = 64;
+const TOKEN_COUNT = 36;
+const UP_AXIS = new THREE.Vector3(0, 1, 0);
 
-function CameraTweenController({ preset }: { preset: PlaygroundCameraPreset }) {
+const PRESET_VANTAGES: Record<PlaygroundCameraPreset, [number, number, number]> = {
+  isometric: [2.2, 3.5, 6.6],
+  top: [0, 8.2, 1.9],
+  orbit: [2.4, 3.1, 6.2],
+};
+
+function CameraRigController({
+  preset,
+  presetTrigger,
+}: {
+  preset: PlaygroundCameraPreset;
+  presetTrigger: number;
+}) {
   const { camera, frameloop, invalidate } = useThree();
-  const targetPos = useMemo(() => new THREE.Vector3(0, 3.25, 6.25), []);
-  const lookTarget = useMemo(() => new THREE.Vector3(0, -0.1, 0), []);
+  const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
+  const targetPosRef = useRef(new THREE.Vector3(...PRESET_VANTAGES.isometric));
+  const lookTargetRef = useRef(new THREE.Vector3(0, 0.08, 0));
+  const transitioningRef = useRef(true);
+  const draggingRef = useRef(false);
+  const elapsedRef = useRef(0);
 
   useEffect(() => {
-    if (preset === "isometric") {
-      targetPos.set(0, 3.25, 6.25);
-    } else if (preset === "top") {
-      targetPos.set(0, 7.1, 1.35);
-    }
-    if (preset !== "orbit") {
-      if (frameloop === "demand") {
-        camera.position.copy(targetPos);
-        camera.lookAt(lookTarget);
-      }
-      invalidate();
-    }
-  }, [preset, targetPos, lookTarget, camera, frameloop, invalidate]);
+    const vantage = PRESET_VANTAGES[preset];
+    targetPosRef.current.set(vantage[0], vantage[1], vantage[2]);
+    lookTargetRef.current.set(0, preset === "top" ? 0 : 0.08, 0);
+    transitioningRef.current = true;
 
-  useFrame((_, delta) => {
-    if (preset === "orbit") return;
-    if (camera.position.distanceTo(targetPos) < 0.005) return;
+    if (frameloop === "demand") {
+      camera.position.copy(targetPosRef.current);
+      if (controlsRef.current) {
+        controlsRef.current.target.copy(lookTargetRef.current);
+        controlsRef.current.update();
+      }
+    }
+    invalidate();
+  }, [preset, presetTrigger, camera, frameloop, invalidate]);
+
+  useFrame((state, delta) => {
     const dt = Math.min(delta, 0.05);
-    camera.position.lerp(targetPos, Math.min(1, dt * 4.5));
-    camera.lookAt(lookTarget);
+    elapsedRef.current += dt;
+    const controls = controlsRef.current;
+    const cam = state.camera;
+
+    if (transitioningRef.current && !draggingRef.current) {
+      const alpha = 1 - Math.exp(-5.5 * dt);
+      cam.position.lerp(targetPosRef.current, alpha);
+
+      if (controls) {
+        controls.target.lerp(lookTargetRef.current, 1 - Math.exp(-6 * dt));
+      }
+
+      if (cam.position.distanceTo(targetPosRef.current) < 0.03) {
+        transitioningRef.current = false;
+      }
+    } else if (preset === "isometric" && !draggingRef.current && controls) {
+      // Gentle living telemetry parallax in isometric idle without fighting user drag
+      controls.target.set(
+        Math.sin(elapsedRef.current * 0.65) * 0.14,
+        0.08 + Math.cos(elapsedRef.current * 0.85) * 0.04,
+        0
+      );
+    }
+
+    controls?.update();
   });
 
-  return preset === "orbit" ? (
+  return (
     <OrbitControls
-      target={[0, -0.1, 0]}
+      ref={controlsRef}
+      target={[0, 0.08, 0]}
       enableZoom={false}
       enablePan={false}
       enableDamping
-      dampingFactor={0.07}
-      minPolarAngle={0.25}
-      maxPolarAngle={Math.PI * 0.48}
+      dampingFactor={0.055}
+      rotateSpeed={0.65}
+      autoRotate={preset === "orbit"}
+      autoRotateSpeed={0.75}
+      minPolarAngle={0.14}
+      maxPolarAngle={Math.PI * 0.47}
+      onStart={() => {
+        draggingRef.current = true;
+        transitioningRef.current = false;
+      }}
+      onEnd={() => {
+        draggingRef.current = false;
+      }}
       touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
     />
-  ) : null;
+  );
 }
 
-function InstancedTokenStream({
+function buildScenarioCurve(scenarioId: string, lastActiveIdx: number): THREE.CatmullRomCurve3 {
+  const endX = STATION_X[Math.max(0, Math.min(5, lastActiveIdx))] ?? 4.0;
+
+  if (scenarioId === "cache-hit") {
+    // Flows into 04 ONNX Cache (x = +0.8), then returns fast over an elevated emerald bypass arc
+    return new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-4.2, 0.46, 0),
+      new THREE.Vector3(-2.4, 0.46, 0),
+      new THREE.Vector3(-0.8, 0.46, 0),
+      new THREE.Vector3(0.8, 0.54, 0),
+      new THREE.Vector3(1.1, 1.15, 0.35),
+      new THREE.Vector3(-1.4, 1.38, 0.45),
+      new THREE.Vector3(-3.9, 0.82, 0.25),
+    ]);
+  }
+
+  if (scenarioId === "breaker-open" || scenarioId === "budget-cutoff" || scenarioId === "nli-refusal") {
+    return new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-4.2, 0.46, 0),
+      new THREE.Vector3(((-4.2 + endX) * 0.5), 0.46, 0),
+      new THREE.Vector3(endX, 0.5, 0),
+      new THREE.Vector3(endX + 0.35, 0.22, 0.55),
+      new THREE.Vector3(endX + 0.55, -0.18, 0.95),
+    ]);
+  }
+
+  if (scenarioId === "hitl-replan") {
+    return new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-4.2, 0.46, 0),
+      new THREE.Vector3(-2.4, 0.46, 0),
+      new THREE.Vector3(-0.8, 0.52, 0),
+      new THREE.Vector3(-0.35, 0.72, 0.42),
+      new THREE.Vector3(-0.8, 0.85, 0),
+      new THREE.Vector3(-1.25, 0.72, -0.42),
+      new THREE.Vector3(-0.8, 0.52, 0),
+    ]);
+  }
+
+  return new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-4.2, 0.46, 0),
+    new THREE.Vector3(-2.4, 0.5, 0),
+    new THREE.Vector3(-0.8, 0.46, 0),
+    new THREE.Vector3(0.8, 0.5, 0),
+    new THREE.Vector3(2.4, 0.46, 0),
+    new THREE.Vector3(4.2, 0.46, 0),
+  ]);
+}
+
+function InstancedPacketStream({
+  scenarioId,
+  lastActiveIdx,
   statusColor,
-  isCacheBypass,
-  isFaultBurst,
   rpsMultiplier,
 }: {
+  scenarioId: string;
+  lastActiveIdx: number;
   statusColor: string;
-  isCacheBypass: boolean;
-  isFaultBurst: boolean;
   rpsMultiplier: number;
 }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const elapsedRef = useRef(0);
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  const pointVec = useMemo(() => new THREE.Vector3(), []);
+  const tangentVec = useMemo(() => new THREE.Vector3(), []);
+
+  const curve = useMemo(
+    () => buildScenarioCurve(scenarioId, lastActiveIdx),
+    [scenarioId, lastActiveIdx]
+  );
+
   const seeds = useMemo(
     () =>
       Array.from({ length: TOKEN_COUNT }, (_, idx) => ({
         offset: idx / TOKEN_COUNT,
-        lane: ((idx % 5) - 2) * 0.09,
-        jitter: ((idx * 17) % 10) / 10 - 0.5,
+        laneZ: ((idx % 3) - 1) * 0.1,
       })),
     []
   );
 
-  useFrame((state) => {
+  useFrame((_, delta) => {
     const mesh = meshRef.current;
     if (!mesh) return;
-    const t = state.clock.elapsedTime;
-    const speed = 0.22 * rpsMultiplier;
+    const dt = Math.min(delta, 0.05);
+    elapsedRef.current += dt;
+
+    const speed =
+      (scenarioId === "cache-hit" ? 0.34 : scenarioId === "hitl-replan" ? 0.24 : 0.28) *
+      rpsMultiplier;
 
     for (let i = 0; i < TOKEN_COUNT; i++) {
       const s = seeds[i];
-      const u = (s.offset + t * speed) % 1;
+      const u = (s.offset + elapsedRef.current * speed) % 1;
 
-      if (isCacheBypass) {
-        const x = -4.0 + u * 8.0;
-        const arch = u > 0.35 ? Math.sin(((u - 0.35) / 0.65) * Math.PI) * 1.45 : 0;
-        dummy.position.set(x, 0.48 + arch, s.lane);
-        dummy.scale.setScalar(1.05);
-      } else if (isFaultBurst) {
-        const burst = Math.max(0, u - 0.2);
-        dummy.position.set(
-          -4.0 + Math.min(0.2, u) * 7 + burst * s.jitter * 2.4,
-          0.42 - burst * 2.1,
-          s.lane + burst * s.jitter * 2.2
-        );
-        dummy.scale.setScalar(Math.max(0.25, 1.15 - burst));
-      } else {
-        dummy.position.set(-4.0 + u * 8.0, 0.48 + Math.sin(u * Math.PI * 4) * 0.08, s.lane);
-        dummy.scale.setScalar(0.95);
-      }
+      curve.getPointAt(u, pointVec);
+      curve.getTangentAt(u, tangentVec).normalize();
 
+      dummy.position.set(pointVec.x, pointVec.y, pointVec.z + s.laneZ);
+      dummy.quaternion.setFromUnitVectors(UP_AXIS, tangentVec);
+
+      const fadeEdge = Math.sin(u * Math.PI);
+      const scaleVal = 0.65 + fadeEdge * 0.45;
+      dummy.scale.set(scaleVal, scaleVal * 1.15, scaleVal);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     }
@@ -125,10 +230,128 @@ function InstancedTokenStream({
   });
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, TOKEN_COUNT]}>
-      <sphereGeometry args={[0.068, 10, 10]} />
-      <meshBasicMaterial color={statusColor} toneMapped={false} />
-    </instancedMesh>
+    <group>
+      {/* Smooth Illuminated Conduit Spine */}
+      <mesh>
+        <tubeGeometry args={[curve, 64, 0.022, 10, false]} />
+        <meshBasicMaterial color={statusColor} transparent opacity={0.34} />
+      </mesh>
+
+      {/* Directional Micro-Packet Capsules */}
+      <instancedMesh ref={meshRef} args={[undefined, undefined, TOKEN_COUNT]}>
+        <capsuleGeometry args={[0.032, 0.11, 6, 12]} />
+        <meshBasicMaterial color={statusColor} toneMapped={false} />
+      </instancedMesh>
+    </group>
+  );
+}
+
+function StationPedestal({
+  stage,
+  x,
+  isActive,
+  isFocused,
+  statusColor,
+  pulsePhase,
+  onSelect,
+}: {
+  stage: { id: string; label: string };
+  x: number;
+  isActive: boolean;
+  isFocused: boolean;
+  statusColor: string;
+  pulsePhase: number;
+  onSelect?: () => void;
+}) {
+  const bodyRef = useRef<THREE.Group>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+  const [hovered, setHovered] = useState(false);
+  const elapsedRef = useRef(0);
+
+  const pedestalColor = isFocused ? UI_ACCENT : isActive ? statusColor : "#2B3647";
+
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05);
+    elapsedRef.current += dt;
+    if (bodyRef.current) {
+      const wave = isActive ? Math.sin(elapsedRef.current * 2.6 + pulsePhase) * 0.035 : 0;
+      const targetY = (isFocused ? 0.16 : isActive ? 0.08 : 0) + (hovered ? 0.06 : 0) + wave;
+      bodyRef.current.position.y = THREE.MathUtils.damp(
+        bodyRef.current.position.y,
+        targetY,
+        8,
+        dt
+      );
+    }
+    if (ringRef.current) {
+      const targetScale = isFocused ? 1.15 : isActive ? 1.0 + Math.sin(elapsedRef.current * 3 + pulsePhase) * 0.08 : 0.7;
+      const next = THREE.MathUtils.damp(ringRef.current.scale.x, targetScale, 8, dt);
+      ringRef.current.scale.set(next, next, 1);
+    }
+  });
+
+  return (
+    <group position={[x, 0.12, 0]}>
+      {/* Ground Halo Ring */}
+      <mesh ref={ringRef} position={[0, -0.34, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.52, 0.59, 32]} />
+        <meshBasicMaterial
+          color={pedestalColor}
+          transparent
+          opacity={isFocused ? 0.92 : isActive ? 0.45 : 0.12}
+          toneMapped={!isActive && !isFocused}
+        />
+      </mesh>
+
+      <group ref={bodyRef}>
+        <RoundedBox
+          args={[0.94, isActive ? 0.64 : 0.4, 0.94]}
+          radius={0.08}
+          smoothness={4}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect?.();
+          }}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            setHovered(true);
+            document.body.style.cursor = "pointer";
+          }}
+          onPointerOut={() => {
+            setHovered(false);
+            document.body.style.cursor = "auto";
+          }}
+        >
+          <meshStandardMaterial
+            color={isFocused ? "#233246" : isActive ? "#1D2634" : "#171F2C"}
+            roughness={0.36}
+            metalness={0.32}
+            emissive={pedestalColor}
+            emissiveIntensity={isFocused ? 0.55 : isActive ? 0.32 : 0.06}
+          />
+        </RoundedBox>
+
+        {/* Top Telemetry Cap */}
+        <mesh position={[0, isActive ? 0.335 : 0.215, 0]}>
+          <boxGeometry args={[0.78, 0.04, 0.78]} />
+          <meshBasicMaterial
+            color={pedestalColor}
+            toneMapped={!isActive && !isFocused}
+            transparent
+            opacity={isFocused ? 1 : isActive ? 0.92 : 0.4}
+          />
+        </mesh>
+
+        <SpriteLabel3D
+          text={stage.label}
+          position={[0, isActive ? 0.68 : 0.54, 0]}
+          active={isActive || isFocused || hovered}
+          accentColor={pedestalColor}
+          worldHeight={0.24}
+          maxWorldWidth={1.42}
+        />
+      </group>
+    </group>
   );
 }
 
@@ -138,12 +361,22 @@ function PipelineDioramaScene({
   activeStages,
   statusColor,
   cameraPreset,
+  presetTrigger = 0,
+  focusedStageId = null,
   rpsMultiplier = 1,
   onSelectStage,
 }: PlaygroundPipeline3DProps) {
-  const rigRef = useRef<THREE.Group>(null);
-  const isFaultBurst = scenarioId === "breaker-open" || scenarioId === "nli-refusal";
+  const isFaultBurst =
+    scenarioId === "breaker-open" ||
+    scenarioId === "budget-cutoff" ||
+    scenarioId === "nli-refusal";
   const isCacheBypass = scenarioId === "cache-hit";
+
+  const activeIndices = stages
+    .map((s, idx) => (activeStages.includes(s.id) ? idx : -1))
+    .filter((idx) => idx >= 0);
+  const lastActiveIdx =
+    activeIndices.length > 0 ? activeIndices[activeIndices.length - 1] : 0;
 
   useEffect(() => {
     return () => {
@@ -151,104 +384,58 @@ function PipelineDioramaScene({
     };
   }, []);
 
-  useFrame((state) => {
-    if (!rigRef.current) return;
-    if (isFaultBurst) {
-      const t = state.clock.elapsedTime;
-      rigRef.current.position.x = Math.sin(t * 28) * 0.03;
-      rigRef.current.position.y = Math.cos(t * 24) * 0.02;
-    } else {
-      rigRef.current.position.x *= 0.85;
-      rigRef.current.position.y *= 0.85;
-    }
-  });
-
   return (
-    <group ref={rigRef}>
-      <ambientLight intensity={0.48} />
+    <group>
+      <ambientLight intensity={0.5} />
       <hemisphereLight args={["#9CC9FF", "#0D1117", 0.85]} />
       <directionalLight position={[4, 6, 4]} intensity={1.35} color="#E6EDF3" />
-      <pointLight position={[-3.5, 2.2, 2.5]} intensity={1.4} decay={0} color={UI_ACCENT} />
-      <pointLight position={[3.5, 2.2, 2.5]} intensity={1.3} decay={0} color={statusColor} />
+      <pointLight position={[-3.5, 2.2, 2.5]} intensity={1.35} decay={0} color={UI_ACCENT} />
+      <pointLight position={[3.5, 2.2, 2.5]} intensity={1.25} decay={0} color={statusColor} />
 
-      <CameraTweenController preset={cameraPreset} />
+      <CameraRigController preset={cameraPreset} presetTrigger={presetTrigger} />
 
-      {/* Ground Telemetry Rail */}
+      {/* Ground Telemetry Chassis */}
       <mesh position={[0, -0.35, 0]}>
-        <boxGeometry args={[9.8, 0.08, 2.4]} />
-        <meshStandardMaterial color="#141A23" roughness={0.62} metalness={0.25} />
+        <boxGeometry args={[9.8, 0.08, 2.5]} />
+        <meshStandardMaterial color="#141A23" roughness={0.6} metalness={0.25} />
       </mesh>
 
-      <gridHelper args={[10.5, 18, "#2A384A", "#19222E"]} position={[0, -0.3, 0]} />
+      <gridHelper args={[11, 20, "#243242", "#17202B"]} position={[0, -0.3, 0]} />
 
-      {/* Main Rail Line */}
-      <mesh position={[0, 0.42, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.025, 0.025, 8.2, 10]} />
+      {/* Inactive Reference Rail */}
+      <mesh position={[0, 0.44, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.015, 0.015, 8.4, 10]} />
         <meshBasicMaterial
-          color={isFaultBurst ? STATE_FAULT : isCacheBypass ? STATE_HEALTHY : UI_ACCENT}
+          color={isFaultBurst ? STATE_FAULT : isCacheBypass ? STATE_HEALTHY : "#2A3646"}
           transparent
-          opacity={0.5}
+          opacity={0.35}
         />
       </mesh>
 
       {/* Station Pedestals */}
       {stages.map((stage, idx) => {
         const isActive = activeStages.includes(stage.id);
+        const isFocused = focusedStageId === stage.id;
         const x = STATION_X[idx] ?? idx * 1.5 - 3.75;
-        const pedestalColor = isActive ? statusColor : "#2B3647";
 
         return (
-          <group key={stage.id} position={[x, 0.14, 0]}>
-            <RoundedBox
-              args={[0.92, isActive ? 0.68 : 0.42, 0.92]}
-              radius={0.07}
-              smoothness={3}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectStage?.(stage.id);
-              }}
-              onPointerOver={() => {
-                document.body.style.cursor = "pointer";
-              }}
-              onPointerOut={() => {
-                document.body.style.cursor = "auto";
-              }}
-            >
-              <meshStandardMaterial
-                color={isActive ? "#1D2634" : "#1C2432"}
-                roughness={0.38}
-                metalness={0.28}
-                emissive={pedestalColor}
-                emissiveIntensity={isActive ? 0.35 : 0.08}
-              />
-            </RoundedBox>
-
-            <mesh position={[0, isActive ? 0.36 : 0.23, 0]}>
-              <boxGeometry args={[0.78, 0.045, 0.78]} />
-              <meshBasicMaterial
-                color={pedestalColor}
-                toneMapped={!isActive}
-                transparent
-                opacity={isActive ? 0.95 : 0.48}
-              />
-            </mesh>
-
-            <SpriteLabel3D
-              text={stage.label}
-              position={[0, isActive ? 0.68 : 0.54, 0]}
-              active={isActive}
-              accentColor={statusColor}
-              worldHeight={0.24}
-              maxWorldWidth={1.42}
-            />
-          </group>
+          <StationPedestal
+            key={stage.id}
+            stage={stage}
+            x={x}
+            isActive={isActive}
+            isFocused={isFocused}
+            statusColor={statusColor}
+            pulsePhase={idx * 0.65}
+            onSelect={() => onSelectStage?.(stage.id)}
+          />
         );
       })}
 
-      <InstancedTokenStream
+      <InstancedPacketStream
+        scenarioId={scenarioId}
+        lastActiveIdx={lastActiveIdx}
         statusColor={statusColor}
-        isCacheBypass={isCacheBypass}
-        isFaultBurst={isFaultBurst}
         rpsMultiplier={rpsMultiplier}
       />
     </group>
@@ -256,14 +443,40 @@ function PipelineDioramaScene({
 }
 
 /**
- * Interactive 3D pipeline diorama powered by 64 instanced token capsules inside the single root canvas.
+ * Interactive 3D pipeline diorama with smooth damping camera presets (Isometric, Top, Orbit),
+ * directional telemetry capsules, and a zero-GPU interactive 2D vector schematic fallback.
  */
 export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {
+  const { canRender3D } = useCanRender3D();
+  const initialPos = PRESET_VANTAGES[props.cameraPreset] ?? PRESET_VANTAGES.isometric;
+
   return (
     <div className="relative h-[265px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[315px]">
-      <ViewportCanvas cameraPosition={[0, 3.25, 6.25]} fov={38} className="h-full w-full">
+      <ViewportCanvas
+        cameraPosition={initialPos}
+        fov={38}
+        className="h-full w-full"
+        fallback={
+          <PlaygroundPipeline2D
+            tab={props.tab}
+            scenarioId={props.scenarioId}
+            stages={props.stages}
+            activeStages={props.activeStages}
+            statusColor={props.statusColor}
+            focusedStageId={props.focusedStageId}
+            rpsMultiplier={props.rpsMultiplier}
+            onSelectStage={props.onSelectStage}
+          />
+        }
+      >
         <PipelineDioramaScene {...props} />
       </ViewportCanvas>
+
+      {canRender3D && (
+        <span className="pointer-events-none absolute bottom-2.5 right-3 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/85 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[#8B949E] backdrop-blur-md">
+          Drag to orbit · Click station
+        </span>
+      )}
     </div>
   );
 }

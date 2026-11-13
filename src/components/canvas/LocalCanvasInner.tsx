@@ -1,20 +1,55 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { PerformanceMonitor } from "@react-three/drei";
 import * as THREE from "three";
+
+// Filter upstream @react-three/fiber internal THREE.Clock deprecation noise on Three r183+
+// while forwarding every other Three.js warning/error untouched.
+let consoleConfigured = false;
+function configureThreeConsole() {
+  if (consoleConfigured || typeof window === "undefined") return;
+  consoleConfigured = true;
+  if (typeof THREE.setConsoleFunction === "function") {
+    THREE.setConsoleFunction((type, message, ...params) => {
+      if (
+        type === "warn" &&
+        typeof message === "string" &&
+        message.includes("Clock: This module has been deprecated")
+      ) {
+        return;
+      }
+      const fn =
+        type === "error"
+          ? console.error
+          : type === "warn"
+            ? console.warn
+            : console.log;
+      fn(message, ...params);
+    });
+  }
+}
+configureThreeConsole();
 
 /**
  * Ensures vertical touch scrolling never gets trapped by OrbitControls' default touch-action: none,
  * and triggers an immediate demand frame when activeLoop state flips.
  */
 function CanvasLifecycle({ activeLoop }: { activeLoop: boolean }) {
-  const { invalidate } = useThree();
+  const setFrameloop = useThree((s) => s.setFrameloop);
+  const invalidate = useThree((s) => s.invalidate);
 
   useEffect(() => {
+    const mode = activeLoop ? "always" : "demand";
+    setFrameloop(mode);
     invalidate();
-  }, [activeLoop, invalidate]);
+    const rafId = window.requestAnimationFrame(() => {
+      setFrameloop(mode);
+      invalidate();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [activeLoop, setFrameloop, invalidate]);
 
   return null;
 }
@@ -41,6 +76,8 @@ export function LocalCanvasInner({
   onContextRestored: () => void;
 }) {
   const unmountingRef = useRef(false);
+  const [dprClamped, setDprClamped] = useState(false);
+  const effectiveDpr: [number, number] = dprClamped ? [1, 1.15] : dpr;
 
   useLayoutEffect(() => {
     unmountingRef.current = false;
@@ -52,15 +89,15 @@ export function LocalCanvasInner({
   return (
     <Canvas
       className="r3f-local-canvas"
-      dpr={dpr}
+      dpr={effectiveDpr}
       frameloop={activeLoop ? "always" : "demand"}
       camera={{ position: cameraPosition, fov, near: 0.1, far: 100 }}
       gl={{
         antialias,
         alpha: true,
-        powerPreference: "default",
+        powerPreference: "high-performance",
         toneMapping: THREE.ACESFilmicToneMapping,
-        toneMappingExposure: 1.08,
+        toneMappingExposure: 1.06,
       }}
       onCreated={(state) => {
         const gl = state.gl;
@@ -93,7 +130,13 @@ export function LocalCanvasInner({
         touchAction: "pan-y",
       }}
     >
-      <PerformanceMonitor flipflops={3} onDecline={onDecline} />
+      <PerformanceMonitor
+        flipflops={3}
+        onDecline={() => {
+          setDprClamped(true);
+          onDecline();
+        }}
+      />
       {children}
       <CanvasLifecycle activeLoop={activeLoop} />
     </Canvas>

@@ -16,8 +16,14 @@ interface StackRack3DProps {
   onSelectTool: (tool: string) => void;
 }
 
-function RackCameraFit({ totalRows }: { totalRows: number }) {
-  const { camera, invalidate } = useThree();
+function RackCameraFit({
+  totalRows,
+  draggingRef,
+}: {
+  totalRows: number;
+  draggingRef: React.MutableRefObject<boolean>;
+}) {
+  const { camera, frameloop, invalidate } = useThree();
   const target = useMemo(
     () =>
       totalRows >= 3
@@ -25,12 +31,27 @@ function RackCameraFit({ totalRows }: { totalRows: number }) {
         : new THREE.Vector3(0, 2.55, 3.55),
     [totalRows]
   );
+  const settlingRef = useRef(true);
 
   useEffect(() => {
-    camera.position.copy(target);
-    camera.lookAt(0, 0.08, 0);
+    settlingRef.current = true;
+    if (frameloop === "demand") {
+      camera.position.copy(target);
+      camera.lookAt(0, 0.08, 0);
+    }
     invalidate();
-  }, [camera, target, invalidate]);
+  }, [camera, target, frameloop, invalidate]);
+
+  useFrame((state, delta) => {
+    if (!settlingRef.current || draggingRef.current) return;
+    const dt = Math.min(delta, 0.05);
+    const cam = state.camera;
+    cam.position.lerp(target, 1 - Math.exp(-6 * dt));
+    cam.lookAt(0, 0.08, 0);
+    if (cam.position.distanceTo(target) < 0.02) {
+      settlingRef.current = false;
+    }
+  });
 
   return null;
 }
@@ -52,17 +73,23 @@ function KeycapNode({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
+  const elapsedRef = useRef(0);
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
+    elapsedRef.current += dt;
     if (!groupRef.current) return;
     const wave =
       rippleDelay > 0
-        ? Math.sin(Math.max(0, state.clock.elapsedTime - rippleDelay) * 8) * 0.03
+        ? Math.sin(Math.max(0, elapsedRef.current - rippleDelay) * 4.5) * 0.018
         : 0;
-    const targetY = (isSelected ? -0.14 : hovered ? -0.07 : 0) + wave;
-    groupRef.current.position.y +=
-      (targetY - groupRef.current.position.y) * Math.min(1, dt * 12);
+    const targetY = (isSelected ? -0.14 : hovered ? -0.06 : 0) + wave;
+    groupRef.current.position.y = THREE.MathUtils.damp(
+      groupRef.current.position.y,
+      targetY,
+      10,
+      dt
+    );
   });
 
   return (
@@ -130,8 +157,87 @@ function KeycapNode({
 }
 
 /**
+ * Interactive Zero-GPU 2D Mechanical Switchboard Rack (2D SAFE mode & WebGL fallback).
+ */
+function StackRack2DFallback({
+  layerCode,
+  layerName,
+  tools,
+  selectedTool,
+  accentHue,
+  onSelectTool,
+}: StackRack3DProps & { accentHue: string }) {
+  return (
+    <div className="relative flex h-full w-full flex-col justify-between bg-[#0D1117] p-4 pt-10">
+      {/* Subtle Architectural Matrix Dots */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-45"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(240, 246, 252, 0.08) 1px, transparent 1px)",
+          backgroundSize: "20px 20px",
+        }}
+      />
+
+      <span className="pointer-events-none absolute right-3 top-2.5 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B949E]">
+        2D Safe · Keycap Matrix
+      </span>
+
+      <div className="relative z-10 my-auto grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        {tools.map((tool, idx) => {
+          const isPicked = selectedTool === tool;
+          return (
+            <button
+              key={`${layerCode}-${tool}`}
+              type="button"
+              onClick={() => onSelectTool(tool)}
+              aria-pressed={isPicked}
+              style={{
+                borderColor: isPicked ? accentHue : "rgba(240,246,252,0.12)",
+                boxShadow: isPicked
+                  ? `0 0 0 1px ${accentHue}55, inset 0 2px 0 rgba(255,255,255,0.08)`
+                  : "0 4px 0 #090C10, inset 0 1px 0 rgba(255,255,255,0.06)",
+              }}
+              className={`group flex min-h-[54px] flex-col justify-between rounded-xl border bg-[#161B22] px-3 py-2 text-left transition-all duration-150 ${
+                isPicked
+                  ? "translate-y-[2px] bg-[#1C2634]"
+                  : "hover:border-[rgba(240,246,252,0.28)] hover:bg-[#1C222B]"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className="font-mono text-[10px] tabular-nums"
+                  style={{ color: isPicked ? accentHue : "#6E7681" }}
+                >
+                  K{String(idx + 1).padStart(2, "0")}
+                </span>
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{
+                    backgroundColor: isPicked ? accentHue : "rgba(240,246,252,0.18)",
+                  }}
+                  aria-hidden="true"
+                />
+              </div>
+              <span className="truncate font-mono text-xs font-semibold text-[#E6EDF3]">
+                {tool}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="relative z-10 font-mono text-[10px] uppercase tracking-[0.12em] text-[#6E7681]">
+        {layerName} · Click any keycap to inspect
+      </p>
+    </div>
+  );
+}
+
+/**
  * Tactile 3D Stack Rack per architecture layer with per-layer hue underglow,
- * balanced row centering, and collision-free sprite labels.
+ * balanced row centering, collision-free sprite labels, and tactile 2D keycap fallback.
  */
 export function StackRack3D({
   layerCode,
@@ -147,6 +253,7 @@ export function StackRack3D({
   const zSpacing = 1.18;
   const layerIdx = Math.max(0, Number.parseInt(layerCode, 10) - 1) % STACK_LAYER_HUES.length;
   const accentHue = STACK_LAYER_HUES[layerIdx] ?? STACK_LAYER_HUES[0];
+  const draggingRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -178,9 +285,19 @@ export function StackRack3D({
       <ViewportCanvas
         cameraPosition={totalRows >= 3 ? [0, 3.0, 4.15] : [0, 2.55, 3.55]}
         fov={40}
+        fallback={
+          <StackRack2DFallback
+            layerCode={layerCode}
+            layerName={layerName}
+            tools={tools}
+            selectedTool={selectedTool}
+            accentHue={accentHue}
+            onSelectTool={onSelectTool}
+          />
+        }
         className="h-full w-full"
       >
-        <RackCameraFit totalRows={totalRows} />
+        <RackCameraFit totalRows={totalRows} draggingRef={draggingRef} />
         <ambientLight intensity={0.62} />
         <hemisphereLight args={["#B8D9FF", "#0D1117", 1.0]} />
         <directionalLight position={[2, 7, 5]} intensity={1.3} color="#E6EDF3" />
@@ -208,9 +325,16 @@ export function StackRack3D({
           enableZoom={false}
           enablePan={false}
           enableDamping
-          dampingFactor={0.08}
+          dampingFactor={0.055}
+          rotateSpeed={0.6}
           minPolarAngle={0.45}
           maxPolarAngle={Math.PI * 0.42}
+          onStart={() => {
+            draggingRef.current = true;
+          }}
+          onEnd={() => {
+            draggingRef.current = false;
+          }}
           touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
         />
       </ViewportCanvas>

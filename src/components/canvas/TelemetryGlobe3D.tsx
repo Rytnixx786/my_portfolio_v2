@@ -18,6 +18,7 @@ const REGIONS = [
     lat: (37.7749 * Math.PI) / 180,
     lon: (-122.4194 * Math.PI) / 180,
     hue: CATEGORY_HUES["Inference & Serving"].hex,
+    svgPos: { x: 64, y: 92 },
   },
   {
     id: "fra",
@@ -26,6 +27,7 @@ const REGIONS = [
     lat: (50.1109 * Math.PI) / 180,
     lon: (8.6821 * Math.PI) / 180,
     hue: CATEGORY_HUES["Agents & RAG"].hex,
+    svgPos: { x: 132, y: 74 },
   },
   {
     id: "tyo",
@@ -34,6 +36,7 @@ const REGIONS = [
     lat: (35.6762 * Math.PI) / 180,
     lon: (139.6503 * Math.PI) / 180,
     hue: CATEGORY_HUES["MLOps & Security"].hex,
+    svgPos: { x: 256, y: 96 },
   },
 ] as const;
 
@@ -46,14 +49,17 @@ function latLonToVec3(lat: number, lon: number, radius: number): THREE.Vector3 {
 
 function GlobeAssembly({
   selectedId,
+  draggingRef,
   onSelect,
 }: {
   selectedId: string;
+  draggingRef: React.MutableRefObject<boolean>;
   onSelect: (id: string) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const pulseRef = useRef<THREE.Mesh>(null);
   const packetRefs = useRef<Array<THREE.Mesh | null>>([]);
+  const elapsedRef = useRef(0);
 
   const dhakaPos = useMemo(() => latLonToVec3(DHAKA_LAT, DHAKA_LON, 1.32), []);
 
@@ -66,14 +72,16 @@ function GlobeAssembly({
     });
   }, [dhakaPos]);
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
-    const t = state.clock.elapsedTime;
-    if (groupRef.current) {
+    elapsedRef.current += dt;
+    const t = elapsedRef.current;
+
+    if (groupRef.current && !draggingRef.current) {
       groupRef.current.rotation.y += dt * 0.14;
     }
     if (pulseRef.current) {
-      const s = 1 + Math.sin(t * 3.1) * 0.28;
+      const s = 1 + Math.sin(t * 2.8) * 0.24;
       pulseRef.current.scale.set(s, s, s);
     }
     routes.forEach((r, idx) => {
@@ -108,7 +116,7 @@ function GlobeAssembly({
       </mesh>
 
       <mesh rotation={[Math.PI / 2, 0.12, 0]}>
-        <torusGeometry args={[1.64, 0.011, 10, 88]} />
+        <torusGeometry args={[1.64, 0.011, 10, 96]} />
         <meshBasicMaterial color={UI_ACCENT} transparent opacity={0.42} />
       </mesh>
 
@@ -118,11 +126,11 @@ function GlobeAssembly({
         return (
           <group key={route.id}>
             <mesh>
-              <tubeGeometry args={[route.curve, 32, isSelected ? 0.022 : 0.014, 8, false]} />
+              <tubeGeometry args={[route.curve, 40, isSelected ? 0.022 : 0.014, 8, false]} />
               <meshBasicMaterial
                 color={route.hue}
                 transparent
-                opacity={isSelected ? 0.88 : 0.42}
+                opacity={isSelected ? 0.9 : 0.4}
               />
             </mesh>
 
@@ -131,7 +139,7 @@ function GlobeAssembly({
                 packetRefs.current[idx] = el;
               }}
             >
-              <sphereGeometry args={[0.04, 10, 10]} />
+              <sphereGeometry args={[0.042, 12, 12]} />
               <meshBasicMaterial color={route.hue} toneMapped={false} />
             </mesh>
 
@@ -142,7 +150,7 @@ function GlobeAssembly({
                 onSelect(route.id);
               }}
             >
-              <sphereGeometry args={[isSelected ? 0.068 : 0.05, 12, 12]} />
+              <sphereGeometry args={[isSelected ? 0.068 : 0.05, 14, 14]} />
               <meshBasicMaterial color={route.hue} toneMapped={!isSelected} />
             </mesh>
           </group>
@@ -164,22 +172,143 @@ function GlobeAssembly({
   );
 }
 
-const Globe2DFallback = (
-  <svg viewBox="0 0 260 260" className="h-full w-full p-4" fill="none" aria-hidden="true">
-    <circle cx="130" cy="130" r="95" stroke="#303946" strokeWidth="1" strokeDasharray="3 3" />
-    <ellipse cx="130" cy="130" rx="95" ry="38" stroke="rgba(56,189,248,0.28)" strokeWidth="1" />
-    <path d="M135 128 Q 95 72 52 96" stroke="#59C5EE" strokeWidth="1.5" strokeDasharray="4 3" />
-    <path d="M135 128 Q 115 74 108 72" stroke="#EB99BB" strokeWidth="1.5" strokeDasharray="4 3" />
-    <path d="M135 128 Q 175 78 202 104" stroke="#A8CE6C" strokeWidth="1.5" strokeDasharray="4 3" />
-    <circle cx="135" cy="128" r="5" fill="#10B981" />
-    <text x="144" y="132" fill="#E6EDF3" fontSize="10" fontFamily="monospace">
-      Dhaka UTC+6
-    </text>
-  </svg>
-);
+/**
+ * Interactive Zero-GPU 2D Telemetry Graticule (2D SAFE mode & WebGL fallback).
+ */
+function Globe2DFallback({
+  selectedId,
+  onSelect,
+}: {
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  const dhaka = { x: 184, y: 122 };
+
+  return (
+    <div className="relative flex h-full w-full items-center justify-center bg-[#0D1117] px-3 pb-10 pt-8">
+      <span className="pointer-events-none absolute right-2.5 top-2.5 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B949E]">
+        2D Safe · Graticule
+      </span>
+
+      <svg
+        viewBox="0 0 320 200"
+        className="h-full max-h-[210px] w-full select-none"
+        role="img"
+        aria-label="Dhaka global latency telemetry map"
+      >
+        {/* Wireframe Globe Graticule */}
+        <circle
+          cx="160"
+          cy="104"
+          r="82"
+          fill="#10151D"
+          stroke="rgba(240,246,252,0.14)"
+          strokeWidth="1.2"
+        />
+        <ellipse
+          cx="160"
+          cy="104"
+          rx="82"
+          ry="30"
+          fill="none"
+          stroke="rgba(56,189,248,0.22)"
+          strokeWidth="1"
+        />
+        <ellipse
+          cx="160"
+          cy="104"
+          rx="36"
+          ry="82"
+          fill="none"
+          stroke="rgba(240,246,252,0.08)"
+          strokeWidth="1"
+        />
+        <line
+          x1="78"
+          y1="104"
+          x2="242"
+          y2="104"
+          stroke="rgba(240,246,252,0.08)"
+          strokeDasharray="3 3"
+        />
+
+        {/* Latency Arcs */}
+        {REGIONS.map((region) => {
+          const isSelected = region.id === selectedId;
+          const mx = (dhaka.x + region.svgPos.x) / 2;
+          const my = Math.min(dhaka.y, region.svgPos.y) - 34;
+          const pathD = `M ${dhaka.x} ${dhaka.y} Q ${mx} ${my} ${region.svgPos.x} ${region.svgPos.y}`;
+
+          return (
+            <g
+              key={region.id}
+              onClick={() => onSelect(region.id)}
+              style={{ cursor: "pointer" }}
+            >
+              <path
+                d={pathD}
+                fill="none"
+                stroke={region.hue}
+                strokeOpacity={isSelected ? 0.92 : 0.35}
+                strokeWidth={isSelected ? 2.2 : 1.2}
+                strokeDasharray={isSelected ? "6 4" : "3 4"}
+              >
+                {isSelected && (
+                  <animate
+                    attributeName="stroke-dashoffset"
+                    from="20"
+                    to="0"
+                    dur="1.1s"
+                    repeatCount="indefinite"
+                  />
+                )}
+              </path>
+
+              <circle
+                cx={region.svgPos.x}
+                cy={region.svgPos.y}
+                r={isSelected ? 6 : 4.2}
+                fill={region.hue}
+                fillOpacity={isSelected ? 1 : 0.65}
+              />
+
+              <text
+                x={region.svgPos.x}
+                y={region.svgPos.y - 11}
+                textAnchor="middle"
+                fill={isSelected ? "#E6EDF3" : "#8B949E"}
+                fontSize="9.5"
+                fontWeight={isSelected ? "700" : "500"}
+                fontFamily="var(--font-mono), monospace"
+              >
+                {region.name}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Dhaka Origin Beacon */}
+        <circle cx={dhaka.x} cy={dhaka.y} r="10" fill="#10B981" fillOpacity="0.2" />
+        <circle cx={dhaka.x} cy={dhaka.y} r="4.5" fill="#10B981" />
+        <text
+          x={dhaka.x}
+          y={dhaka.y + 16}
+          textAnchor="middle"
+          fill="#10B981"
+          fontSize="9.5"
+          fontWeight="600"
+          fontFamily="var(--font-mono), monospace"
+        >
+          Dhaka
+        </text>
+      </svg>
+    </div>
+  );
+}
 
 export function TelemetryGlobe3D() {
   const [selectedId, setSelectedId] = useState<string>(REGIONS[0].id);
+  const draggingRef = useRef(false);
   const activeRegion = REGIONS.find((r) => r.id === selectedId) ?? REGIONS[0];
 
   return (
@@ -192,7 +321,7 @@ export function TelemetryGlobe3D() {
       <ViewportCanvas
         cameraPosition={[0, 0.3, 4.1]}
         fov={38}
-        fallback={Globe2DFallback}
+        fallback={<Globe2DFallback selectedId={selectedId} onSelect={setSelectedId} />}
         className="h-full w-full"
       >
         <ambientLight intensity={0.5} />
@@ -200,13 +329,24 @@ export function TelemetryGlobe3D() {
         <directionalLight position={[4, 4, 4]} intensity={1.15} color="#E6EDF3" />
         <pointLight position={[-3, 1.5, 2]} intensity={1.35} decay={0} color={UI_ACCENT} />
 
-        <GlobeAssembly selectedId={selectedId} onSelect={setSelectedId} />
+        <GlobeAssembly
+          selectedId={selectedId}
+          draggingRef={draggingRef}
+          onSelect={setSelectedId}
+        />
 
         <OrbitControls
           enableZoom={false}
           enablePan={false}
           enableDamping
-          dampingFactor={0.07}
+          dampingFactor={0.055}
+          rotateSpeed={0.6}
+          onStart={() => {
+            draggingRef.current = true;
+          }}
+          onEnd={() => {
+            draggingRef.current = false;
+          }}
           touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
         />
       </ViewportCanvas>

@@ -44,7 +44,6 @@ export function ViewportCanvas({
     requestSlot,
     releaseSlot,
     setContextLost,
-    setPreference,
   } = useCanRender3D();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,7 +60,7 @@ export function ViewportCanvas({
           setNearView(entry.isIntersecting);
         }
       },
-      { rootMargin: "260px 0px" }
+      { rootMargin: "480px 0px" }
     );
 
     const activeObserver = new IntersectionObserver(
@@ -102,7 +101,7 @@ export function ViewportCanvas({
 
   const hasSlot = canRender3D && nearView && activeSlotIds.has(slotId);
   const dpr: [number, number] =
-    maxDpr ?? (effectiveTier === "high" ? [1, 1.75] : [1, 1.5]);
+    maxDpr ?? (effectiveTier === "high" ? [1, 1.5] : [1, 1.25]);
 
   return (
     <div
@@ -127,9 +126,7 @@ export function ViewportCanvas({
           antialias={effectiveTier !== "low"}
           activeLoop={!isStaticPose && inView}
           onDecline={() => {
-            if (effectiveTier === "high") {
-              setPreference("balanced");
-            }
+            // Keep slot count stable; local DPR adaptation avoids context thrashing
           }}
           onContextLost={() => setContextLost(true)}
           onContextRestored={() => setContextLost(false)}

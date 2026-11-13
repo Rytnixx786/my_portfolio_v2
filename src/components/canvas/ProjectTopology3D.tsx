@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { CATEGORY_HUES, STATE_FAULT, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
 import { ViewportCanvas } from "./ViewportCanvas";
@@ -18,11 +18,14 @@ interface ProjectTopology3DProps {
  */
 function CinchGpuSculpture({
   mode,
+  draggingRef,
 }: {
   mode: "cache" | "marlin" | "breaker";
+  draggingRef: React.MutableRefObject<boolean>;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const pulseRef = useRef<THREE.Mesh>(null);
+  const elapsedRef = useRef(0);
   const hue = CATEGORY_HUES["Inference & Serving"].hex;
 
   const bypassCurve = useMemo(() => {
@@ -34,14 +37,15 @@ function CinchGpuSculpture({
     ]);
   }, []);
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
-    if (groupRef.current) {
-      groupRef.current.rotation.y += dt * 0.26;
+    elapsedRef.current += dt;
+    if (groupRef.current && !draggingRef.current) {
+      groupRef.current.rotation.y += dt * 0.22;
     }
     if (pulseRef.current) {
-      const speed = mode === "cache" ? 0.65 : mode === "marlin" ? 0.42 : 0.9;
-      const t = (state.clock.elapsedTime * speed) % 1;
+      const speed = mode === "cache" ? 0.62 : mode === "marlin" ? 0.42 : 0.85;
+      const t = (elapsedRef.current * speed) % 1;
       bypassCurve.getPointAt(t, pulseRef.current.position);
     }
   });
@@ -53,18 +57,17 @@ function CinchGpuSculpture({
     <group ref={groupRef}>
       {[-0.48, -0.16, 0.16, 0.48].map((y, idx) => (
         <group key={y} position={[0, y, 0]}>
-          <mesh>
-            <boxGeometry args={[1.38, 0.12, 0.92]} />
+          <RoundedBox args={[1.38, 0.12, 0.92]} radius={0.03} smoothness={3}>
             <meshStandardMaterial
               color={idx === 2 ? "#283447" : "#1E2736"}
               emissive={hue}
               emissiveIntensity={mode === "marlin" ? 0.34 : 0.08}
-              roughness={0.42}
-              metalness={0.28}
+              roughness={0.38}
+              metalness={0.32}
             />
-          </mesh>
+          </RoundedBox>
           <mesh position={[0.66, 0, 0.42]}>
-            <sphereGeometry args={[0.045, 12, 12]} />
+            <sphereGeometry args={[0.045, 14, 14]} />
             <meshBasicMaterial
               color={mode === "breaker" && idx === 0 ? STATE_FAULT : pulseColor}
               toneMapped={false}
@@ -74,12 +77,12 @@ function CinchGpuSculpture({
       ))}
 
       <mesh>
-        <tubeGeometry args={[bypassCurve, 40, 0.026, 8, false]} />
-        <meshBasicMaterial color={pulseColor} transparent opacity={0.42} />
+        <tubeGeometry args={[bypassCurve, 48, 0.025, 10, false]} />
+        <meshBasicMaterial color={pulseColor} transparent opacity={0.44} />
       </mesh>
 
       <mesh ref={pulseRef}>
-        <sphereGeometry args={[0.075, 14, 14]} />
+        <sphereGeometry args={[0.075, 16, 16]} />
         <meshBasicMaterial color={pulseColor} toneMapped={false} />
       </mesh>
     </group>
@@ -92,13 +95,16 @@ function CinchGpuSculpture({
 function NexusDagSculpture({
   hitlApproved,
   activeNodeIdx,
+  draggingRef,
   onSelectNode,
 }: {
   hitlApproved: boolean;
   activeNodeIdx: number;
+  draggingRef: React.MutableRefObject<boolean>;
   onSelectNode: (idx: number, label: string) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
+  const nodeRefs = useRef<Array<THREE.Mesh | null>>([]);
   const rose = CATEGORY_HUES["Agents & RAG"].hex;
 
   const nodes = useMemo(
@@ -138,9 +144,16 @@ function NexusDagSculpture({
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
-    if (groupRef.current) {
-      groupRef.current.rotation.y += dt * 0.2;
+    if (groupRef.current && !draggingRef.current) {
+      groupRef.current.rotation.y += dt * 0.18;
     }
+    nodes.forEach((_, idx) => {
+      const mesh = nodeRefs.current[idx];
+      if (!mesh) return;
+      const target = idx === activeNodeIdx ? 1.28 : 0.95;
+      const next = THREE.MathUtils.damp(mesh.scale.x, target, 8, dt);
+      mesh.scale.setScalar(next);
+    });
   });
 
   return (
@@ -167,18 +180,27 @@ function NexusDagSculpture({
         return (
           <group key={node.id} position={node.pos}>
             <mesh
+              ref={(el) => {
+                nodeRefs.current[idx] = el;
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectNode(idx, node.id);
               }}
+              onPointerOver={() => {
+                document.body.style.cursor = "pointer";
+              }}
+              onPointerOut={() => {
+                document.body.style.cursor = "auto";
+              }}
             >
-              <octahedronGeometry args={[isSelected ? 0.22 : 0.16, 0]} />
+              <sphereGeometry args={[0.16, 20, 20]} />
               <meshStandardMaterial
                 color={color}
                 emissive={color}
-                emissiveIntensity={isSelected || isHitl ? 1.15 : 0.35}
-                roughness={0.3}
-                metalness={0.6}
+                emissiveIntensity={isSelected || isHitl ? 1.05 : 0.35}
+                roughness={0.28}
+                metalness={0.45}
                 toneMapped={!isSelected}
               />
             </mesh>
@@ -192,8 +214,15 @@ function NexusDagSculpture({
 /**
  * ARES 3D interactive mini-lab: threshold plane slices champion/candidate slice bars in real time.
  */
-function AresGateSculpture({ threshold }: { threshold: number }) {
+function AresGateSculpture({
+  threshold,
+  draggingRef,
+}: {
+  threshold: number;
+  draggingRef: React.MutableRefObject<boolean>;
+}) {
   const groupRef = useRef<THREE.Group>(null);
+  const planeRef = useRef<THREE.Mesh>(null);
   const lime = CATEGORY_HUES["MLOps & Security"].hex;
 
   const slices = useMemo(
@@ -206,14 +235,22 @@ function AresGateSculpture({ threshold }: { threshold: number }) {
     []
   );
 
+  const targetPlaneY = -0.55 + threshold * 1.1;
+
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
-    if (groupRef.current) {
-      groupRef.current.rotation.y += dt * 0.24;
+    if (groupRef.current && !draggingRef.current) {
+      groupRef.current.rotation.y += dt * 0.2;
+    }
+    if (planeRef.current) {
+      planeRef.current.position.y = THREE.MathUtils.damp(
+        planeRef.current.position.y,
+        targetPlaneY,
+        10,
+        dt
+      );
     }
   });
-
-  const planeY = -0.55 + threshold * 1.1;
 
   return (
     <group ref={groupRef}>
@@ -222,22 +259,27 @@ function AresGateSculpture({ threshold }: { threshold: number }) {
         const height = s.val * 1.15;
         const col = passed ? lime : STATE_FAULT;
         return (
-          <mesh key={s.id} position={[s.x, -0.55 + height * 0.5, 0]}>
-            <boxGeometry args={[0.3, height, 0.3]} />
+          <RoundedBox
+            key={s.id}
+            args={[0.3, height, 0.3]}
+            radius={0.04}
+            smoothness={3}
+            position={[s.x, -0.55 + height * 0.5, 0]}
+          >
             <meshStandardMaterial
               color={col}
               emissive={col}
               emissiveIntensity={passed ? 0.35 : 0.9}
-              roughness={0.4}
-              metalness={0.28}
+              roughness={0.36}
+              metalness={0.3}
               toneMapped={passed}
             />
-          </mesh>
+          </RoundedBox>
         );
       })}
 
       {/* Live Threshold Promotion Plane */}
-      <mesh position={[0, planeY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh ref={planeRef} position={[0, targetPlaneY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[2.5, 0.95]} />
         <meshBasicMaterial color={UI_ACCENT} transparent opacity={0.22} side={THREE.DoubleSide} />
       </mesh>
@@ -256,6 +298,7 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
     label: "HITL",
   });
   const [aresThreshold, setAresThreshold] = useState(0.82);
+  const draggingRef = useRef(false);
 
   return (
     <div className={`relative h-[225px] w-full overflow-hidden rounded-b-[calc(1.5rem-0.375rem)] sm:h-[260px] ${className}`}>
@@ -265,21 +308,31 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
         <directionalLight position={[3, 4, 4]} intensity={1.2} color="#E6EDF3" />
         <pointLight position={[-2.5, -1.5, 2.5]} intensity={1.35} decay={0} color={UI_ACCENT} />
 
-        {slug === "cinch" && <CinchGpuSculpture mode={cinchMode} />}
+        {slug === "cinch" && <CinchGpuSculpture mode={cinchMode} draggingRef={draggingRef} />}
         {slug === "nexus-researcher" && (
           <NexusDagSculpture
             hitlApproved={hitlApproved}
             activeNodeIdx={nexusNode.idx}
+            draggingRef={draggingRef}
             onSelectNode={(idx, label) => setNexusNode({ idx, label })}
           />
         )}
-        {slug === "ares" && <AresGateSculpture threshold={aresThreshold} />}
+        {slug === "ares" && (
+          <AresGateSculpture threshold={aresThreshold} draggingRef={draggingRef} />
+        )}
 
         <OrbitControls
           enableZoom={false}
           enablePan={false}
           enableDamping
-          dampingFactor={0.08}
+          dampingFactor={0.055}
+          rotateSpeed={0.6}
+          onStart={() => {
+            draggingRef.current = true;
+          }}
+          onEnd={() => {
+            draggingRef.current = false;
+          }}
           touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
         />
       </ViewportCanvas>

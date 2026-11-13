@@ -51,6 +51,9 @@ function SpatialDagScene({
   const connections = architecture.connections;
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const pulseRefs = useRef<Array<THREE.Mesh | null>>([]);
+  const elapsedRef = useRef(0);
+  const draggingRef = useRef(false);
+  const settlingRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -102,13 +105,45 @@ function SpatialDagScene({
   const activeNode = positioned[activeIndex] ?? positioned[0];
 
   useEffect(() => {
-    if (!controlsRef.current || !activeNode) return;
-    controlsRef.current.target.lerp(activeNode.vec, 0.45);
-    controlsRef.current.update();
+    if (!activeNode) return;
+    settlingRef.current = true;
   }, [activeNode]);
 
-  useFrame((state) => {
-    const t = state.clock.elapsedTime;
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05);
+    elapsedRef.current += dt;
+    const t = elapsedRef.current;
+
+    if (controlsRef.current) {
+      if (settlingRef.current && !draggingRef.current && activeNode) {
+        controlsRef.current.target.x = THREE.MathUtils.damp(
+          controlsRef.current.target.x,
+          activeNode.vec.x * 0.45,
+          6,
+          dt
+        );
+        controlsRef.current.target.y = THREE.MathUtils.damp(
+          controlsRef.current.target.y,
+          activeNode.vec.y * 0.45,
+          6,
+          dt
+        );
+        controlsRef.current.target.z = THREE.MathUtils.damp(
+          controlsRef.current.target.z,
+          activeNode.vec.z * 0.45,
+          6,
+          dt
+        );
+        if (
+          Math.abs(controlsRef.current.target.x - activeNode.vec.x * 0.45) < 0.01 &&
+          Math.abs(controlsRef.current.target.y - activeNode.vec.y * 0.45) < 0.01
+        ) {
+          settlingRef.current = false;
+        }
+      }
+      controlsRef.current.update();
+    }
+
     curves.forEach((c, idx) => {
       const mesh = pulseRefs.current[idx];
       if (!mesh) return;
@@ -238,7 +273,15 @@ function SpatialDagScene({
         minDistance={4.2}
         maxDistance={12}
         enableDamping
-        dampingFactor={0.07}
+        dampingFactor={0.055}
+        rotateSpeed={0.6}
+        onStart={() => {
+          draggingRef.current = true;
+          settlingRef.current = false;
+        }}
+        onEnd={() => {
+          draggingRef.current = false;
+        }}
         touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
       />
     </group>

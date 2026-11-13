@@ -130,7 +130,14 @@ export function ProjectPreviewPlate({
       {show3DStage ? (
         <LazyProjectTopology3D slug={project.slug} />
       ) : (
-        <div className="p-3 sm:p-4">
+        <div
+          className="relative p-3 sm:p-4"
+          style={{
+            backgroundImage:
+              "radial-gradient(rgba(240, 246, 252, 0.06) 1px, transparent 1px)",
+            backgroundSize: "20px 20px",
+          }}
+        >
           <svg
             viewBox={`0 0 ${svgWidth} ${svgHeight}`}
             className="h-auto w-full select-none"
@@ -151,7 +158,7 @@ export function ProjectPreviewPlate({
                   d={`M ${from.x} ${from.y} Q ${mx} ${my} ${to.x} ${to.y}`}
                   fill="none"
                   stroke={isHighlighted ? hue.hex : "rgba(240,246,252,0.16)"}
-                  strokeWidth={isHighlighted ? 2.2 : 1.2}
+                  strokeWidth={isHighlighted ? 2.4 : 1.2}
                   strokeDasharray={isHighlighted ? undefined : "4 4"}
                 />
               );
@@ -160,9 +167,23 @@ export function ProjectPreviewPlate({
             {coords.map((node) => {
               const isActive = node.index === activeIdx;
               return (
-                <g key={node.id} transform={`translate(${node.x}, ${node.y})`}>
+                <g
+                  key={node.id}
+                  transform={`translate(${node.x}, ${node.y})`}
+                  onClick={() => setActiveIdx(node.index)}
+                  style={{ cursor: "pointer" }}
+                >
+                  {isActive && (
+                    <circle
+                      r={22}
+                      fill="none"
+                      stroke={hue.hex}
+                      strokeOpacity={0.35}
+                      strokeWidth={1.2}
+                    />
+                  )}
                   <circle
-                    r={isActive ? 16 : 11}
+                    r={isActive ? 16 : 12}
                     fill={isActive ? hue.softBg : "#161B22"}
                     stroke={isActive ? hue.hex : "rgba(240,246,252,0.22)"}
                     strokeWidth={isActive ? 2 : 1.2}

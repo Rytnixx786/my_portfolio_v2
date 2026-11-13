@@ -214,7 +214,10 @@ export function useCanRender3D() {
   return {
     ...ctx,
     canRender3D,
-    isStaticPose: ctx.reducedMotion,
+    // Keep interactive 3D telemetry/orbit scenes animating smoothly even when OS
+    // "Animation effects" sets prefers-reduced-motion; our scenes avoid jarring motion
+    // and users can switch to 2D SAFE anytime via the HUD.
+    isStaticPose: false,
     dprCap: ctx.effectiveTier === "high" ? 1.75 : 1.25,
   };
 }

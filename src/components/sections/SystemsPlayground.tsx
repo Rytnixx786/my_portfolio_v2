@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowUpRight, Cpu, GitBranch, Lightning, Sliders } from "@phosphor-icons/react";
 import type { PlaygroundCameraPreset } from "@/components/canvas/PlaygroundPipeline3D";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
+import { PlaygroundPipeline2D } from "./PlaygroundPipeline2D";
 import { SectionReveal } from "./SectionReveal";
 
 const LazyPlaygroundPipeline3D = dynamic(
@@ -208,6 +209,7 @@ export function SystemsPlayground() {
   const [cinchId, setCinchId] = useState(CINCH_SCENARIOS[0].id);
   const [ragId, setRagId] = useState(RAG_SCENARIOS[0].id);
   const [cameraPreset, setCameraPreset] = useState<PlaygroundCameraPreset>("isometric");
+  const [presetTrigger, setPresetTrigger] = useState<number>(0);
   const [rpsMultiplier, setRpsMultiplier] = useState<number>(1.0);
   const [piiGuardEnabled, setPiiGuardEnabled] = useState<boolean>(true);
   const [semanticCacheEnabled, setSemanticCacheEnabled] = useState<boolean>(true);
@@ -402,7 +404,10 @@ export function SystemsPlayground() {
                     <button
                       key={preset}
                       type="button"
-                      onClick={() => setCameraPreset(preset)}
+                      onClick={() => {
+                        setCameraPreset(preset);
+                        setPresetTrigger((n) => n + 1);
+                      }}
                       className={`rounded-md px-2.5 py-1 uppercase transition-colors ${
                         cameraPreset === preset
                           ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
@@ -417,18 +422,35 @@ export function SystemsPlayground() {
             </div>
 
             <div className="space-y-6 p-4 sm:p-6">
-              <LazyPlaygroundPipeline3D
-                tab={tab}
-                scenarioId={activeScenario.id}
-                stages={stages}
-                activeStages={effectiveStages}
-                statusColor={activeScenario.statusColor}
-                cameraPreset={cameraPreset}
-                rpsMultiplier={rpsMultiplier}
-                onSelectStage={(stageId) =>
-                  setFocusedStageId((prev) => (prev === stageId ? null : stageId))
-                }
-              />
+              {canRender3D ? (
+                <LazyPlaygroundPipeline3D
+                  tab={tab}
+                  scenarioId={activeScenario.id}
+                  stages={stages}
+                  activeStages={effectiveStages}
+                  statusColor={activeScenario.statusColor}
+                  cameraPreset={cameraPreset}
+                  presetTrigger={presetTrigger}
+                  focusedStageId={focusedStageId}
+                  rpsMultiplier={rpsMultiplier}
+                  onSelectStage={(stageId) =>
+                    setFocusedStageId((prev) => (prev === stageId ? null : stageId))
+                  }
+                />
+              ) : (
+                <PlaygroundPipeline2D
+                  tab={tab}
+                  scenarioId={activeScenario.id}
+                  stages={stages}
+                  activeStages={effectiveStages}
+                  statusColor={activeScenario.statusColor}
+                  focusedStageId={focusedStageId}
+                  rpsMultiplier={rpsMultiplier}
+                  onSelectStage={(stageId) =>
+                    setFocusedStageId((prev) => (prev === stageId ? null : stageId))
+                  }
+                />
+              )}
 
               {/* Stage Contract Strip */}
               <ol className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
@@ -436,17 +458,21 @@ export function SystemsPlayground() {
                   const isActive = effectiveStages.includes(stage.id);
                   const isFocused = focusedStageId === stage.id;
                   return (
-                    <li
-                      key={stage.id}
-                      className={`rounded-xl border px-3 py-2.5 font-mono text-xs transition-colors ${
-                        isFocused
-                          ? "border-[#38BDF8] bg-[#38BDF8]/18 text-[#F0F6FC] ring-1 ring-[#38BDF8]/40"
-                          : isActive
-                            ? "border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#E6EDF3]"
-                            : "border-[rgba(240,246,252,0.08)] bg-[#0D1117] text-[#8B949E]"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
+                    <li key={stage.id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFocusedStageId((prev) => (prev === stage.id ? null : stage.id))
+                        }
+                        aria-pressed={isFocused}
+                        className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left font-mono text-xs transition-colors ${
+                          isFocused
+                            ? "border-[#38BDF8] bg-[#38BDF8]/18 text-[#F0F6FC] ring-1 ring-[#38BDF8]/40"
+                            : isActive
+                              ? "border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#E6EDF3] hover:border-[#38BDF8]/70"
+                              : "border-[rgba(240,246,252,0.08)] bg-[#0D1117] text-[#8B949E] hover:border-[rgba(240,246,252,0.2)] hover:text-[#E6EDF3]"
+                        }`}
+                      >
                         <span className="truncate font-semibold">{stage.label}</span>
                         <span
                           className={`h-2 w-2 shrink-0 rounded-full ${
@@ -454,7 +480,7 @@ export function SystemsPlayground() {
                           }`}
                           style={isActive ? { backgroundColor: activeScenario.statusColor } : undefined}
                         />
-                      </div>
+                      </button>
                     </li>
                   );
                 })}
