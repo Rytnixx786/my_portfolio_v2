@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Html, OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
+import { STATE_FAULT, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
 import { ViewportCanvas } from "./ViewportCanvas";
 
 export type PlaygroundCameraPreset = "isometric" | "top" | "orbit";
@@ -15,22 +16,21 @@ interface PlaygroundPipeline3DProps {
   activeStages: string[];
   statusColor: "#10B981" | "#38BDF8" | "#F59E0B" | "#EF4444";
   cameraPreset: PlaygroundCameraPreset;
+  rpsMultiplier?: number;
+  onSelectStage?: (stageId: string) => void;
 }
 
 const STATION_X = [-4.0, -2.4, -0.8, 0.8, 2.4, 4.0] as const;
+const TOKEN_COUNT = 64;
 
-function CameraTweenController({
-  preset,
-}: {
-  preset: PlaygroundCameraPreset;
-}) {
+function CameraTweenController({ preset }: { preset: PlaygroundCameraPreset }) {
   const { camera } = useThree();
-  const targetPos = useMemo(() => new THREE.Vector3(0, 3.3, 6.2), []);
+  const targetPos = useMemo(() => new THREE.Vector3(0, 3.25, 6.25), []);
   const lookTarget = useMemo(() => new THREE.Vector3(0, -0.1, 0), []);
 
   useEffect(() => {
     if (preset === "isometric") {
-      targetPos.set(0, 3.3, 6.2);
+      targetPos.set(0, 3.25, 6.25);
     } else if (preset === "top") {
       targetPos.set(0, 7.1, 1.35);
     }
@@ -55,232 +55,200 @@ function CameraTweenController({
   ) : null;
 }
 
+function InstancedTokenStream({
+  statusColor,
+  isCacheBypass,
+  isFaultBurst,
+  rpsMultiplier,
+}: {
+  statusColor: string;
+  isCacheBypass: boolean;
+  isFaultBurst: boolean;
+  rpsMultiplier: number;
+}) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const seeds = useMemo(
+    () =>
+      Array.from({ length: TOKEN_COUNT }, (_, idx) => ({
+        offset: idx / TOKEN_COUNT,
+        lane: ((idx % 5) - 2) * 0.09,
+        jitter: ((idx * 17) % 10) / 10 - 0.5,
+      })),
+    []
+  );
+
+  useFrame((state) => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const t = state.clock.elapsedTime;
+    const speed = 0.22 * rpsMultiplier;
+
+    for (let i = 0; i < TOKEN_COUNT; i++) {
+      const s = seeds[i];
+      const u = (s.offset + t * speed) % 1;
+
+      if (isCacheBypass) {
+        const x = -4.0 + u * 8.0;
+        const arch = u > 0.35 ? Math.sin(((u - 0.35) / 0.65) * Math.PI) * 1.45 : 0;
+        dummy.position.set(x, 0.48 + arch, s.lane);
+        dummy.scale.setScalar(1.05);
+      } else if (isFaultBurst) {
+        const burst = Math.max(0, u - 0.2);
+        dummy.position.set(
+          -4.0 + Math.min(0.2, u) * 7 + burst * s.jitter * 2.4,
+          0.42 - burst * 2.1,
+          s.lane + burst * s.jitter * 2.2
+        );
+        dummy.scale.setScalar(Math.max(0.25, 1.15 - burst));
+      } else {
+        dummy.position.set(-4.0 + u * 8.0, 0.48 + Math.sin(u * Math.PI * 4) * 0.08, s.lane);
+        dummy.scale.setScalar(0.95);
+      }
+
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={meshRef} args={[undefined, undefined, TOKEN_COUNT]}>
+      <sphereGeometry args={[0.068, 10, 10]} />
+      <meshBasicMaterial color={statusColor} toneMapped={false} />
+    </instancedMesh>
+  );
+}
+
 function PipelineDioramaScene({
-  tab,
   scenarioId,
   stages,
   activeStages,
   statusColor,
   cameraPreset,
+  rpsMultiplier = 1,
+  onSelectStage,
 }: PlaygroundPipeline3DProps) {
-  const breakerArmRef = useRef<THREE.Group>(null);
-  const gpuTowerRef = useRef<THREE.Group>(null);
-  const packetsRef = useRef<Array<THREE.Mesh | null>>([]);
+  const rigRef = useRef<THREE.Group>(null);
+  const isFaultBurst = scenarioId === "breaker-open" || scenarioId === "nli-refusal";
+  const isCacheBypass = scenarioId === "cache-hit";
 
-  const maxTraversedIdx = Math.max(0, activeStages.length - 1);
-  const endX = STATION_X[Math.min(maxTraversedIdx, STATION_X.length - 1)];
-
-  const packetCurve = useMemo(() => {
-    if (tab === "cinch" && scenarioId === "cache-hit") {
-      return new THREE.CatmullRomCurve3([
-        new THREE.Vector3(STATION_X[0], 0.42, 0),
-        new THREE.Vector3(STATION_X[2], 0.42, 0),
-        new THREE.Vector3(STATION_X[3], 0.48, 0),
-        new THREE.Vector3(STATION_X[1], 1.28, -0.45),
-        new THREE.Vector3(STATION_X[0], 0.42, 0),
-      ]);
+  useFrame((state) => {
+    if (!rigRef.current) return;
+    if (isFaultBurst) {
+      const t = state.clock.elapsedTime;
+      rigRef.current.position.x = Math.sin(t * 28) * 0.03;
+      rigRef.current.position.y = Math.cos(t * 24) * 0.02;
+    } else {
+      rigRef.current.position.x *= 0.85;
+      rigRef.current.position.y *= 0.85;
     }
-    return new THREE.CatmullRomCurve3([
-      new THREE.Vector3(STATION_X[0], 0.42, 0),
-      new THREE.Vector3((STATION_X[0] + endX) * 0.5, 0.48, 0),
-      new THREE.Vector3(endX, 0.42, 0),
-    ]);
-  }, [tab, scenarioId, endX]);
-
-  useFrame((state, delta) => {
-    const dt = Math.min(delta, 0.05);
-
-    if (breakerArmRef.current) {
-      const targetRot = scenarioId === "breaker-open" ? -Math.PI * 0.45 : 0;
-      breakerArmRef.current.rotation.z +=
-        (targetRot - breakerArmRef.current.rotation.z) * Math.min(1, dt * 8);
-    }
-
-    if (gpuTowerRef.current) {
-      const spinSpeed = scenarioId === "cold-vllm" ? 1.5 : 0.18;
-      gpuTowerRef.current.rotation.y += dt * spinSpeed;
-    }
-
-    const speed =
-      scenarioId === "cold-vllm"
-        ? 0.52
-        : scenarioId === "cache-hit"
-          ? 0.65
-          : 0.35;
-
-    packetsRef.current.forEach((mesh, idx) => {
-      if (!mesh) return;
-      const t = (state.clock.elapsedTime * speed + idx * 0.25) % 1;
-      packetCurve.getPointAt(t, mesh.position);
-    });
   });
 
   return (
-    <>
+    <group ref={rigRef}>
+      <ambientLight intensity={0.62} />
+      <directionalLight position={[4, 6, 4]} intensity={1.3} color="#E6EDF3" />
+      <pointLight position={[-3.5, 2.2, 2.5]} intensity={1.1} color={UI_ACCENT} />
+      <pointLight position={[3.5, 2.2, 2.5]} intensity={0.95} color={statusColor} />
+
       <CameraTweenController preset={cameraPreset} />
 
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[4, 7, 5]} intensity={1.25} color="#E6EDF3" />
-      <pointLight position={[0, 3.5, 2]} intensity={1.6} color="#38BDF8" />
-
-      {/* Machined Base Deck & Subtle Floor Grid */}
-      <mesh position={[0, -0.42, 0]}>
-        <boxGeometry args={[10.4, 0.2, 3.2]} />
-        <meshStandardMaterial color="#161B22" roughness={0.55} metalness={0.45} />
-      </mesh>
-      <gridHelper
-        args={[10.2, 20, "#38BDF8", "#222A36"]}
-        position={[0, -0.31, 0]}
-      />
-
-      {/* Base Horizontal Bus Spine */}
-      <mesh position={[0, 0.28, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.025, 0.025, 8.2, 12]} />
-        <meshBasicMaterial color="#303946" />
+      {/* Ground Telemetry Rail */}
+      <mesh position={[0, -0.35, 0]}>
+        <boxGeometry args={[9.8, 0.08, 2.4]} />
+        <meshStandardMaterial color="#11161D" roughness={0.68} metalness={0.45} />
       </mesh>
 
-      {/* Active Signal Route Spine */}
-      <mesh>
-        <tubeGeometry args={[packetCurve, 44, 0.032, 10, false]} />
-        <meshBasicMaterial color={statusColor} transparent opacity={0.78} />
+      <gridHelper args={[10.5, 18, "#263242", "#18202B"]} position={[0, -0.3, 0]} />
+
+      {/* Main Rail Line */}
+      <mesh position={[0, 0.42, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.025, 0.025, 8.2, 10]} />
+        <meshBasicMaterial
+          color={isFaultBurst ? STATE_FAULT : isCacheBypass ? STATE_HEALTHY : UI_ACCENT}
+          transparent
+          opacity={0.45}
+        />
       </mesh>
 
-      {/* Streaming Token/Request Packets */}
-      {[0, 1, 2, 3].map((idx) => (
-        <mesh
-          key={idx}
-          ref={(el) => {
-            packetsRef.current[idx] = el;
-          }}
-        >
-          <sphereGeometry args={[0.085, 16, 16]} />
-          <meshBasicMaterial color={statusColor} />
-        </mesh>
-      ))}
-
-      {/* 6 Architectural Stage Hardware Pedestals */}
+      {/* Station Pedestals */}
       {stages.map((stage, idx) => {
-        const x = STATION_X[idx] ?? 0;
-        const isTraversed = activeStages.includes(stage.id);
-        const isTerminal =
-          isTraversed && idx === activeStages.length - 1;
-
-        const nodeAccent = isTerminal
-          ? statusColor
-          : isTraversed
-            ? "#38BDF8"
-            : "#30363D";
-
-        const isGpuStage = tab === "cinch" && stage.id === "vllm";
-        const isBreakerStage = tab === "cinch" && stage.id === "breaker";
+        const isActive = activeStages.includes(stage.id);
+        const x = STATION_X[idx] ?? idx * 1.5 - 3.75;
+        const pedestalColor = isActive ? statusColor : "#232B38";
 
         return (
-          <group key={stage.id} position={[x, 0, 0]}>
-            {/* Pedestal Base */}
-            <RoundedBox args={[1.06, 0.45, 1.06]} radius={0.07} smoothness={3} position={[0, -0.06, 0]}>
+          <group key={stage.id} position={[x, 0.14, 0]}>
+            <RoundedBox
+              args={[0.92, isActive ? 0.68 : 0.42, 0.92]}
+              radius={0.07}
+              smoothness={3}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectStage?.(stage.id);
+              }}
+              onPointerOver={() => {
+                document.body.style.cursor = "pointer";
+              }}
+              onPointerOut={() => {
+                document.body.style.cursor = "auto";
+              }}
+            >
               <meshStandardMaterial
-                color={isTraversed ? "#1C222B" : "#12161C"}
+                color={isActive ? "#1C2430" : "#141920"}
                 roughness={0.35}
-                metalness={0.65}
+                metalness={0.75}
+                emissive={pedestalColor}
+                emissiveIntensity={isActive ? 0.32 : 0.04}
               />
             </RoundedBox>
 
-            {/* Status Rim Ring */}
-            <mesh position={[0, 0.18, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[0.32, 0.39, 28]} />
+            <mesh position={[0, isActive ? 0.36 : 0.23, 0]}>
+              <boxGeometry args={[0.78, 0.045, 0.78]} />
               <meshBasicMaterial
-                color={nodeAccent}
+                color={pedestalColor}
+                toneMapped={!isActive}
                 transparent
-                opacity={isTraversed ? 0.9 : 0.25}
-                side={THREE.DoubleSide}
+                opacity={isActive ? 0.95 : 0.4}
               />
             </mesh>
 
-            {/* Stage Core Geometry */}
-            {isGpuStage ? (
-              <group ref={gpuTowerRef} position={[0, 0.56, 0]}>
-                {[0, 0.2, 0.4].map((layerY) => (
-                  <mesh key={layerY} position={[0, layerY - 0.15, 0]}>
-                    <boxGeometry args={[0.56, 0.1, 0.56]} />
-                    <meshStandardMaterial
-                      color={isTraversed ? "#38BDF8" : "#161B22"}
-                      emissive={isTraversed ? "#38BDF8" : "#000000"}
-                      emissiveIntensity={scenarioId === "cold-vllm" ? 0.6 : 0.08}
-                      roughness={0.3}
-                      metalness={0.7}
-                    />
-                  </mesh>
-                ))}
-              </group>
-            ) : isBreakerStage ? (
-              <group position={[0, 0.42, 0]}>
-                <mesh>
-                  <boxGeometry args={[0.42, 0.44, 0.42]} />
-                  <meshStandardMaterial color="#1C222B" roughness={0.35} metalness={0.6} />
-                </mesh>
-                <group ref={breakerArmRef} position={[-0.18, 0.22, 0]}>
-                  <mesh position={[0.24, 0.18, 0]}>
-                    <boxGeometry args={[0.48, 0.08, 0.14]} />
-                    <meshStandardMaterial
-                      color={scenarioId === "breaker-open" ? "#EF4444" : "#38BDF8"}
-                      emissive={scenarioId === "breaker-open" ? "#EF4444" : "#38BDF8"}
-                      emissiveIntensity={scenarioId === "breaker-open" ? 0.9 : 0.35}
-                    />
-                  </mesh>
-                </group>
-              </group>
-            ) : (
-              <mesh position={[0, 0.48, 0]}>
-                <octahedronGeometry args={[isTerminal ? 0.28 : 0.21, 0]} />
-                <meshStandardMaterial
-                  color={nodeAccent}
-                  emissive={nodeAccent}
-                  emissiveIntensity={isTerminal ? 0.85 : isTraversed ? 0.4 : 0.05}
-                  roughness={0.28}
-                  metalness={0.65}
-                />
-              </mesh>
-            )}
-
-            <Html
-              position={[0, 1.15, 0]}
-              center
-              distanceFactor={8.2}
-              zIndexRange={[10, 0]}
-            >
-              <div
-                className={`whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] ${
-                  isTerminal
-                    ? "border-[#38BDF8] bg-[#0D1117]/95 font-semibold text-[#E6EDF3]"
-                    : isTraversed
-                      ? "border-[rgba(240,246,252,0.16)] bg-[#161B22]/90 text-[#8B949E]"
-                      : "border-[rgba(240,246,252,0.06)] bg-[#0D1117]/75 text-[#6E7681]"
+            <Html position={[0, isActive ? 0.68 : 0.54, 0]} center style={{ pointerEvents: "none" }}>
+              <span
+                className={`whitespace-nowrap rounded-md border px-2 py-0.5 font-mono text-xs uppercase tracking-[0.06em] ${
+                  isActive
+                    ? "border-[rgba(240,246,252,0.22)] bg-[#0D1117]/95 font-semibold text-[#E6EDF3]"
+                    : "border-[rgba(240,246,252,0.08)] bg-[#0D1117]/75 text-[#8B949E]"
                 }`}
               >
                 {stage.label}
-              </div>
+              </span>
             </Html>
           </group>
         );
       })}
-    </>
+
+      <InstancedTokenStream
+        statusColor={statusColor}
+        isCacheBypass={isCacheBypass}
+        isFaultBurst={isFaultBurst}
+        rpsMultiplier={rpsMultiplier}
+      />
+    </group>
   );
 }
 
 /**
- * Interactive 3D request & token routing diorama coupled live to SystemsPlayground
- * scenario states and Bruno-Simon-style preset camera tweening.
+ * Interactive 3D pipeline diorama powered by 64 instanced token capsules inside the single root canvas.
  */
 export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {
   return (
-    <ViewportCanvas
-      className="h-[290px] w-full rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[360px]"
-      cameraPosition={[0, 3.3, 6.2]}
-      fov={40}
-      fallback={null}
-    >
-      <PipelineDioramaScene {...props} />
-    </ViewportCanvas>
+    <div className="relative h-[265px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[315px]">
+      <ViewportCanvas cameraPosition={[0, 3.25, 6.25]} fov={38} className="h-full w-full">
+        <PipelineDioramaScene {...props} />
+      </ViewportCanvas>
+    </div>
   );
 }
-

@@ -1,36 +1,86 @@
 "use client";
 
-import { useState } from "react";
-import { CaretDown, CheckCircle, Cpu } from "@phosphor-icons/react";
+import dynamic from "next/dynamic";
+import { useState, type KeyboardEvent } from "react";
+import { CaretDown, CheckCircle, Cpu, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
 import { focusAreas, stack } from "@/data/site";
-import { useWebGLContext } from "@/components/canvas/WebGLContextProvider";
-import { StackRack3D } from "@/components/canvas/StackRack3D";
+import { STACK_LAYER_HUES, getCategoryHue } from "@/lib/palette";
 import { SectionReveal } from "./SectionReveal";
 
+const LazyStackRack3D = dynamic(
+  () => import("@/components/canvas/StackRack3D").then((mod) => mod.StackRack3D),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-[225px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] font-mono text-xs text-[#8B949E] sm:h-[255px]">
+        Loading interactive keycap rack...
+      </div>
+    ),
+  }
+);
+
+function playMechanicalClick(muted: boolean) {
+  if (muted || typeof window === "undefined") return;
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(520, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(160, ctx.currentTime + 0.04);
+    gain.gain.setValueAtTime(0.06, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.045);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.05);
+    window.setTimeout(() => void ctx.close(), 90);
+  } catch {
+    // Ignore blocked audio context
+  }
+}
+
 export function ExpertiseSection() {
-  const { hasMounted, effectiveTier, webglSupported } = useWebGLContext();
   const [activeLayerIdx, setActiveLayerIdx] = useState(0);
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
-  const [expandedFocusId, setExpandedFocusId] = useState<string>(
-    focusAreas[0].id
-  );
+  const [expandedFocusId, setExpandedFocusId] = useState<string>(focusAreas[0].id);
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
   const activeLayer = stack[activeLayerIdx];
-  const show3DRack = hasMounted && webglSupported && effectiveTier !== "low";
+  const layerHue = STACK_LAYER_HUES[activeLayerIdx] ?? "#38BDF8";
+
+  const handleSelectTool = (tool: string) => {
+    playMechanicalClick(!soundEnabled);
+    setSelectedTool((prev) => (prev === tool ? null : tool));
+  };
+
+  const handleTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+      e.preventDefault();
+      setActiveLayerIdx((i) => (i + 1) % stack.length);
+      setSelectedTool(null);
+    } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+      e.preventDefault();
+      setActiveLayerIdx((i) => (i - 1 + stack.length) % stack.length);
+      setSelectedTool(null);
+    }
+  };
 
   return (
     <section
       id="expertise"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-24 sm:py-32"
+      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-20 sm:py-28"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
-          <div className="flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-10 lg:flex-row lg:items-end">
+          <div className="flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#7DD3FC]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#7DD3FC]">
                 <span>Capabilities</span>
               </div>
-              <h2 className="mt-4 font-display text-[clamp(2.4rem,5vw,4.5rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]">
+              <h2 className="mt-4 font-display text-[clamp(2.4rem,5vw,4.3rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]">
                 STACK BY{" "}
                 <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
                   layer.
@@ -38,46 +88,56 @@ export function ExpertiseSection() {
               </h2>
             </div>
 
-            <div className="flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[#8B949E]">
-              <span className="relative flex h-2 w-2" aria-hidden="true">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#10B981] opacity-55 motion-reduce:hidden" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#10B981]" />
-              </span>
-              <span>Inference to interface · Zero inflated bars</span>
+            <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-[#9DA7B3]">
+              <button
+                type="button"
+                aria-pressed={soundEnabled}
+                onClick={() => setSoundEnabled((v) => !v)}
+                className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-3.5 py-1.5 text-xs uppercase tracking-[0.1em] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
+              >
+                {soundEnabled ? (
+                  <SpeakerHigh className="h-3.5 w-3.5 text-[#10B981]" weight="regular" aria-hidden="true" />
+                ) : (
+                  <SpeakerSlash className="h-3.5 w-3.5 text-[#8B949E]" weight="regular" aria-hidden="true" />
+                )}
+                <span>Click Audio: {soundEnabled ? "ON" : "MUTED"}</span>
+              </button>
             </div>
           </div>
 
           <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
-            {/* Layer Selector Tabs */}
             <div
               role="tablist"
               aria-label="Engineering stack layers"
+              onKeyDown={handleTabKeyDown}
               className="flex flex-col divide-y divide-[rgba(240,246,252,0.08)] border-y border-[rgba(240,246,252,0.08)] lg:col-span-5"
             >
               {stack.map((row, idx) => {
                 const isSelected = activeLayerIdx === idx;
+                const rowHue = STACK_LAYER_HUES[idx] ?? "#38BDF8";
                 return (
                   <button
                     key={row.layer}
                     type="button"
                     role="tab"
+                    id={`stack-tab-${row.code}`}
                     aria-selected={isSelected}
                     aria-controls={`stack-panel-${row.code}`}
                     onClick={() => {
+                      playMechanicalClick(!soundEnabled);
                       setActiveLayerIdx(idx);
                       setSelectedTool(null);
                     }}
-                    className={`group flex w-full items-center justify-between gap-4 px-3 py-4 text-left transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] sm:px-4 ${
+                    className={`flex min-h-[56px] w-full items-center justify-between gap-4 px-3 py-3.5 text-left transition-colors sm:px-4 ${
                       isSelected
                         ? "bg-[#161B22] text-[#E6EDF3]"
-                        : "bg-transparent text-[#8B949E] hover:bg-[#161B22]/60 hover:text-[#E6EDF3]"
+                        : "bg-transparent text-[#9DA7B3] hover:bg-[#161B22]/60 hover:text-[#E6EDF3]"
                     }`}
                   >
                     <div className="flex min-w-0 items-center gap-3.5">
                       <span
-                        className={`font-mono text-xs font-semibold tabular-nums ${
-                          isSelected ? "text-[#38BDF8]" : "text-[#6E7681]"
-                        }`}
+                        className="font-mono text-xs font-semibold tabular-nums"
+                        style={{ color: isSelected ? rowHue : "#8B949E" }}
                       >
                         {row.code}
                       </span>
@@ -85,193 +145,125 @@ export function ExpertiseSection() {
                         {row.layer}
                       </span>
                     </div>
-
-                    <div className="flex shrink-0 items-center gap-2.5">
-                      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#6E7681] tabular-nums">
-                        {row.items.length} tools
-                      </span>
-                      <span
-                        className={`h-2 w-2 rounded-full transition-transform duration-300 ${
-                          isSelected
-                            ? "scale-100 bg-[#38BDF8]"
-                            : "scale-75 bg-[rgba(240,246,252,0.16)] group-hover:bg-[#38BDF8]/55"
-                        }`}
-                        aria-hidden="true"
-                      />
-                    </div>
+                    <span className="font-mono text-xs text-[#8B949E] tabular-nums">
+                      {row.items.length} tools
+                    </span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Active Layer Detail Well */}
             <div
               id={`stack-panel-${activeLayer.code}`}
               role="tabpanel"
-              className="min-w-0 lg:col-span-7"
+              aria-labelledby={`stack-tab-${activeLayer.code}`}
+              className="double-bezel-outer lg:col-span-7"
             >
-              <div className="double-bezel-outer">
-                <div className="double-bezel-core p-6 sm:p-8">
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(240,246,252,0.08)] pb-4">
-                    <div className="flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.16em] text-[#38BDF8]">
-                      <Cpu className="h-4 w-4" weight="regular" aria-hidden="true" />
-                      <span>Layer {activeLayer.code} · Verified Production Stack</span>
-                    </div>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#10B981]/30 bg-[#10B981]/10 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[#10B981]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]" aria-hidden="true" />
-                      Active Scope
+              <div className="double-bezel-core space-y-5 p-5 sm:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em]" style={{ color: layerHue }}>
+                    <Cpu className="h-4 w-4" weight="regular" aria-hidden="true" />
+                    <span>
+                      Layer {activeLayer.code} · {activeLayer.layer}
                     </span>
                   </div>
-
-                  <h3 className="mt-5 font-display text-3xl font-bold uppercase tracking-tight text-[#E6EDF3] sm:text-4xl">
-                    {activeLayer.layer}
-                  </h3>
-                  <p className="mt-2 max-w-[60ch] font-sans text-base leading-relaxed text-[#8B949E]">
-                    {activeLayer.summary}
-                  </p>
-
-                  {show3DRack && (
-                    <div className="mt-6">
-                      <StackRack3D
-                        layerCode={activeLayer.code}
-                        layerName={activeLayer.layer}
-                        tools={activeLayer.items}
-                        selectedTool={selectedTool}
-                        onSelectTool={(tool) =>
-                          setSelectedTool((prev) => (prev === tool ? null : tool))
-                        }
-                      />
-                    </div>
+                  {selectedTool && (
+                    <span className="rounded-full border border-[#38BDF8]/40 bg-[#38BDF8]/12 px-3 py-0.5 font-mono text-xs text-[#7DD3FC]">
+                      Selected: {selectedTool}
+                    </span>
                   )}
+                </div>
 
-                  <ul className="mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                    {activeLayer.items.map((tool) => {
-                      const isToolSelected = selectedTool === tool;
-                      return (
-                        <li key={tool}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelectedTool((prev) => (prev === tool ? null : tool))
-                            }
-                            aria-pressed={isToolSelected}
-                            className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 font-mono text-xs transition-colors ${
-                              isToolSelected
-                                ? "border-[#38BDF8] bg-[#38BDF8]/12 text-[#7DD3FC]"
-                                : "border-[rgba(240,246,252,0.08)] bg-[#0D1117] text-[#E6EDF3] hover:border-[#38BDF8]/40"
-                            }`}
-                          >
-                            <span className="truncate font-medium">{tool}</span>
-                            <CheckCircle
-                              className="h-4 w-4 shrink-0 text-[#38BDF8]"
-                              weight="regular"
-                              aria-hidden="true"
-                            />
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                <p className="font-sans text-sm leading-relaxed text-[#9DA7B3] sm:text-base">
+                  {activeLayer.summary}
+                </p>
 
-                  <div className="mt-8 border-t border-[rgba(240,246,252,0.08)] pt-5">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#6E7681]">
-                      Complete Stack Matrix
-                    </p>
-                    <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                      {stack.map((layer, idx) => (
-                        <button
-                          key={layer.layer}
-                          type="button"
-                          onClick={() => {
-                      setActiveLayerIdx(idx);
-                      setSelectedTool(null);
-                    }}
-                          className={`rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
-                            idx === activeLayerIdx
-                              ? "border-[#38BDF8]/45 bg-[#38BDF8]/10"
-                              : "border-[rgba(240,246,252,0.08)] bg-[#1C222B] hover:border-[#38BDF8]/30"
-                          }`}
-                        >
-                          <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-[#38BDF8]">
-                            {layer.code} · {layer.layer}
-                          </span>
-                          <span className="mt-1 block truncate font-sans text-xs text-[#8B949E]">
-                            {layer.items.join(" · ")}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                <LazyStackRack3D
+                  layerCode={activeLayer.code}
+                  layerName={activeLayer.layer}
+                  tools={activeLayer.items}
+                  selectedTool={selectedTool}
+                  onSelectTool={handleSelectTool}
+                />
+
+                <div className="flex flex-wrap gap-2">
+                  {activeLayer.items.map((tool) => {
+                    const isPicked = selectedTool === tool;
+                    return (
+                      <button
+                        key={tool}
+                        type="button"
+                        onClick={() => handleSelectTool(tool)}
+                        aria-pressed={isPicked}
+                        className={`inline-flex min-h-[36px] items-center rounded-full border px-3.5 py-1 font-mono text-xs transition-colors ${
+                          isPicked
+                            ? "border-[#38BDF8] bg-[#38BDF8]/15 font-semibold text-[#E6EDF3]"
+                            : "border-[rgba(240,246,252,0.1)] bg-[#0D1117] text-[#9DA7B3] hover:text-[#E6EDF3]"
+                        }`}
+                      >
+                        {tool}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Expandable Architectural Focus Areas */}
-          <div className="mt-16 border-t border-[rgba(240,246,252,0.08)] pt-12">
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-              <div>
-                <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#38BDF8]">
-                  System Capabilities
-                </p>
-                <h3 className="mt-2 font-display text-3xl font-bold uppercase tracking-tight text-[#E6EDF3]">
-                  ARCHITECTURAL FOCUS AREAS
-                </h3>
-              </div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#6E7681]">
-                Select an area to inspect patterns
-              </p>
-            </div>
-
-            <div className="mt-6 divide-y divide-[rgba(240,246,252,0.08)] border-y border-[rgba(240,246,252,0.08)]">
-              {focusAreas.map((area) => {
-                const isOpen = expandedFocusId === area.id;
-                return (
-                  <div key={area.id} className="bg-transparent">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedFocusId(isOpen ? "" : area.id)}
-                      aria-expanded={isOpen}
-                      className="flex w-full items-center justify-between gap-4 py-5 text-left transition-colors hover:text-[#38BDF8]"
-                    >
-                      <div className="flex min-w-0 items-baseline gap-4">
-                        <span className="font-mono text-xs font-semibold text-[#38BDF8]">
-                          {area.code}
-                        </span>
-                        <span className="font-display text-2xl font-bold uppercase tracking-tight text-[#E6EDF3] sm:text-3xl">
-                          {area.title}
-                        </span>
-                      </div>
-                      <span
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#8B949E] transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${
-                          isOpen ? "rotate-180 border-[#38BDF8] text-[#38BDF8]" : ""
-                        }`}
-                      >
-                        <CaretDown className="h-4 w-4" weight="regular" aria-hidden="true" />
+          {/* Domain Focus Accordions */}
+          <div className="mt-14 space-y-3">
+            {focusAreas.map((area) => {
+              const expanded = expandedFocusId === area.id;
+              const hue = getCategoryHue(area.category);
+              return (
+                <div
+                  key={area.id}
+                  className="rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]"
+                >
+                  <button
+                    type="button"
+                    aria-expanded={expanded}
+                    onClick={() => setExpandedFocusId(expanded ? "" : area.id)}
+                    className="flex min-h-[56px] w-full items-center justify-between gap-4 px-5 py-4 text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs font-semibold" style={{ color: hue.labelText }}>
+                        {area.code}
                       </span>
-                    </button>
+                      <span className="font-display text-xl font-bold uppercase tracking-tight text-[#E6EDF3] sm:text-2xl">
+                        {area.title}
+                      </span>
+                    </div>
+                    <CaretDown
+                      className={`h-4 w-4 shrink-0 text-[#9DA7B3] transition-transform duration-300 ${
+                        expanded ? "rotate-180" : ""
+                      }`}
+                      weight="regular"
+                      aria-hidden="true"
+                    />
+                  </button>
 
-                    {isOpen && (
-                      <div className="grid grid-cols-1 gap-6 pb-6 pl-0 sm:pl-9 lg:grid-cols-12">
-                        <p className="max-w-[65ch] font-sans text-base leading-relaxed text-[#8B949E] lg:col-span-7">
-                          {area.description}
-                        </p>
-                        <ul className="flex flex-wrap content-start gap-2 lg:col-span-5">
-                          {area.capabilities.map((cap) => (
-                            <li
-                              key={cap}
-                              className="rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-[11px] text-[#7DD3FC]"
-                            >
-                              {cap}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  {expanded && (
+                    <div className="border-t border-[rgba(240,246,252,0.08)] px-5 pb-5 pt-4">
+                      <p className="max-w-[66ch] font-sans text-sm leading-relaxed text-[#9DA7B3] sm:text-base">
+                        {area.description}
+                      </p>
+                      <ul className="mt-4 flex flex-wrap gap-2">
+                        {area.capabilities.map((cap) => (
+                          <li
+                            key={cap}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117] px-3 py-1 font-mono text-xs text-[#E6EDF3]"
+                          >
+                            <CheckCircle className="h-3.5 w-3.5 text-[#10B981]" weight="regular" aria-hidden="true" />
+                            <span>{cap}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </SectionReveal>
       </div>

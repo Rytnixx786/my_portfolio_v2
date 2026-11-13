@@ -1,4 +1,4 @@
-// Case-study content and verified engineering metadata sourced from portfolio.ts, README.md, and resume.
+// Case-study content and verified engineering metadata grounded in README.md and Mehedi_Hasan_Resume.pdf.
 
 export const PROJECT_CATEGORIES = [
   "Inference & Serving",
@@ -9,56 +9,90 @@ export const PROJECT_CATEGORIES = [
 
 export type ProjectCategory = (typeof PROJECT_CATEGORIES)[number];
 
+export interface EvalSeriesPoint {
+  label: string;
+  baseline: number;
+  current: number;
+  unit: string;
+}
+
 export const projects = [
   {
     slug: "cinch",
     name: "Cinch",
+    featured: true,
     category: "Inference & Serving" as ProjectCategory,
-    year: "2025 — 2026",
+    year: "2025 to 2026",
+    role: "Sole Author · Serving & Gateway Architecture",
+    timeline: "6 weeks",
+    statusLabel: "Open-source benchmarked",
     services: ["LLM Serving", "Async Gateway", "FinOps Control"],
-    eyebrow: "Self-hosted LLM serving platform & async gateway",
+    eyebrow: "Self-hosted LLM serving gateway",
     description:
-      "A 14-stage asynchronous FastAPI gateway & INT4 Marlin quantized serving platform for Qwen2.5-7B on workstation GPUs with sub-5ms semantic caching, Kubernetes HPA, and multi-tenant FinOps governance.",
+      "A 14-stage asynchronous FastAPI gateway & AWQ Marlin INT4 serving layer for Qwen2.5-7B on 8 GB VRAM GPUs with sub-5ms semantic caching, Kubernetes HPA, and per-tenant token cutoffs.",
     impact:
-      "10.86x throughput speedup (331 tok/s), 4.12ms semantic cache hits (0W GPU), 45ms circuit breaker fast-fail, 195 verified tests, and 2-to-6 replica HPA autoscaling on k3d.",
-    highlightMetrics: [
-      { value: "10.86×", label: "Throughput Speedup" },
-      { value: "4.12ms", label: "Semantic Cache Hit" },
-      { value: "195", label: "Verified Tests" },
-      { value: "45ms", label: "Circuit Fast-Fail" },
+      "10.86x throughput speedup (30.48 -> 331.0 tok/s), 4.12ms ONNX semantic cache hits (0W GPU), 45.56ms circuit breaker fast-fail, and 195 deterministic CI tests.",
+    methodology:
+      "Benchmarked Qwen2.5-7B-Instruct on an 8 GB VRAM workstation GPU comparing FP16 baseline (30.48 tok/s) against AWQ Marlin W4A16 INT4 with prefix caching, plus k3d 2-to-6 replica HPA scaling and pytest fault injection.",
+    reproduceCmd: "pytest tests/ -v --cov=gateway && python scripts/bench_throughput.py --quant awq_marlin",
+    constraints: [
+      "8 GB consumer VRAM ceiling forcing strict 4.2 GiB weights budget plus KV cache headroom",
+      "Sub-50ms failure isolation requirement so worker OOM crashes never hang downstream callers for 30s",
+      "Strict EBNF JSON grammar repair required on 7B parameters for deterministic tool calling",
     ],
-    tech: ["Python", "FastAPI", "vLLM", "AWQ Marlin", "Kubernetes", "k3d", "Docker", "Prometheus", "OpenTelemetry", "ONNX", "Next.js"],
+    tradeoffs: [
+      "Selected in-process CPU ONNX embeddings + TF-IDF cache over external Redis vector search, trading cluster-wide cache sharing on single-node replicas for a 4.12ms hit path with zero GPU wattage.",
+      "Used AWQ Marlin W4A16 quantization instead of FP16 tensor parallelism, accepting slight perplexity drift in exchange for 10.86x throughput on 8 GB VRAM.",
+    ],
+    failures: [
+      "Early semantic cache threshold of cosine >= 0.85 triggered false hits on negated follow-up prompts; raised threshold to >= 0.92 and gated cache bypass on system-prompt hashes.",
+      "Half-open circuit breaker thundering herd occurred when 12 queued workers probed simultaneously; added a single-flight canary mutex during HALF_OPEN state.",
+    ],
+    evalSeries: [
+      { label: "Throughput", baseline: 30.5, current: 331.0, unit: "tok/s" },
+      { label: "Cache Latency", baseline: 1200, current: 4.12, unit: "ms" },
+      { label: "Fault Fail", baseline: 30000, current: 45.6, unit: "ms" },
+    ] satisfies ReadonlyArray<EvalSeriesPoint>,
+    highlightMetrics: [
+      { value: "10.86x", label: "Throughput Speedup" },
+      { value: "4.12ms", label: "Semantic Cache Hit" },
+      { value: "195", label: "CI Deterministic Tests" },
+      { value: "45.56ms", label: "Circuit Fast-Fail" },
+    ],
+    tech: ["Python", "FastAPI", "vLLM", "AWQ Marlin", "Kubernetes", "k3d", "Docker", "Prometheus", "OpenTelemetry", "ONNX"],
     href: "https://github.com/Rytnixx786/Cinch",
+    sourceRef: "gateway/circuit_breaker.py",
+    codeLabel: "Circuit Breaker FSM",
     challenge:
-      "Serving LLMs in multi-tenant self-hosted environments creates severe operational challenges: raw vLLM workers lack security guardrails, budget allocation, and circuit breaking. Worker crashes cause 30-second TCP timeouts that cascade across microservices, while redundant prompt paraphrases repeatedly burn GPU cycles. Moreover, small models require strict EBNF JSON grammar enforcement to prevent broken downstream tool executions.",
+      "Serving self-hosted LLMs across multi-tenant callers exposes raw vLLM processes to cascading failure: GPU OOM panics stall sockets for 30 seconds, paraphrased prompts burn redundant KV cache cycles, and unguarded JSON generation breaks downstream tool parsers.",
     approach:
-      "Built Cinch as an asynchronous 14-stage traffic governance gateway around Marlin W4A16 AWQ quantized vLLM backends. Integrated an in-process CPU ONNX semantic vector cache (cosine similarity >= 0.92) returning duplicate queries in 4.12ms with zero GPU power. Implemented a 3-state circuit breaker FSM that isolates GPU panics in 45.56ms (HTTP 503) and self-heals via canary probes. Added micro-dollar token accounting with hard HTTP 402 budget cutoffs, sliding-window rate limiting, AST JSON grammar repair, sandboxed server-side tool execution, and Kubernetes HPA autoscaling from 2 to 6 replicas under load.",
+      "Engineered Cinch as a 14-stage async FastAPI control plane around AWQ Marlin INT4 workers. Built an in-process ONNX semantic vector cache (cosine >= 0.92) returning exact/paraphrased hits in 4.12ms at 0W GPU, a 3-state circuit breaker FSM isolating panics in 45.56ms (HTTP 503) with canary recovery probes, micro-dollar FinOps cutoffs (HTTP 402), EBNF grammar repair, and k3d HPA autoscaling.",
     architecture: {
       nodes: [
-        { id: "circuit_breaker", label: "Circuit Breaker FSM", desc: "45ms fast-fail with automated canary probe MTTR recovery" },
-        { id: "finops_gate", label: "FinOps Budget Gate", desc: "Pre-flight micro-dollar token cost accounting with HTTP 402 cutoff" },
-        { id: "guardrails", label: "Security & PII Filter", desc: "Lightweight regex & heuristic scanner masking SSN/keys before GPU" },
-        { id: "semantic_cache", label: "Semantic Vector Cache", desc: "In-process CPU cosine similarity cache returning hits in 4.12ms (0W GPU)" },
-        { id: "rate_limiter", label: "Dual-Tier Limiter & Queue", desc: "Sliding-window 60 RPM / 50k TPM limiter with interactive priority queue" },
-        { id: "vllm_engine", label: "vLLM Marlin Engine", desc: "INT4 W4A16 GEMM inference serving Qwen2.5-7B in 4.2 GiB VRAM" },
-        { id: "tool_engine", label: "Sandboxed Tool Executor", desc: "Closed-loop execution for Python REPL, SQL runner, and math tools" },
-        { id: "shadow_replayer", label: "Async Shadow Replayer", desc: "Fire-and-forget 5% candidate traffic duplication with Jaccard divergence score" },
+        { id: "circuit_breaker", label: "Circuit Breaker FSM", desc: "45.56ms fast-fail with single-flight canary probe recovery" },
+        { id: "finops_gate", label: "FinOps Budget Gate", desc: "Pre-flight micro-dollar token cutoff returning HTTP 402" },
+        { id: "guardrails", label: "PII & Input Filter", desc: "Regex & heuristic scanner redacting keys before GPU dispatch" },
+        { id: "semantic_cache", label: "ONNX Semantic Cache", desc: "CPU cosine >= 0.92 vector lookup in 4.12ms (0W GPU)" },
+        { id: "rate_limiter", label: "PID Admission Queue", desc: "60 RPM / 50k TPM sliding window with priority scheduling" },
+        { id: "vllm_engine", label: "vLLM Marlin Engine", desc: "INT4 W4A16 GEMM inference for Qwen2.5-7B in 4.2 GiB VRAM" },
+        { id: "tool_engine", label: "Sandboxed Executor", desc: "Isolated EBNF-repaired Python & SQL tool execution loop" },
+        { id: "shadow_replayer", label: "Shadow Replayer", desc: "5% async candidate traffic capture with divergence scoring" },
       ],
       connections: [
         { from: "circuit_breaker", to: "finops_gate", label: "Breaker Closed" },
         { from: "finops_gate", to: "guardrails", label: "Budget OK" },
         { from: "guardrails", to: "semantic_cache" },
         { from: "semantic_cache", to: "rate_limiter", label: "Cache Miss" },
-        { from: "rate_limiter", to: "vllm_engine", label: "Priority Scheduled" },
-        { from: "vllm_engine", to: "tool_engine", label: "Tool Call Loop" },
+        { from: "rate_limiter", to: "vllm_engine", label: "Admitted" },
+        { from: "vllm_engine", to: "tool_engine", label: "Tool Loop" },
         { from: "vllm_engine", to: "shadow_replayer", label: "Async Replay" },
-        { from: "tool_engine", to: "vllm_engine", label: "Tool Output Re-inject" },
+        { from: "tool_engine", to: "vllm_engine", label: "Tool Result" },
       ],
     },
     lessons: [
-      "In-process CPU vector caching with pure Python TF-IDF and ONNX eliminates external Redis vector DB latency hops and avoids consuming precious GPU VRAM, delivering sub-5ms memoized responses with zero wattage overhead.",
-      "A 3-state Circuit Breaker FSM prevents cascading failures: when upstream vLLM workers crash or encounter CUDA OOM, Cinch fast-fails incoming requests in 45.56ms (HTTP 503) instead of waiting for 30-second socket timeouts.",
-      "Prefix caching and speculative decoding combine to slash Time-To-First-Token (TTFT) by 4.87x and accelerate per-token generation speed by 2.58x on consumer 8GB VRAM hardware.",
+      "Running ONNX vector embeddings in-process eliminated external vector DB network hops and preserved GPU VRAM for KV cache pages, keeping cache hits at 4.12ms.",
+      "Single-flight canary gating in the HALF_OPEN state prevents simultaneous queued requests from crashing a recovering vLLM worker on startup.",
+      "Combining prefix caching with AWQ Marlin W4A16 cut Time-To-First-Token by 4.87x alongside a 10.86x raw generation speedup.",
     ],
     codeLanguage: "python",
     codeSnippet: `# Cinch: Async Circuit Breaker FSM & Canary Recovery (gateway/circuit_breaker.py)
@@ -118,35 +152,62 @@ class CircuitBreaker:
   {
     slug: "nexus-researcher",
     name: "Nexus Researcher",
+    featured: true,
     category: "Agents & RAG" as ProjectCategory,
     year: "2025",
-    services: ["LangGraph Orchestration", "SSE Streaming", "Checkpointing"],
-    eyebrow: "Stateful multi-agent research",
+    role: "Sole Author · Agent Orchestration & Backend",
+    timeline: "5 weeks",
+    statusLabel: "Open-source · 5 ADRs",
+    services: ["LangGraph Orchestration", "SSE Replay", "Postgres Checkpointing"],
+    eyebrow: "Stateful multi-agent research engine",
     description:
-      "An 8-node LangGraph workflow with four-stage retrieval, human-in-the-loop approval, resumable SSE streaming, and PostgreSQL checkpointing.",
+      "An 8-node LangGraph workflow combining four-stage hybrid retrieval (Tavily -> BM25 -> RRF -> cross-encoder rerank), human-in-the-loop query approval, and resumable Last-Event-ID SSE streams.",
     impact:
-      "8.05 req/s under sustained load, 91% refusal accuracy across adversarial cases, and 122 backend tests with zero failures.",
+      "8.05 req/s sustained API throughput, 91% adversarial refusal accuracy, 122 passing backend tests, and 5 documented architectural decision records.",
+    methodology:
+      "Evaluated against adversarial unanswerable/conflicting web source fixtures alongside sustained load tests across the FastAPI SSE endpoint with PostgreSQL AsyncPostgresSaver state recovery.",
+    reproduceCmd: "pytest backend/tests -q && uvicorn app.main:app --reload",
+    constraints: [
+      "Mid-run process restarts must resume seamlessly via Last-Event-ID without losing scraped citations",
+      "Search and crawl spend must halt at an explicit human approval interrupt before fanning out web calls",
+      "Outgoing crawls constrained by target rate limits across parallel scraping workers",
+    ],
+    tradeoffs: [
+      "Moved LangGraph checkpoints from Redis to PostgreSQL AsyncPostgresSaver: accepted +12ms cold write overhead for ACID crash recovery and resumable SSE replay.",
+      "Placed a mandatory human-in-the-loop checkpoint before scraping rather than fully autonomous loops, trading 1 click for deterministic cost control.",
+    ],
+    failures: [
+      "Unbounded parallel scraping initially triggered HTTP 429 bans from search targets; added a Redis token-bucket limiter per host.",
+      "Sparse citations caused synthesizer hallucination when passing top-k chunks unconditionally; added a groundedness >= 0.85 conditional loop back to the planner.",
+    ],
+    evalSeries: [
+      { label: "Adversarial Refusal", baseline: 42, current: 91, unit: "%" },
+      { label: "Backend Suite", baseline: 0, current: 122, unit: "tests" },
+      { label: "Load Throughput", baseline: 2.4, current: 8.05, unit: "req/s" },
+    ] satisfies ReadonlyArray<EvalSeriesPoint>,
     highlightMetrics: [
       { value: "8.05 req/s", label: "Sustained Throughput" },
       { value: "91%", label: "Refusal Accuracy" },
-      { value: "122", label: "Backend Tests (0 fails)" },
-      { value: "8 Nodes", label: "LangGraph Flow" },
+      { value: "122", label: "Passing Tests (5 ADRs)" },
+      { value: "8 Nodes", label: "LangGraph StateGraph" },
     ],
-    tech: ["LangGraph", "FastAPI", "PostgreSQL", "SSE", "Redis", "Next.js"],
+    tech: ["LangGraph", "FastAPI", "PostgreSQL", "Redis", "SSE", "React"],
     href: "https://github.com/Rytnixx786/Nexus",
+    sourceRef: "backend/graph/workflow.py",
+    codeLabel: "LangGraph StateGraph",
     challenge:
-      "Automated research systems often fail in production because they operate in a single shot. If the LLM enters a bad search query or encounters a broken link, the entire run fails. Furthermore, fully automated agents consume excessive tokens crawling irrelevant content and risk hallucinating synthesis summaries when web sources contain conflicting or sparse evidence.",
+      "Single-pass research agents break silently on bad search formulations, waste tokens scraping boilerplate pages, and synthesize fabricated claims whenever retrieved sources contradict or lack proof.",
     approach:
-      "Designed an 8-node stateful agentic system using LangGraph. The workflow splits research into distinct stages: Planning, Query Formulation, Human Approval (to prune keywords and save costs), Parallel Web Scraping (with Redis-backed rate limiting), Extraction, Grounding Validation, Synthesis, and Refusal Calibration. State is persisted in PostgreSQL using custom checkpointers so interrupted runs can resume instantly from where they stopped. Streaming is achieved via Server-Sent Events (SSE) for sub-second visual updates.",
+      "Designed an 8-node LangGraph StateGraph separating Planning, Query Formulation, Human Approval interrupt, rate-limited Parallel Scraping (Tavily -> BM25 -> RRF -> cross-encoder rerank), Refusal Calibration, and Citation Synthesis. State persists in PostgreSQL via AsyncPostgresSaver so disconnected SSE streams resume via Last-Event-ID.",
     architecture: {
       nodes: [
-        { id: "planner", label: "Research Planner", desc: "Deconstructs user prompt into factual sub-topics" },
-        { id: "query_gen", label: "Query Generator", desc: "Generates multi-aspect search terms optimized for Google Search API" },
-        { id: "hitl", label: "Human Loop Checkpoint", desc: "Interrupts execution for user validation/pruning of search terms" },
-        { id: "scraper", label: "Parallel Scraper", desc: "Crawls HTML in parallel using Playwright, bypasses cookie walls" },
-        { id: "extractor", label: "Context Extractor", desc: "Extracts key sentences matching sub-topics using dense embeddings" },
-        { id: "refusal", label: "Refusal Evaluator", desc: "Verifies if sources have enough evidence; scores groundedness" },
-        { id: "synthesizer", label: "Report Synthesizer", desc: "Generates markdown dossier with inline academic citations" },
+        { id: "planner", label: "Research Planner", desc: "Deconstructs user prompt into verifiable sub-topics" },
+        { id: "query_gen", label: "Query Generator", desc: "Builds scoped search queries for Tavily retrieval" },
+        { id: "hitl", label: "Human Checkpoint", desc: "Pauses graph so user can approve or prune search queries" },
+        { id: "scraper", label: "Parallel Scraper", desc: "Crawls targets under Redis token-bucket rate limits" },
+        { id: "extractor", label: "Hybrid Reranker", desc: "BM25 + dense RRF plus cross-encoder sentence ranking" },
+        { id: "refusal", label: "Refusal Gate", desc: "Enforces evidence sufficiency before allowing synthesis" },
+        { id: "synthesizer", label: "Report Synthesizer", desc: "Streams inline-cited dossier over Last-Event-ID SSE" },
       ],
       connections: [
         { from: "planner", to: "query_gen" },
@@ -154,17 +215,17 @@ class CircuitBreaker:
         { from: "hitl", to: "scraper", label: "Approved" },
         { from: "scraper", to: "extractor" },
         { from: "extractor", to: "refusal" },
-        { from: "refusal", to: "synthesizer", label: "Groundedness > 0.85" },
-        { from: "refusal", to: "planner", label: "Failed (Re-plan)" },
+        { from: "refusal", to: "synthesizer", label: "Groundedness >= 0.85" },
+        { from: "refusal", to: "planner", label: "Insufficient -> Re-plan" },
       ],
     },
     lessons: [
-      "Initially used Redis for checkpointing but found it inadequate for recovering long-running sessions after server crashes. Migrating checkpointers to PostgreSQL schema-level isolation added 12ms latency, which we neutralized by layering an in-memory cache for warm runs.",
-      "Parallel scraping caused rate-limit blocks. Implemented a token-bucket rate limiter in Redis to self-regulate outgoing request spikes.",
+      "Migrating checkpoint state from ephemeral Redis to PostgreSQL schema tables added 12ms per step while guaranteeing exact resume semantics after crashes.",
+      "A Redis token-bucket limiter synced across worker tasks eliminated external host 429 throttling under concurrent load.",
     ],
     codeLanguage: "python",
-    codeSnippet: `# Nexus Researcher: LangGraph Stateful Multi-Agent Workflow (workflow.py)
-from typing import TypedDict, Annotated, List, Dict, Any
+    codeSnippet: `# Nexus Researcher: LangGraph Stateful Multi-Agent Workflow (backend/graph/workflow.py)
+from typing import TypedDict, List, Dict, Any
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
@@ -176,10 +237,7 @@ class ResearchState(TypedDict):
     groundedness_score: float
     citation_dossier: str
 
-# Instantiate state graph with typed schema
 workflow = StateGraph(ResearchState)
-
-# Register execution nodes
 workflow.add_node("planner", plan_research_subtopics)
 workflow.add_node("query_generator", generate_focused_queries)
 workflow.add_node("human_approval", hitl_checkpoint_node)
@@ -187,138 +245,186 @@ workflow.add_node("parallel_scraper", scrape_with_rate_limits)
 workflow.add_node("refusal_check", evaluate_groundedness_score)
 workflow.add_node("synthesizer", compile_citation_dossier)
 
-# Define transitions & conditional gates
 workflow.add_edge(START, "planner")
 workflow.add_edge("planner", "query_generator")
 workflow.add_edge("query_generator", "human_approval")
 workflow.add_conditional_edges(
     "human_approval",
-    lambda state: "parallel_scraper" if state["is_approved"] else "planner"
+    lambda state: "parallel_scraper" if state["is_approved"] else "planner",
 )
 workflow.add_edge("parallel_scraper", "refusal_check")
 workflow.add_conditional_edges(
     "refusal_check",
-    lambda state: "synthesizer" if state["groundedness_score"] >= 0.85 else "planner"
+    lambda state: "synthesizer" if state["groundedness_score"] >= 0.85 else "planner",
 )
 workflow.add_edge("synthesizer", END)
 
-# Compile with PostgreSQL checkpointer for resumable SSE streaming
+# Compile with PostgreSQL checkpointer for Last-Event-ID resumable SSE replay
 app = workflow.compile(checkpointer=AsyncPostgresSaver(connection_pool))`,
   },
   {
     slug: "ares",
     name: "ARES",
+    featured: true,
     category: "MLOps & Security" as ProjectCategory,
     year: "2025",
+    role: "Sole Author · MLOps & Evaluation Control Plane",
+    timeline: "4 weeks",
+    statusLabel: "Open-source · CI-enforced",
     services: ["CI Promotion Gates", "Drift Monitoring", "Evaluation API"],
-    eyebrow: "ML model evaluation & promotion gate",
+    eyebrow: "ML model regression & promotion gate",
     description:
-      "A Python 3.11+ model regression detection system that evaluates candidates against a golden dataset, compares them to the live champion, applies configurable promotion gate rules, and records every decision trail.",
+      "A Python 3.11+ evaluation control plane comparing candidate models against live champions across aggregate F1, p95 latency, KS/PSI drift, and critical demographic slices before permitting promotion.",
     impact:
-      "92%+ pytest coverage enforced in CI, idempotent evaluations keyed by commit SHA, configurable F1/accuracy/latency/slice regression gates, full Prometheus observability, and a Streamlit operator dashboard.",
+      "92%+ enforced pytest coverage across 72 test modules (~420 tests), idempotent commit-SHA evaluations, Prometheus telemetry, and automated GitHub Actions PR gates.",
+    methodology:
+      "Validated with CI coverage enforcement (--cov-fail-under=92) running unit, contract, and property-based gate rules on synthetic drift and slice regression fixtures.",
+    reproduceCmd: "pytest --cov=ares --cov-fail-under=92",
+    constraints: [
+      "Duplicate CI re-runs on the same commit SHA and golden set must never corrupt champion history",
+      "Overall accuracy gains must be rejected if critical minority slice F1 regresses below policy",
+      "Promotion decisions require immutable audit records accessible via FastAPI and Streamlit",
+    ],
+    tradeoffs: [
+      "Keyed evaluation tables uniquely by (commit_sha, golden_set_version, model_name), trading ad-hoc overwrite flexibility for strict idempotent auditability.",
+      "Used Streamlit for the internal operator leaderboard rather than building a second React frontend so engineering time stayed on rules_engine.py and CI workflows.",
+    ],
+    failures: [
+      "Early aggregate-only checks passed candidates that lost 15% F1 on rare demographic slices; added mandatory per-slice floor rules alongside overall delta thresholds.",
+      "CI job retries originally inserted duplicate champion records; resolved cleanly via composite idempotency keys.",
+    ],
+    evalSeries: [
+      { label: "CI Coverage", baseline: 0, current: 92, unit: "%" },
+      { label: "Test Modules", baseline: 12, current: 72, unit: "files" },
+      { label: "Test Cases", baseline: 60, current: 420, unit: "tests" },
+    ] satisfies ReadonlyArray<EvalSeriesPoint>,
     highlightMetrics: [
       { value: "92%+", label: "CI Test Coverage" },
-      { value: "Idempotent", label: "Commit-SHA Keyed" },
-      { value: "Multi-Slice", label: "Regression Detection" },
-      { value: "Automated", label: "Promotion Gate in CI" },
+      { value: "~420", label: "Tests (72 Modules)" },
+      { value: "Commit-SHA", label: "Idempotent Eval Key" },
+      { value: "Slice-Gated", label: "Drift & F1 Checks" },
     ],
     tech: ["Python", "FastAPI", "SQLAlchemy", "PostgreSQL", "Redis", "Streamlit", "Docker", "GitHub Actions", "DVC"],
     href: "https://github.com/Rytnixx786/Ares",
+    sourceRef: "ares/engine/rules_engine.py",
+    codeLabel: "Promotion Gate Engine",
     challenge:
-      "ML teams promoting models without rigorous evidence create silent production regressions: a model with a higher aggregate accuracy score can still fail on critical demographic slices or underperform on latency. Most pipelines lack idempotent evaluation records, champion history, and configurable slice-specific gates — making repeatable and auditable promotion decisions impossible.",
+      "Ad-hoc notebook checks let silent regressions reach users: a candidate model improving headline F1 by 2% can simultaneously degrade p95 latency or fail critical underrepresented slices.",
     approach:
-      "Built ARES as a full evaluation orchestration system. The core is a configurable `rules_engine` that checks candidate metrics against the active champion across F1, accuracy, precision, recall, critical slice performance, model size, and statistical significance. Evaluations are keyed by `commit_sha + golden_set_version + model_name` for idempotency. Results are persisted via async SQLAlchemy into PostgreSQL, exposed through a FastAPI API with API-key auth and rate limiting, and surfaced in a Streamlit dashboard with leaderboard, drill-down, drift monitor, and promotion workflow pages. GitHub Actions workflows gate every PR with quality and regression checks.",
+      "Built ARES around a declarative rules_engine checking candidate builds against the champion on metric deltas, demographic slice floors, latency budgets, and KS/PSI drift. Results persist idempotently in PostgreSQL via async SQLAlchemy and surface through authenticated FastAPI endpoints and Prometheus metrics.",
     architecture: {
       nodes: [
-        { id: "ci", label: "GitHub Actions", desc: "quality.yml / regression_gate.yml / drift_monitor.yml trigger evaluations on each PR" },
-        { id: "cli", label: "Evaluation CLI", desc: "scripts/run_evaluation.py orchestrates the full evaluation run" },
-        { id: "golden", label: "Golden Set Validator", desc: "Validates checksum, row counts, class balance, and slice distributions" },
-        { id: "eval", label: "Evaluators", desc: "BaseEvaluator + concrete classification/regression/detection evaluators" },
-        { id: "gate", label: "Promotion Gate", desc: "rules_engine applies F1, accuracy, latency, slice, and significance gates" },
-        { id: "db", label: "PostgreSQL DB", desc: "SQLAlchemy models store runs, champions, drift reports, audit logs" },
-        { id: "api", label: "FastAPI API", desc: "Authenticated endpoints with Prometheus instrumentation and webhooks" },
-        { id: "dash", label: "Streamlit Dashboard", desc: "Leaderboard, drill-down, drift monitor, and promotion workflow UI" },
+        { id: "ci", label: "GitHub Actions", desc: "PR workflows invoke regression, quality, and drift gates" },
+        { id: "cli", label: "Evaluation CLI", desc: "scripts/run_evaluation.py executes deterministic candidate runs" },
+        { id: "golden", label: "Golden Validator", desc: "Verifies dataset SHA checksums, row counts, and slices" },
+        { id: "eval", label: "Evaluators", desc: "Classification, latency, and KS/PSI drift extractors" },
+        { id: "gate", label: "Promotion Gate", desc: "rules_engine rejects slice, F1, or latency regressions" },
+        { id: "db", label: "PostgreSQL Ledger", desc: "Idempotent run history keyed by commit_sha + golden version" },
+        { id: "api", label: "FastAPI Service", desc: "API-key protected endpoints + Prometheus exporter" },
+        { id: "dash", label: "Streamlit Console", desc: "Operator leaderboard, slice drill-down, and promotion audit" },
       ],
       connections: [
         { from: "ci", to: "cli" },
         { from: "cli", to: "golden" },
         { from: "golden", to: "eval" },
         { from: "eval", to: "gate" },
-        { from: "gate", to: "db", label: "Persist Decision" },
+        { from: "gate", to: "db", label: "Persist Run" },
         { from: "db", to: "api" },
         { from: "api", to: "dash" },
-        { from: "gate", to: "api", label: "Promoted / Rejected" },
+        { from: "gate", to: "api", label: "Pass / Reject" },
       ],
     },
     lessons: [
-      "Aggregate metrics hide slice-level regressions. A model improving overall F1 by 2% can lose 15% on a specific demographic slice. Implementing mandatory critical-slice gates revealed real regressions that were previously invisible.",
-      "Idempotent evaluations are non-negotiable in CI. Without commit-SHA + golden-set-version keying, re-running pipelines on the same commit produced duplicated records that corrupted the champion leaderboard.",
+      "Aggregate accuracy hides severe slice regressions; enforcing explicit per-slice minimum thresholds caught real failure modes masked by global averages.",
+      "Composite idempotency keys across commit SHA and dataset digest keep CI retries completely safe and deterministic.",
     ],
     codeLanguage: "python",
-    codeSnippet: `# ARES Promotion Gate — rules_engine.py
+    codeSnippet: `# ARES Promotion Gate (ares/engine/rules_engine.py)
 class RulesEngine:
     def __init__(self, config: GateConfig):
         self.config = config
-    
+
     def evaluate(self, candidate: EvalResult, champion: EvalResult) -> GateDecision:
         failures = []
-        
-        # Core metric regression gates
-        for metric, threshold in self.config.metric_gates.items():
+
+        for metric, max_drop in self.config.metric_gates.items():
             delta = candidate.metrics[metric] - champion.metrics[metric]
-            if delta < -threshold:
-                failures.append(
-                    f"{metric} regressed {delta:.4f} (gate: {threshold})"
-                )
-        
-        # Critical slice gates (e.g. specific demographics or edge cases)
+            if delta < -max_drop:
+                failures.append(f"{metric} regressed {delta:.4f} (limit: -{max_drop})")
+
         for slice_name, min_f1 in self.config.critical_slices.items():
-            if candidate.slices[slice_name]["f1"] < min_f1:
+            slice_f1 = candidate.slices[slice_name]["f1"]
+            if slice_f1 < min_f1:
                 failures.append(
-                    f"Critical slice '{slice_name}' failed (f1={candidate.slices[slice_name]['f1']:.3f} < {min_f1})"
+                    f"Slice '{slice_name}' below floor (f1={slice_f1:.3f} < {min_f1})"
                 )
-        
-        # Latency gate
+
         if candidate.p95_latency_ms > self.config.max_latency_ms:
-            failures.append(f"Latency {candidate.p95_latency_ms}ms exceeds gate {self.config.max_latency_ms}ms")
-        
+            failures.append(
+                f"p95 latency {candidate.p95_latency_ms}ms > {self.config.max_latency_ms}ms"
+            )
+
         return GateDecision(
             passed=len(failures) == 0,
             failures=failures,
-            narrative=self._build_narrative(candidate, champion, failures)
+            narrative=self._build_narrative(candidate, champion, failures),
         )`,
   },
   {
     slug: "mindstack",
     name: "MindStack",
+    featured: false,
     category: "Agents & RAG" as ProjectCategory,
     year: "2025",
+    role: "Sole Author · Hybrid RAG & Evaluation",
+    timeline: "4 weeks",
+    statusLabel: "Open-source · Dockerized",
     services: ["Hybrid BM25 + Dense", "NLI Refusal Gate", "Ragas Evals"],
-    eyebrow: "Production RAG system",
+    eyebrow: "Calibrated hybrid RAG platform",
     description:
-      "A hybrid BM25 plus ChromaDB retrieval system designed to answer only when supporting evidence is present.",
+      "An evidence-only document Q&A engine fusing ChromaDB vectors with BM25 lexical search via Reciprocal Rank Fusion (k = 60), cross-encoder reranking, and an NLI refusal classifier.",
     impact:
-      "Reached 95% groundedness and improved refusal accuracy from 26.67% to 66.67% with CI-backed adversarial tests.",
+      "Measured 95% factual QA groundedness and raised adversarial unanswerable refusal accuracy from 26.67% to 66.67% under CI evaluation suites.",
+    methodology:
+      "Measured using CI-backed adversarial QA suites comparing baseline un-gated vector retrieval against RRF (k = 60) plus NLI entailment gating and cross-encoder reranking.",
+    reproduceCmd: "docker compose up --build -d && pytest evals/adversarial_suite.py",
+    constraints: [
+      "Exact code identifiers and error strings frequently miss pure embedding nearest-neighbor search",
+      "Unanswerable user queries must trigger an explicit refusal instead of hallucinated synthesis",
+    ],
+    tradeoffs: [
+      "Adopted parent-child chunking (small index child chunks, large parent window passed to generator), trading extra SQLite metadata lookups for intact surrounding context.",
+      "Used Reciprocal Rank Fusion (k = 60) over tuned linear score weighting to avoid fragile normalization across BM25 and cosine similarity distributions.",
+    ],
+    failures: [
+      "Raw cosine distance thresholding broke whenever Markdown formatting changed; replaced with cross-encoder + NLI entailment checks.",
+    ],
+    evalSeries: [
+      { label: "Groundedness", baseline: 71, current: 95, unit: "%" },
+      { label: "Refusal Accuracy", baseline: 26.7, current: 66.7, unit: "%" },
+    ] satisfies ReadonlyArray<EvalSeriesPoint>,
     highlightMetrics: [
       { value: "95%", label: "QA Groundedness" },
       { value: "66.7%", label: "Adversarial Refusal" },
       { value: "k = 60", label: "RRF Fusion Constant" },
-      { value: "Hybrid", label: "BM25 + ChromaDB" },
+      { value: "26.7%->66.7%", label: "Refusal Delta" },
     ],
-    tech: ["FastAPI", "React", "Docker", "ChromaDB", "BM25", "Mistral"],
+    tech: ["FastAPI", "React", "Docker", "ChromaDB", "BM25", "Ollama", "Mistral", "SQLite"],
     href: "https://github.com/Rytnixx786/MindStack",
+    sourceRef: "backend/retrieval/hybrid.py",
+    codeLabel: "RRF + NLI Refusal Gate",
     challenge:
-      "Vector-only retrieval models often return irrelevant results for specific keywords or product codes because semantic searches lack word-level exact matches. In production, this causes the LLM generator to hallucinate answers using out-of-context documents rather than admitting it doesn't know.",
+      "Vector-only RAG retrieves semantically adjacent paragraphs while missing exact error codes or identifiers, and unconstrained generators synthesize plausible falsehoods when supporting chunks are absent.",
     approach:
-      "Implemented a hybrid search pipeline. Combined dense vectors (ChromaDB + OpenAI text-embedding-3-small) with sparse indices (BM25) using Reciprocal Rank Fusion (RRF) with a parameter constant (k=60). Developed a Custom Refusal Classifier. Before passing contexts to the generator, a calibrated evaluation step calculates the overlap and entailment scores. If the context fails to support the query premises, the system refuses to answer, preventing hallucinations at the source.",
+      "Combined ChromaDB dense search with sparse BM25 lexical matching through Reciprocal Rank Fusion (k = 60), followed by cross-encoder reranking and an NLI entailment gate that aborts generation when context support drops below threshold.",
     architecture: {
       nodes: [
-        { id: "query", label: "User Query", desc: "Incoming search query" },
-        { id: "dense", label: "ChromaDB Dense", desc: "Retrieves semantic contexts using cosine distance" },
-        { id: "sparse", label: "BM25 Sparse", desc: "Retrieves exact keyword matches from token index" },
-        { id: "rrf", label: "RRF Merger", desc: "Combines dense & sparse rankings using Reciprocal Rank Fusion" },
-        { id: "filter", label: "Evidence Filter", desc: "Evaluates factual grounding; drops unsupported claims" },
-        { id: "generator", label: "LLM Generator", desc: "Formulates final, citation-linked markdown answer" },
+        { id: "query", label: "User Query", desc: "Incoming question normalized for dual retrieval" },
+        { id: "dense", label: "ChromaDB Dense", desc: "Semantic embedding search across child chunks" },
+        { id: "sparse", label: "BM25 Sparse", desc: "Exact lexical token index for identifiers and terms" },
+        { id: "rrf", label: "RRF Merger (k=60)", desc: "Rank fusion + cross-encoder reranking" },
+        { id: "filter", label: "NLI Refusal Gate", desc: "Verifies entailment support before invoking LLM" },
+        { id: "generator", label: "Mistral Generator", desc: "Synthesizes citation-backed answer on parent chunks" },
       ],
       connections: [
         { from: "query", to: "dense" },
@@ -326,168 +432,214 @@ class RulesEngine:
         { from: "dense", to: "rrf" },
         { from: "sparse", to: "rrf" },
         { from: "rrf", to: "filter" },
-        { from: "filter", to: "generator", label: "Evidence Check Pass" },
-        { from: "filter", to: "query", label: "Refusal Triggered" },
+        { from: "filter", to: "generator", label: "Entailment >= 0.70" },
+        { from: "filter", to: "query", label: "Calibrated Refusal" },
       ],
     },
     lessons: [
-      "Found that simple cosine similarity thresholding was too sensitive to formatting changes in docs. Switching to RRF + NLI (Natural Language Inference) entailment classifier stabilized groundedness scores across unstructured documents.",
-      "Chunk size optimization is a balancing act. Small chunks (128 tokens) maximized retrieval precision but deprived the generator of surrounding context. Standardized on parent-child chunking (retrieve small, serve large).",
+      "Reciprocal Rank Fusion (k = 60) plus NLI entailment proved far less brittle across formatting noise than arbitrary cosine distance cutoffs.",
+      "Retrieving small 128-token child chunks while supplying parent sections to Mistral kept both recall precision and answer completeness high.",
     ],
     codeLanguage: "python",
-    codeSnippet: `def reciprocal_rank_fusion(dense_results, sparse_results, k=60):
-    fused_scores = {}
+    codeSnippet: `# MindStack: Reciprocal Rank Fusion & NLI Entailment Gate (backend/retrieval/hybrid.py)
+def reciprocal_rank_fusion(dense_results, sparse_results, doc_map, k: int = 60):
+    fused_scores: dict[str, float] = {}
     for rank, doc in enumerate(dense_results):
         fused_scores[doc.id] = fused_scores.get(doc.id, 0.0) + 1.0 / (rank + k)
     for rank, doc in enumerate(sparse_results):
         fused_scores[doc.id] = fused_scores.get(doc.id, 0.0) + 1.0 / (rank + k)
-    
-    # Sort and return combined documents
-    sorted_docs = sorted(fused_scores.items(), key=lambda x: x[1], reverse=True)
-    return [doc_map[doc_id] for doc_id, _ in sorted_docs[:5]]
 
-def check_groundedness(query, retrieved_chunks):
+    ranked = sorted(fused_scores.items(), key=lambda item: item[1], reverse=True)
+    return [doc_map[doc_id] for doc_id, _ in ranked[:5]]
+
+def check_groundedness(query: str, retrieved_chunks: list[str], nli_model) -> bool:
     entailment_score = nli_model.predict(query, retrieved_chunks)
     if entailment_score < 0.70:
-        raise RefusalException("Insufficient supporting evidence in database.")
+        raise RefusalException("Insufficient supporting evidence in indexed sources.")
     return True`,
   },
   {
     slug: "offboarder",
     name: "OFFBoarder",
+    featured: false,
     category: "MLOps & Security" as ProjectCategory,
     year: "2025",
+    role: "Sole Author · Full-Stack Security Architecture",
+    timeline: "4 weeks",
+    statusLabel: "Open-source platform",
     services: ["Multi-Tenant RLS", "Segregation of Duties", "SHA-256 Ledger"],
-    eyebrow: "Security-first enterprise platform",
+    eyebrow: "Zero-trust enterprise offboarding",
     description:
-      "A multi-tenant offboarding platform with strict tenant isolation, RBAC, segregation-of-duties controls, and immutable audit packs.",
+      "A multi-tenant employee offboarding platform enforcing database-level PostgreSQL Row-Level Security, Segregation of Duties (Creator != Approver), Risk Radar scoring, and chained SHA-256 PDF audit evidence packs.",
     impact:
-      "Owned the product end to end: data model, API layer, auth flows, dashboard, workflow orchestration, and audit design.",
+      "Delivered the complete system end to end: Prisma + Postgres RLS schema, SoD enforcement middleware, IP ban/unban lockdown flows, jsPDF evidence packs, and transactional outbox retries.",
+    methodology:
+      "Verified tenant isolation and Segregation of Duties invariants with server-side integration tests checking cross-tenant session isolation, self-approval rejection, and tamper detection on chained hashes.",
+    reproduceCmd: "npm run test:security && npx prisma migrate status",
+    constraints: [
+      "Application-level WHERE filters are easy to forget; isolation must be enforced inside PostgreSQL RLS policies",
+      "An offboarding creator must never be permitted to self-approve or execute high-risk lockdowns",
+    ],
+    tradeoffs: [
+      "Enforced PostgreSQL session variables (`app.current_tenant_id`) via Prisma middleware extensions instead of separate schemas per tenant to keep migrations simple.",
+      "Used chained SHA-256 audit rows inside PostgreSQL rather than external blockchain infrastructure for predictable ACID compliance.",
+    ],
+    failures: [
+      "Upstream identity provider rate limits initially desynced audit log timestamps; resolved by moving outbound webhook revocations into a transactional outbox table.",
+    ],
+    evalSeries: [
+      { label: "Isolation Layer", baseline: 1, current: 2, unit: "DB + API" },
+      { label: "Audit Hash", baseline: 0, current: 256, unit: "bit SHA" },
+    ] satisfies ReadonlyArray<EvalSeriesPoint>,
     highlightMetrics: [
-      { value: "SoD Enforced", label: "Creator ≠ Approver" },
+      { value: "SoD Enforced", label: "Creator != Approver" },
       { value: "SHA-256", label: "Chained Audit Ledger" },
       { value: "Postgres RLS", label: "Tenant Isolation" },
-      { value: "Zero Leak", label: "Transactional Outbox" },
+      { value: "Outbox Sync", label: "Transactional Retries" },
     ],
-    tech: ["Next.js", "TypeScript", "PostgreSQL", "Prisma", "Supabase", "RBAC"],
+    tech: ["Next.js", "TypeScript", "PostgreSQL", "Prisma", "Supabase", "jsPDF"],
     href: "https://github.com/Rytnixx786/OFF-Boarder",
+    sourceRef: "src/lib/middleware/sod.ts",
+    codeLabel: "Segregation of Duties Guard",
     challenge:
-      "Employee offboarding in large companies creates massive security holes if access revocation is not verified or if admins can act unilaterally. Backdoor accounts are frequently left active, and standard SaaS tools do not provide immutable cryptographic auditing, making tampering easy and breach tracing impossible.",
+      "Rushed employee offboarding leaves stale cloud sessions and unilaterally approved actions with mutable logs that fail compliance audits.",
     approach:
-      "Built a secure multi-tenant dashboard. Implemented strict Row-Level Security (RLS) on PostgreSQL via Prisma. Enforced Segregation of Duties (SoD) via middleware: the creator of an offboarding task cannot be the approver. Created a cryptographic ledger using SHA-256 hashing where every access revocation action is appended into an immutable, chained audit table, forming a tamper-proof security log.",
+      "Built multi-tenant RLS isolation via PostgreSQL session contexts, enforced Segregation of Duties checks requiring distinct creator and security approver identities, and appended every revocation into a hash-chained SHA-256 ledger exportable as jsPDF evidence packs.",
     architecture: {
       nodes: [
-        { id: "client", label: "Enterprise Admin UI", desc: "Next.js dashboard with strict RBAC views" },
-        { id: "middleware", label: "SoD Middleware", desc: "Validates role and checks for creator/approver collisions" },
-        { id: "db_rls", label: "Postgres RLS", desc: "Filters queries dynamically at database level based on Tenant ID" },
-        { id: "revoker", label: "API Revoker Agent", desc: "Automates API calls to AD/Okta to terminate accounts" },
-        { id: "audit", label: "Cryptographic Ledger", desc: "Hashes actions and links them sequentially in a blockchain-style log" },
+        { id: "client", label: "Admin & Employee UI", desc: "Role-scoped workflows for tasks, risk escalation, and evidence" },
+        { id: "middleware", label: "SoD Middleware", desc: "Blocks creator self-approval and verifies officer role" },
+        { id: "db_rls", label: "Postgres RLS", desc: "Enforces tenant boundary via DB session variables" },
+        { id: "revoker", label: "Transactional Outbox", desc: "Dispatches Slack, IP ban, and revocation retries safely" },
+        { id: "audit", label: "SHA-256 Audit Ledger", desc: "Chained hash records + jsPDF compliance export" },
       ],
       connections: [
         { from: "client", to: "middleware" },
-        { from: "middleware", to: "db_rls", label: "Pass" },
+        { from: "middleware", to: "db_rls", label: "SoD Verified" },
         { from: "db_rls", to: "revoker" },
-        { from: "revoker", to: "audit" },
+        { from: "revoker", to: "audit", label: "Hash Chained" },
       ],
     },
     lessons: [
-      "Learned that multi-tenancy at the application layer is prone to leakage. We solved this by enforcing tenant contexts directly inside database connections using PostgreSQL session variables instead of simple WHERE clauses in Prisma.",
-      "External API timeouts (e.g. Okta rate limits) caused audit logs to desync. Re-architected revocation to use transactional outbox patterns with dynamic retries.",
+      "Application-level tenant filters invite accidental leaks; pushing tenant context into PostgreSQL RLS policies locks boundaries at the storage engine.",
+      "Writing webhook dispatches through a transactional outbox table keeps revocation state and hash audit entries consistent across upstream timeouts.",
     ],
     codeLanguage: "typescript",
-    codeSnippet: `// Segregation of Duties Middleware (middleware/sod.ts)
-export async function enforceSegregationOfDuties(req: Request) {
-  const user = req.user;
-  const taskId = req.params.taskId;
-  
-  const task = await prisma.offboardingTask.findUnique({
-    where: { id: taskId }
+    codeSnippet: `// OFFBoarder: Segregation of Duties Guard (src/lib/middleware/sod.ts)
+export async function enforceSegregationOfDuties(
+  prisma: PrismaClient,
+  taskId: string,
+  actor: { id: string; roles: string[]; tenantId: string }
+) {
+  const task = await prisma.offboardingTask.findFirst({
+    where: { id: taskId, tenantId: actor.tenantId },
   });
-  
-  if (!task) throw new NotFoundException();
-  
-  // Creator of the task cannot approve or execute it
-  if (task.creatorId === user.id) {
-    throw new ForbiddenException(
-      "Segregation of Duties Enforced: Creators cannot approve their own tasks."
+
+  if (!task) throw new NotFoundError("Offboarding task not found.");
+
+  // Creator of the offboarding request cannot approve their own action
+  if (task.creatorId === actor.id) {
+    throw new ForbiddenError(
+      "Segregation of Duties violated: creators cannot self-approve tasks."
     );
   }
-  
-  if (!user.roles.includes("SEC_OFFICER")) {
-    throw new UnauthorizedException("Security approval credentials required.");
+
+  if (!actor.roles.includes("SEC_OFFICER")) {
+    throw new UnauthorizedError("Security officer approval required.");
   }
-  
-  return true;
+
+  return task;
 }`,
   },
   {
     slug: "masheba-ai",
     name: "MaSheba AI",
+    featured: false,
     category: "Mobile & Systems" as ProjectCategory,
     year: "2025",
-    services: ["SQLite WAL Sync", "On-Device ONNX", "Clinical Backend"],
-    eyebrow: "Offline-first healthcare assistant",
+    role: "Backend Engineer · Team Build",
+    timeline: "Team capstone",
+    statusLabel: "Open-source · Live docs",
+    services: ["SQLite WAL Sync", "On-Device ONNX (AUC 0.90)", "Clinical FastAPI"],
+    eyebrow: "Offline-first Bangla maternal healthcare",
     description:
-      "A Bangla maternal health platform for mothers and community health workers, built around local persistence and resilient sync.",
+      "A Bangla maternal health ecosystem for community health workers operating in zero-connectivity rural zones, featuring local SQLite WAL persistence, on-device ONNX XGBoost triage (AUC 0.90), and a Groq -> Gemini -> offline chat cascade.",
     impact:
-      "Implemented SQLite sync, Supabase-backed storage, on-device vitals triage, and Bangla clinical chat workflows.",
-    highlightMetrics: [
-      { value: "Offline-First", label: "Local SQLite Storage" },
-      { value: "Resilient", label: "Outbox Sync Queue" },
-      { value: "Zero Loss", label: "Microsecond Clock Sync" },
-      { value: "Bangla NLP", label: "Clinical Chat & Triage" },
+      "Owned the FastAPI backend, dual-LLM clinical chat cascade, SQLite WAL outbox sync protocol, and ONNX XGBoost maternal risk model achieving 0.90 AUC on-device.",
+    methodology:
+      "Evaluated the maternal risk triage classifier offline via stratified cross-validation (AUC 0.90) exported to ONNX Runtime, alongside airplane-mode SQLite outbox replay drills.",
+    reproduceCmd: "cd backend && pytest tests/sync/ -v",
+    constraints: [
+      "Rural community workers operate for hours in zero-reception areas; patient intake must never block on HTTP",
+      "Bilingual clinical fallback must gracefully degrade from online Groq/Gemini to offline guidance",
     ],
-    tech: ["React Native", "Expo Router", "SQLite", "Supabase", "FastAPI", "PostgreSQL"],
+    tradeoffs: [
+      "Exported XGBoost triage directly to ONNX on-device instead of cloud scoring so high-risk vital signs flag instantaneously without connectivity.",
+      "Used client-generated UUID v4 identifiers plus microsecond logical clocks to merge offline writes without server round-trips.",
+    ],
+    failures: [
+      "Sequential integer IDs caused primary-key collisions across disconnected devices; migrated cleanly to UUID v4 keys.",
+      "Large prescription images starved cellular sync batches; separated media into resumable byte-offset chunk uploads.",
+    ],
+    evalSeries: [
+      { label: "Risk Triage AUC", baseline: 0.72, current: 0.9, unit: "ROC-AUC" },
+      { label: "LLM Cascade", baseline: 1, current: 3, unit: "tiers" },
+    ] satisfies ReadonlyArray<EvalSeriesPoint>,
+    highlightMetrics: [
+      { value: "0.90 AUC", label: "ONNX Risk Model" },
+      { value: "WAL Sync", label: "Offline SQLite Outbox" },
+      { value: "3-Tier", label: "Groq->Gemini->Offline" },
+      { value: "PostGIS", label: "Regional CHW Telemetry" },
+    ],
+    tech: ["FastAPI", "React Native", "Expo Router", "SQLite WAL", "ONNX", "Supabase", "PostGIS"],
     href: "https://github.com/DigontaDas/MaSheba--AI",
     docs: "https://masheba-docs.vercel.app/docs",
+    sourceRef: "mobile/services/sync.ts",
+    codeLabel: "Parameterized Outbox Sync",
     challenge:
-      "Community healthcare workers in rural Bangladesh travel to remote villages with poor or non-existent cellular reception. When offline, medical worker applications often crash or lose vital patient records, while online-only systems prevent record inputs, leaving critical symptoms untriaged.",
+      "Rural health workers lose intermittent cellular links during home visits. Online-only forms lose patient vitals or hang during critical triage moments.",
     approach:
-      "Developed a robust offline-first architecture for React Native using SQLite (via Expo SQLite) for local persistence. Designed a background sync queue that buffers write operations locally with auto-incrementing sequencing. Upon network detection, a sync engine flushes the queue via transactional payloads to Supabase, automatically resolving schema conflicts using last-write-wins and client-side merge policies.",
+      "Owned the FastAPI backend and SQLite WAL outbox synchronization protocol. Offline mutations queue locally using UUID v4 IDs and flush safely upon network recovery, paired with an on-device ONNX XGBoost model (0.90 AUC) and a Groq -> Gemini -> offline clinical chat cascade.",
     architecture: {
       nodes: [
-        { id: "mobile_ui", label: "React Native UI", desc: "Bengali interface displaying offline triage widgets" },
-        { id: "sqlite", label: "Local SQLite DB", desc: "Instant local reads and writes with zero latency" },
-        { id: "queue", label: "Outbox Sync Queue", desc: "Buffers serialized mutations while offline" },
-        { id: "sync_engine", label: "Sync Coordinator", desc: "Listens for online states, coordinates batches" },
-        { id: "gateway", label: "FastAPI Gateway", desc: "Validates payloads, inserts into centralized Supabase DB" },
+        { id: "mobile_ui", label: "Expo Bangla UI", desc: "Offline triage intake and on-device ONNX XGBoost (0.90 AUC)" },
+        { id: "sqlite", label: "SQLite WAL DB", desc: "Local persistence surviving zero-connectivity visits" },
+        { id: "queue", label: "Outbox Sync Queue", desc: "Ordered mutation queue keyed by UUID v4 and timestamp" },
+        { id: "sync_engine", label: "Sync Coordinator", desc: "Batches pending rows when cellular link returns" },
+        { id: "gateway", label: "FastAPI + Cascade", desc: "Groq -> Gemini -> offline chat + PostGIS sync ingestion" },
       ],
       connections: [
         { from: "mobile_ui", to: "sqlite" },
         { from: "sqlite", to: "queue" },
         { from: "queue", to: "sync_engine" },
-        { from: "sync_engine", to: "gateway", label: "Network Restored" },
+        { from: "sync_engine", to: "gateway", label: "Link Restored" },
       ],
     },
     lessons: [
-      "UUID collisions and out-of-order execution were common in early sync cycles. We replaced sequential integers with client-side UUID v4s and tracked timestamps down to microseconds, establishing logical clocks to handle conflict resolution.",
-      "Large media uploads (e.g. photos of prescriptions) choked cellular connections. Wrote background chunked upload queues that resume from the byte offset on reconnection.",
+      "Client-generated UUID v4 primary keys and microsecond ordering eliminated multi-device merge collisions during offline field testing.",
+      "Decoupling large prescription image uploads into chunked byte-offset transfers prevented slow cellular links from blocking urgent vitals sync.",
     ],
     codeLanguage: "typescript",
-    codeSnippet: `// SQLite Outbox Sync Queue Handler (services/sync.ts)
-export async function flushSyncQueue() {
-  const pendingMutations = await db.all(
-    "SELECT * FROM sync_queue ORDER BY timestamp ASC LIMIT 50"
+    codeSnippet: `// MaSheba AI: Parameterized SQLite Outbox Sync Flush (mobile/services/sync.ts)
+export async function flushSyncQueue(db: SQLiteDatabase, endpoint: string) {
+  const pending = await db.getAllAsync<{ id: string; payload: string }>(
+    "SELECT id, payload FROM sync_queue ORDER BY created_us ASC LIMIT 50"
   );
-  
-  if (pendingMutations.length === 0) return;
-  
-  try {
-    const response = await fetch("https://api.masheba.ai/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mutations: pendingMutations })
-    });
-    
-    if (response.ok) {
-      const idsToDelete = pendingMutations.map(m => m.id);
-      await db.run(
-        \`DELETE FROM sync_queue WHERE id IN (\${idsToDelete.join(",")})\`
-      );
-    }
-  } catch (error) {
-    console.error("Sync batch failed. Will retry on network state change.", error);
+  if (pending.length === 0) return;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mutations: pending }),
+  });
+
+  if (!response.ok) {
+    throw new Error(\`Sync batch rejected with status \${response.status}\`);
   }
+
+  const ids = pending.map((row) => row.id);
+  const placeholders = ids.map(() => "?").join(", ");
+  await db.runAsync(\`DELETE FROM sync_queue WHERE id IN (\${placeholders})\`, ids);
 }`,
   },
 ] as const;

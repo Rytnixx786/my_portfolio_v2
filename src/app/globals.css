@@ -11,12 +11,17 @@
   --color-surface: #161b22;
   --color-surface-muted: #1c222b;
   --color-ink: #e6edf3;
-  --color-graphite: #8b949e;
-  --color-muted: #6e7681;
+  --color-graphite: #9da7b3;
+  --color-muted: #8b949e;
   --color-accent: #38bdf8;
   --color-accent-hover: #7dd3fc;
   --color-accent-soft: rgba(56, 189, 248, 0.12);
   --color-hairline: rgba(240, 246, 252, 0.1);
+
+  --color-hue-serving: oklch(0.78 0.14 215);
+  --color-hue-agents: oklch(0.78 0.12 350);
+  --color-hue-mlops: oklch(0.8 0.13 135);
+  --color-hue-mobile: oklch(0.8 0.12 55);
 
   --ease-editorial: cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -27,8 +32,8 @@
   --bg-surface: #161b22;
   --bg-surface-muted: #1c222b;
   --ink-primary: #e6edf3;
-  --ink-secondary: #8b949e;
-  --ink-muted: #6e7681;
+  --ink-secondary: #9da7b3;
+  --ink-muted: #8b949e;
   --accent-primary: #38bdf8;
   --accent-hover: #7dd3fc;
   --accent-soft: rgba(56, 189, 248, 0.12);
@@ -61,6 +66,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+h1,
+h2,
+h3,
+h4 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
 ::selection {
   background-color: rgba(56, 189, 248, 0.24);
   color: #e6edf3;
@@ -71,18 +87,18 @@ body {
   outline-offset: 3px;
 }
 
-/* Subtle dark telemetry noise overlay — GPU-safe fixed pseudo-layer */
+/* Subtle dark telemetry noise overlay */
 .paper-grain {
   position: fixed;
   inset: 0;
   z-index: 50;
   pointer-events: none;
-  opacity: 0.032;
+  opacity: 0.028;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)' opacity='0.85'/%3E%3C/svg%3E");
   mix-blend-mode: soft-light;
 }
 
-/* Double-Bezel machined dark compute enclosures (depth via brightness step, not pure black drop shadow) */
+/* Double-Bezel machined dark compute enclosures */
 .double-bezel-outer {
   padding: 0.375rem;
   border-radius: 1.75rem;
@@ -104,46 +120,16 @@ body {
   box-shadow: inset 0 1px 0 rgba(240, 246, 252, 0.05);
 }
 
-/* Tabular numeric precision for telemetry & benchmarks */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
-/* Editorial hairlines */
 .editorial-rule {
   border-color: var(--border-hairline);
 }
 
 .editorial-rule-accent {
   border-color: rgba(56, 189, 248, 0.35);
-}
-
-/* 3D Perspective helpers */
-.perspective-1200 {
-  perspective: 1200px;
-}
-
-.preserve-3d {
-  transform-style: preserve-3d;
-}
-
-/* Continuous marquee animation (respects reduced motion below) */
-@keyframes marquee-scroll {
-  0% {
-    transform: translate3d(0, 0, 0);
-  }
-  100% {
-    transform: translate3d(-50%, 0, 0);
-  }
-}
-
-.animate-telemetry-marquee {
-  animation: marquee-scroll 38s linear infinite;
-}
-
-.group:hover .animate-telemetry-marquee,
-.group:focus-within .animate-telemetry-marquee {
-  animation-play-state: paused;
 }
 
 /* Custom subtle scrollbars for code blocks and console */
@@ -159,6 +145,12 @@ body {
 .editorial-scroll::-webkit-scrollbar-thumb {
   background: rgba(56, 189, 248, 0.32);
   border-radius: 9999px;
+}
+
+/* Native command dialog backdrop */
+dialog.palette-dialog::backdrop {
+  background-color: rgba(8, 11, 16, 0.78);
+  backdrop-filter: blur(12px);
 }
 
 /* View Transitions between work cards and /work/[slug] */
@@ -196,9 +188,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto !important;
-  }
-  .animate-telemetry-marquee {
-    animation: none !important;
   }
   *,
   *::before,

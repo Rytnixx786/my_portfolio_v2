@@ -1,9 +1,25 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import type { Project } from "@/data/projects";
-import { useWebGLContext } from "@/components/canvas/WebGLContextProvider";
-import { ProjectTopology3D } from "@/components/canvas/ProjectTopology3D";
+import { useCanRender3D } from "@/hooks/usePortfolioUtils";
+import { getCategoryHue } from "@/lib/palette";
+
+const LazyProjectTopology3D = dynamic(
+  () =>
+    import("@/components/canvas/ProjectTopology3D").then(
+      (mod) => mod.ProjectTopology3D
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-[225px] w-full items-center justify-center bg-[#0D1117] font-mono text-xs text-[#8B949E] sm:h-[260px]">
+        Loading interactive 3D topology...
+      </div>
+    ),
+  }
+);
 
 const SCULPTURE_SLUGS = new Set(["cinch", "nexus-researcher", "ares"]);
 
@@ -14,9 +30,8 @@ interface ProjectPreviewPlateProps {
 }
 
 /**
- * Interactive dark-compute SVG topology explorer derived strictly from
- * project.architecture and project.highlightMetrics. Users can inspect stages
- * directly in place on hover/tap/focus.
+ * Interactive topology preview supporting lazy-loaded 3D mini-labs on flagship
+ * cards alongside an accessible SVG + HTML stage selector list.
  */
 export function ProjectPreviewPlate({
   project,
@@ -26,36 +41,30 @@ export function ProjectPreviewPlate({
   const nodes = project.architecture.nodes;
   const connections = project.architecture.connections;
   const isFeatured = variant === "featured";
+  const hue = getCategoryHue(project.category);
 
-  const { hasMounted, effectiveTier, webglSupported } = useWebGLContext();
+  const { canRender3D } = useCanRender3D();
   const supports3D = SCULPTURE_SLUGS.has(project.slug);
-  const webglReady = hasMounted && webglSupported && effectiveTier !== "low";
 
   const [activeIdx, setActiveIdx] = useState<number>(0);
   const [viewMode, setViewMode] = useState<"3d" | "2d">(supports3D ? "3d" : "2d");
-  const show3DStage = supports3D && viewMode === "3d" && webglReady;
+  const show3DStage = supports3D && viewMode === "3d" && canRender3D;
 
   const svgWidth = 640;
-  const svgHeight = isFeatured ? 305 : 245;
+  const svgHeight = isFeatured ? 235 : 205;
   const count = nodes.length;
 
   const coords = nodes.map((node, i) => {
     const t = count > 1 ? i / (count - 1) : 0.5;
-    const x = 68 + t * (svgWidth - 136);
+    const x = 64 + t * (svgWidth - 128);
     const wave =
       project.slug === "cinch"
-        ? Math.sin(t * Math.PI * 2.2) * 42
+        ? Math.sin(t * Math.PI * 2.2) * 34
         : project.slug === "nexus-researcher"
-          ? (i % 2 === 0 ? -30 : 32) + Math.cos(t * Math.PI) * 14
+          ? (i % 2 === 0 ? -24 : 26) + Math.cos(t * Math.PI) * 12
           : project.slug === "ares"
-            ? Math.cos(t * Math.PI * 2) * 36
-            : project.slug === "mindstack"
-              ? i === 1
-                ? -42
-                : i === 2
-                  ? 42
-                  : Math.sin(t * Math.PI) * 12
-              : Math.sin(t * Math.PI * 1.6 + 0.6) * 30;
+            ? Math.cos(t * Math.PI * 2) * 30
+            : Math.sin(t * Math.PI * 1.6 + 0.6) * 26;
 
     const y = svgHeight * 0.5 + wave;
     return { ...node, x, y, index: i };
@@ -66,227 +75,152 @@ export function ProjectPreviewPlate({
 
   return (
     <div className="relative overflow-hidden rounded-[calc(1.5rem-0.375rem)] border border-[rgba(240,246,252,0.08)] bg-[#0D1117]">
-      {/* Subtle coordinate matrix */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-60"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, rgba(240,246,252,0.035) 1px, transparent 1px), linear-gradient(to bottom, rgba(240,246,252,0.035) 1px, transparent 1px)",
-          backgroundSize: "32px 32px",
-        }}
-      />
+      {/* Category Hue Hairline */}
+      <div className="h-[2px] w-full" style={{ backgroundColor: hue.hex }} aria-hidden="true" />
 
       {/* Top Plate Bar */}
-      <div className="relative z-10 flex items-center justify-between gap-2 border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/90 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[#8B949E]">
+      <div className="relative z-10 flex items-center justify-between gap-2 border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/90 px-4 py-2.5 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3]">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#38BDF8]" aria-hidden="true" />
+          <span
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: hue.hex }}
+            aria-hidden="true"
+          />
           <span className="truncate font-semibold text-[#E6EDF3]">
             {indexLabel} · {project.category}
           </span>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          {supports3D && webglReady ? (
-            <div className="inline-flex rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117] p-0.5">
+          {supports3D && canRender3D ? (
+            <div className="inline-flex rounded-full border border-[rgba(240,246,252,0.12)] bg-[#0D1117] p-0.5">
               <button
                 type="button"
                 onClick={() => setViewMode("3d")}
                 aria-pressed={viewMode === "3d"}
-                className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] transition-colors ${
+                className={`rounded-full px-2.5 py-0.5 font-mono text-xs uppercase transition-colors ${
                   viewMode === "3d"
-                    ? "bg-[#38BDF8] text-[#0D1117]"
+                    ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                     : "text-[#8B949E] hover:text-[#E6EDF3]"
                 }`}
               >
-                3D Model
+                3D
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode("2d")}
                 aria-pressed={viewMode === "2d"}
-                className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] transition-colors ${
+                className={`rounded-full px-2.5 py-0.5 font-mono text-xs uppercase transition-colors ${
                   viewMode === "2d"
-                    ? "bg-[#38BDF8] text-[#0D1117]"
+                    ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                     : "text-[#8B949E] hover:text-[#E6EDF3]"
                 }`}
               >
-                2D Stages
+                Graph
               </button>
             </div>
           ) : (
-            <span className="shrink-0 text-[#38BDF8] tabular-nums">
-              {nodes.length} STAGES · INTERACTIVE
+            <span className="hidden font-mono text-xs text-[#8B949E] sm:inline">
+              {nodes.length} stages
             </span>
           )}
         </div>
       </div>
 
-      {/* Interactive 3D Sculpture or SVG Topology Canvas */}
       {show3DStage ? (
-        <div className="relative z-10 px-2 py-2.5 sm:px-4">
-          <div className="relative">
-            <ProjectTopology3D
-              slug={project.slug}
-              className={isFeatured ? "h-48 sm:h-56 w-full" : "h-40 sm:h-44 w-full"}
-            />
-            <span className="pointer-events-none absolute bottom-1 right-2 font-mono text-[9px] uppercase tracking-[0.14em] text-[#6E7681]">
-              Drag to inspect mesh
-            </span>
-          </div>
-        </div>
+        <LazyProjectTopology3D slug={project.slug} />
       ) : (
-        <div className="relative z-10 px-2 py-2.5 sm:px-4">
-        <svg
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          role="img"
-          aria-label={`${project.name} interactive architecture topology`}
-          className={`w-full ${isFeatured ? "h-48 sm:h-56" : "h-40 sm:h-44"}`}
-        >
-          <line
-            x1="36"
-            y1={svgHeight * 0.5}
-            x2={svgWidth - 36}
-            y2={svgHeight * 0.5}
-            stroke="rgba(240,246,252,0.08)"
-            strokeDasharray="4 4"
-            strokeWidth="1"
-          />
+        <div className="p-3 sm:p-4">
+          <svg
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+            className="h-auto w-full select-none"
+            aria-hidden="true"
+          >
+            {connections.map((conn) => {
+              const from = coordMap.get(conn.from);
+              const to = coordMap.get(conn.to);
+              if (!from || !to) return null;
+              const isHighlighted =
+                from.id === activeNode?.id || to.id === activeNode?.id;
+              const mx = (from.x + to.x) / 2;
+              const my = Math.min(from.y, to.y) - 24;
 
-          {/* Directed Edges */}
-          {connections.map((conn, idx) => {
-            const from = coordMap.get(conn.from);
-            const to = coordMap.get(conn.to);
-            if (!from || !to) return null;
-
-            const isFeedback = to.x < from.x;
-            const isConnected =
-              from.id === activeNode?.id || to.id === activeNode?.id;
-            const midX = (from.x + to.x) * 0.5;
-            const ctrlY = isFeedback
-              ? Math.max(from.y, to.y) + 52
-              : (from.y + to.y) * 0.5 - (idx % 2 === 0 ? 18 : -18);
-
-            return (
-              <path
-                key={`${conn.from}-${conn.to}-${idx}`}
-                d={`M ${from.x} ${from.y} Q ${midX} ${ctrlY} ${to.x} ${to.y}`}
-                fill="none"
-                stroke={isConnected ? "#38BDF8" : "#8B949E"}
-                strokeOpacity={isConnected ? 0.9 : isFeedback ? 0.4 : 0.2}
-                strokeWidth={isConnected ? 2.1 : 1.25}
-                strokeDasharray={isFeedback ? "5 4" : undefined}
-              />
-            );
-          })}
-
-          {/* Primary Pipeline Spine */}
-          {coords.length > 1 && (
-            <polyline
-              fill="none"
-              stroke="#38BDF8"
-              strokeOpacity="0.28"
-              strokeWidth="1.4"
-              points={coords.map((c) => `${c.x},${c.y}`).join(" ")}
-            />
-          )}
-
-          {/* Interactive Stage Nodes */}
-          {coords.map((pt, idx) => {
-            const isActive = idx === activeIdx;
-            const showLabelBelow = pt.y >= svgHeight * 0.5;
-            const shortLabel =
-              pt.label.length > 15 ? `${pt.label.slice(0, 13)}..` : pt.label;
-
-            return (
-              <g
-                key={pt.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`Inspect ${pt.label} stage`}
-                aria-pressed={isActive}
-                onMouseEnter={() => setActiveIdx(idx)}
-                onFocus={() => setActiveIdx(idx)}
-                onClick={() => setActiveIdx(idx)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setActiveIdx(idx);
-                  }
-                }}
-                className="cursor-pointer outline-none"
-              >
-                {/* Invisible generous hit zone */}
-                <circle cx={pt.x} cy={pt.y} r={20} fill="transparent" />
-
-                {isActive && (
-                  <circle
-                    cx={pt.x}
-                    cy={pt.y}
-                    r={14}
-                    fill="#38BDF8"
-                    fillOpacity="0.16"
-                    stroke="#38BDF8"
-                    strokeOpacity="0.45"
-                    strokeWidth="1"
-                  />
-                )}
-                <circle
-                  cx={pt.x}
-                  cy={pt.y}
-                  r={isActive ? 6.5 : 4.8}
-                  fill={isActive ? "#38BDF8" : "#161B22"}
-                  stroke={isActive ? "#E6EDF3" : "#8B949E"}
-                  strokeWidth="1.75"
+              return (
+                <path
+                  key={`${conn.from}-${conn.to}`}
+                  d={`M ${from.x} ${from.y} Q ${mx} ${my} ${to.x} ${to.y}`}
+                  fill="none"
+                  stroke={isHighlighted ? hue.hex : "rgba(240,246,252,0.16)"}
+                  strokeWidth={isHighlighted ? 2.2 : 1.2}
+                  strokeDasharray={isHighlighted ? undefined : "4 4"}
                 />
+              );
+            })}
 
-                <text
-                  x={pt.x}
-                  y={showLabelBelow ? pt.y - 14 : pt.y + 18}
-                  textAnchor="middle"
-                  fill={isActive ? "#7DD3FC" : "#6E7681"}
-                  fontSize="9"
-                  fontFamily="var(--font-jetbrains-mono), monospace"
-                  fontWeight="600"
-                >
-                  0{idx + 1}
-                </text>
-
-                {(isFeatured || isActive || idx % 2 === 0) && (
+            {coords.map((node) => {
+              const isActive = node.index === activeIdx;
+              return (
+                <g key={node.id} transform={`translate(${node.x}, ${node.y})`}>
+                  <circle
+                    r={isActive ? 16 : 11}
+                    fill={isActive ? hue.softBg : "#161B22"}
+                    stroke={isActive ? hue.hex : "rgba(240,246,252,0.22)"}
+                    strokeWidth={isActive ? 2 : 1.2}
+                  />
                   <text
-                    x={pt.x}
-                    y={showLabelBelow ? pt.y + 20 : pt.y - 16}
+                    y={4}
                     textAnchor="middle"
-                    fill={isActive ? "#E6EDF3" : "#8B949E"}
-                    fontSize={isFeatured ? "10" : "9.2"}
-                    fontWeight={isActive ? "600" : "400"}
-                    fontFamily="var(--font-jetbrains-mono), monospace"
+                    fill={isActive ? "#E6EDF3" : "#9DA7B3"}
+                    fontSize="10"
+                    fontFamily="var(--font-mono), monospace"
+                    fontWeight="600"
                   >
-                    {shortLabel}
+                    {node.index + 1}
                   </text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-        </div>
-      )}
+                </g>
+              );
+            })}
+          </svg>
 
-      {/* Inline Interactive Stage Telemetry Readout */}
-      {activeNode && (
-        <div
-          aria-live="polite"
-          className="relative z-10 flex items-center justify-between gap-3 border-t border-[rgba(240,246,252,0.08)] bg-[#161B22] px-4 py-2.5 font-mono text-[11px]"
-        >
-          <div className="min-w-0 truncate">
-            <span className="font-semibold text-[#38BDF8]">
-              0{activeNode.index + 1} {activeNode.label}:
-            </span>{" "}
-            <span className="text-[#8B949E]">{activeNode.desc}</span>
-          </div>
-          <span className="shrink-0 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#7DD3FC] tabular-nums">
-            {project.highlightMetrics[0]?.value} {project.highlightMetrics[0]?.label}
-          </span>
+          {/* Accessible HTML stage switcher buttons (replaces SVG-trapped buttons) */}
+          <ol
+            aria-label={`${project.name} execution stages`}
+            className="mt-2 flex flex-wrap gap-1.5"
+          >
+            {coords.map((node) => {
+              const isActive = node.index === activeIdx;
+              return (
+                <li key={node.id}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveIdx(node.index)}
+                    aria-pressed={isActive}
+                    className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-xs transition-colors ${
+                      isActive
+                        ? "border-[#38BDF8] bg-[#38BDF8]/12 font-semibold text-[#E6EDF3]"
+                        : "border-[rgba(240,246,252,0.08)] bg-[#161B22] text-[#9DA7B3] hover:border-[rgba(240,246,252,0.22)] hover:text-[#E6EDF3]"
+                    }`}
+                  >
+                    <span style={{ color: isActive ? hue.labelText : "#8B949E" }}>
+                      {String(node.index + 1).padStart(2, "0")}
+                    </span>
+                    <span>{node.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+
+          {activeNode && (
+            <div className="mt-3 rounded-xl border border-[rgba(240,246,252,0.08)] bg-[#161B22] px-3.5 py-2.5">
+              <p className="font-mono text-xs font-semibold text-[#E6EDF3]">
+                {activeNode.label}
+              </p>
+              <p className="mt-0.5 font-sans text-xs leading-relaxed text-[#9DA7B3]">
+                {activeNode.desc}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -4,5 +4,9 @@ out
 *.tsbuildinfo
 next-env.d.ts
 .vercel
-.env*.local
+.env*
+!.env.example
 _assets-in/*.psd
+coverage
+test-results
+playwright-report

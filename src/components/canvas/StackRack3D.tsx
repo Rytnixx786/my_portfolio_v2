@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html, OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
+import { STACK_LAYER_HUES } from "@/lib/palette";
 import { ViewportCanvas } from "./ViewportCanvas";
 
 interface StackRack3DProps {
@@ -17,34 +18,42 @@ interface StackRack3DProps {
 function KeycapNode({
   label,
   position,
+  accentHue,
   isSelected,
+  rippleDelay,
   onSelect,
 }: {
   label: string;
   position: [number, number, number];
+  accentHue: string;
   isSelected: boolean;
+  rippleDelay: number;
   onSelect: () => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     const dt = Math.min(delta, 0.05);
     if (!groupRef.current) return;
-    const targetY = isSelected ? -0.14 : hovered ? -0.07 : 0;
+    const wave =
+      rippleDelay > 0
+        ? Math.sin(Math.max(0, state.clock.elapsedTime - rippleDelay) * 8) * 0.03
+        : 0;
+    const targetY = (isSelected ? -0.15 : hovered ? -0.07 : 0) + wave;
     groupRef.current.position.y +=
       (targetY - groupRef.current.position.y) * Math.min(1, dt * 12);
   });
 
   return (
     <group position={position}>
-      {/* Glowing Base Socket */}
       <mesh position={[0, -0.18, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.38, 0.46, 4]} />
         <meshBasicMaterial
-          color={isSelected || hovered ? "#38BDF8" : "#222A36"}
+          color={isSelected || hovered ? accentHue : "#222A36"}
           transparent
-          opacity={isSelected ? 0.95 : hovered ? 0.7 : 0.4}
+          opacity={isSelected ? 0.95 : hovered ? 0.72 : 0.42}
+          toneMapped={!isSelected}
         />
       </mesh>
 
@@ -68,33 +77,34 @@ function KeycapNode({
           }}
         >
           <meshStandardMaterial
-            color={isSelected ? "#38BDF8" : hovered ? "#1F2937" : "#161B22"}
-            emissive={isSelected ? "#38BDF8" : hovered ? "#38BDF8" : "#000000"}
-            emissiveIntensity={isSelected ? 0.32 : hovered ? 0.16 : 0}
-            roughness={0.32}
-            metalness={0.62}
+            color={isSelected ? "#1D2838" : hovered ? "#1A222E" : "#151A22"}
+            roughness={0.34}
+            metalness={0.78}
+            emissive={isSelected ? accentHue : hovered ? accentHue : "#000000"}
+            emissiveIntensity={isSelected ? 0.45 : hovered ? 0.16 : 0}
           />
         </RoundedBox>
 
-        <Html
-          position={[0, 0.22, 0]}
-          center
-          distanceFactor={7.2}
-          zIndexRange={[10, 0]}
-        >
-          <button
-            type="button"
-            onClick={onSelect}
-            className={`pointer-events-auto whitespace-nowrap rounded-md px-2 py-0.5 font-mono text-[10px] font-semibold tracking-[0.06em] transition-colors ${
+        <mesh position={[0, 0.18, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.9, 0.64]} />
+          <meshBasicMaterial
+            color={isSelected ? accentHue : "#8B949E"}
+            transparent
+            opacity={isSelected ? 0.48 : hovered ? 0.25 : 0.06}
+            toneMapped={!isSelected}
+          />
+        </mesh>
+
+        <Html position={[0, 0.25, 0]} center style={{ pointerEvents: "none" }}>
+          <span
+            className={`whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-xs font-medium tracking-tight ${
               isSelected
-                ? "bg-[#0D1117] text-[#38BDF8]"
-                : hovered
-                  ? "bg-[#0D1117]/90 text-[#E6EDF3]"
-                  : "bg-[#0D1117]/75 text-[#8B949E]"
+                ? "bg-[#0D1117]/95 font-semibold text-[#E6EDF3]"
+                : "text-[#C9D1D9]"
             }`}
           >
             {label}
-          </button>
+          </span>
         </Html>
       </group>
     </group>
@@ -102,8 +112,8 @@ function KeycapNode({
 }
 
 /**
- * Interactive 3D mechanical compute keycap deck allowing visitors to depress
- * individual production tools across the active engineering layer.
+ * Tactile 3D Stack Rack per architecture layer with per-layer hue underglow
+ * and keyboard/click neighbor spring feedback.
  */
 export function StackRack3D({
   layerCode,
@@ -112,65 +122,60 @@ export function StackRack3D({
   selectedTool,
   onSelectTool,
 }: StackRack3DProps) {
-  useEffect(() => {
-    return () => {
-      document.body.style.cursor = "auto";
-    };
-  }, []);
+  const pulseTime = layerCode ? 0.1 : 0;
+  const cols = tools.length <= 4 ? 2 : 3;
+  const layerIdx = Math.max(0, Number.parseInt(layerCode, 10) - 1) % STACK_LAYER_HUES.length;
+  const accentHue = STACK_LAYER_HUES[layerIdx] ?? STACK_LAYER_HUES[0];
 
-  const visibleTools = tools.slice(0, 6);
-  const cols = visibleTools.length <= 3 ? visibleTools.length : 3;
+  const positions = tools.map((_, idx) => {
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    const totalRows = Math.ceil(tools.length / cols);
+    const x = (col - (cols - 1) / 2) * 1.24;
+    const z = (row - (totalRows - 1) / 2) * 1.04;
+    return [x, 0, z] as [number, number, number];
+  });
 
   return (
-    <ViewportCanvas
-      className="h-[230px] w-full rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[260px]"
-      cameraPosition={[0, 2.75, 4.15]}
-      fov={40}
-      fallback={null}
-    >
-      <ambientLight intensity={0.75} />
-      <directionalLight position={[3, 6, 4]} intensity={1.3} color="#E6EDF3" />
-      <pointLight position={[-2.5, 2.5, 2]} intensity={1.5} color="#38BDF8" />
-
-      {/* Mechanical Compute Backplate */}
-      <group rotation={[-0.14, 0, 0]}>
-        <RoundedBox args={[4.45, 0.22, 2.45]} radius={0.09} smoothness={3} position={[0, -0.32, 0]}>
-          <meshStandardMaterial color="#11161D" roughness={0.5} metalness={0.55} />
-        </RoundedBox>
-        <gridHelper args={[4.3, 12, "#38BDF8", "#1F2630"]} position={[0, -0.2, 0]} />
-
-        {visibleTools.map((tool, idx) => {
-          const row = Math.floor(idx / cols);
-          const col = idx % cols;
-          const x = (col - (cols - 1) / 2) * 1.32;
-          const z = visibleTools.length > 3 ? (row === 0 ? -0.52 : 0.52) : 0;
-
-          return (
-            <KeycapNode
-              key={`${layerCode}-${tool}`}
-              label={tool}
-              position={[x, 0, z]}
-              isSelected={selectedTool === tool}
-              onSelect={() => onSelectTool(tool)}
-            />
-          );
-        })}
-      </group>
-
-      <OrbitControls
-        enableZoom={false}
-        enablePan={false}
-        enableDamping
-        dampingFactor={0.07}
-        minPolarAngle={0.4}
-        maxPolarAngle={Math.PI * 0.45}
-      />
-
-      <Html position={[-1.95, -0.85, 1.15]} zIndexRange={[5, 0]}>
-        <span className="pointer-events-none whitespace-nowrap font-mono text-[9px] uppercase tracking-[0.14em] text-[#6E7681]">
-          {layerCode} · {layerName} · Click keys or drag
+    <div className="relative h-[225px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[255px]">
+      <div className="pointer-events-none absolute left-3 top-2.5 z-10 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3]">
+        <span className="font-semibold" style={{ color: accentHue }}>
+          {layerCode}
         </span>
-      </Html>
-    </ViewportCanvas>
+        <span>{layerName}</span>
+      </div>
+
+      <ViewportCanvas cameraPosition={[0, 2.75, 3.65]} fov={38} className="h-full w-full">
+        <ambientLight intensity={0.65} />
+        <directionalLight position={[3, 5, 4]} intensity={1.3} color="#E6EDF3" />
+        <pointLight position={[-2.5, 2, 2.5]} intensity={0.95} color={accentHue} />
+
+        <mesh position={[0, -0.26, 0]}>
+          <boxGeometry args={[4.4, 0.14, 2.75]} />
+          <meshStandardMaterial color="#12171E" roughness={0.6} metalness={0.5} />
+        </mesh>
+
+        {tools.map((tool, idx) => (
+          <KeycapNode
+            key={`${layerCode}-${tool}`}
+            label={tool}
+            position={positions[idx]}
+            accentHue={accentHue}
+            isSelected={selectedTool === tool}
+            rippleDelay={pulseTime > 0 ? idx * 0.05 : 0}
+            onSelect={() => onSelectTool(tool)}
+          />
+        ))}
+
+        <OrbitControls
+          enableZoom={false}
+          enablePan={false}
+          enableDamping
+          dampingFactor={0.08}
+          minPolarAngle={0.45}
+          maxPolarAngle={Math.PI * 0.42}
+        />
+      </ViewportCanvas>
+    </div>
   );
 }

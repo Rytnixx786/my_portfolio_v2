@@ -1,12 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { PaperPlaneRight, TerminalWindow, CaretDown } from "@phosphor-icons/react";
-
-interface Exchange {
-  q: string;
-  a: string;
-}
+import Link from "next/link";
+import { CaretDown, PaperPlaneRight, TerminalWindow } from "@phosphor-icons/react";
+import { useQueryConsole } from "@/hooks/usePortfolioUtils";
 
 const SUGGESTIONS = [
   "How does Cinch achieve 4.12ms?",
@@ -15,46 +12,19 @@ const SUGGESTIONS = [
   "What is his backend stack?",
 ] as const;
 
+/**
+ * Grounded engineering Q&A terminal using progressive SSE streaming.
+ * Starts collapsed by default to keep initial homepage height focused (Phase 2).
+ */
 export function AskTerminal() {
-  const [open, setOpen] = useState(true);
-  const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState<Exchange[]>([
+  const [open, setOpen] = useState(false);
+  const { query, setQuery, loading, history, submitQuestion } = useQueryConsole([
     {
       q: "status",
-      a: "Ready. Ask anything about Cinch, Nexus Researcher, ARES, MindStack, OFFBoarder, MaSheba AI, FlyRank, or benchmarks (or press Cmd/Ctrl+K anywhere).",
+      a: "Ready. Ask anything about Cinch, Nexus Researcher, ARES, MindStack, OFFBoarder, MaSheba AI, FlyRank, or press Ctrl/Cmd+K anywhere.",
+      citations: [{ label: "Recruiter Brief", href: "/brief" }],
     },
   ]);
-
-  async function submitQuestion(text: string) {
-    const trimmed = text.trim();
-    if (!trimmed || loading) return;
-    setLoading(true);
-    setQuery("");
-
-    try {
-      const res = await fetch("/api/query", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed }),
-      });
-      const data = (await res.json()) as { text?: string };
-      const answer =
-        data.text ??
-        "Could not reach the query endpoint. Inspect /work/[slug] for full system specifications.";
-      setHistory((prev) => [...prev.slice(-4), { q: trimmed, a: answer }]);
-    } catch {
-      setHistory((prev) => [
-        ...prev.slice(-4),
-        {
-          q: trimmed,
-          a: "Network unavailable. Use the case study pages above for complete metrics and code.",
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -62,23 +32,23 @@ export function AskTerminal() {
   }
 
   return (
-    <div className="double-bezel-outer mt-14">
+    <div className="double-bezel-outer mt-12">
       <div className="double-bezel-core overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(240,246,252,0.08)] bg-[#1C222B] px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-2.5 font-mono text-xs text-[#38BDF8]">
             <TerminalWindow className="h-4 w-4" weight="regular" aria-hidden="true" />
             <span className="font-semibold">&gt;_ ask</span>
-            <span className="text-[#6E7681]" aria-hidden="true">
+            <span className="text-[#8B949E]" aria-hidden="true">
               /
             </span>
-            <span className="text-[#8B949E]">Grounded /api/query console</span>
+            <span className="text-[#9DA7B3]">Interactive /api/query console (SSE)</span>
           </div>
 
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            className="inline-flex items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[#E6EDF3] transition-colors duration-300 hover:border-[#38BDF8] hover:text-[#38BDF8]"
+            className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-4 py-1.5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors duration-300 hover:border-[#38BDF8] hover:text-[#38BDF8]"
           >
             <span>{open ? "Collapse" : "Open console"}</span>
             <CaretDown
@@ -92,53 +62,63 @@ export function AskTerminal() {
         </div>
 
         {open && (
-          <div className="space-y-4 bg-[#161B22] p-4 sm:p-6">
+          <div className="space-y-4 p-4 sm:p-6">
             <div className="flex flex-wrap gap-2">
-              {SUGGESTIONS.map((s) => (
+              {SUGGESTIONS.map((item) => (
                 <button
-                  key={s}
+                  key={item}
                   type="button"
-                  onClick={() => void submitQuestion(s)}
-                  className="rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1.5 font-mono text-xs text-[#7DD3FC] transition-colors duration-300 hover:border-[#38BDF8] hover:bg-[#38BDF8] hover:text-[#0D1117]"
+                  onClick={() => void submitQuestion(item)}
+                  className="rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117] px-3 py-1.5 font-mono text-xs text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
                 >
-                  {s}
+                  {item}
                 </button>
               ))}
             </div>
 
-            <div className="editorial-scroll max-h-56 space-y-3 overflow-y-auto rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] p-4 font-mono text-xs leading-relaxed">
-              {history.map((item, i) => (
-                <div key={`${item.q}-${i}`} className="space-y-1">
-                  <div className="font-semibold text-[#E6EDF3]">
-                    <span className="text-[#38BDF8]">$</span> {item.q}
-                  </div>
-                  <div className="text-[#8B949E]">{item.a}</div>
+            <div
+              className="max-h-64 space-y-3 overflow-y-auto rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] p-4 editorial-scroll"
+              aria-live="polite"
+            >
+              {history.map((exchange, idx) => (
+                <div key={`${exchange.q}-${idx}`} className="space-y-1.5">
+                  <p className="font-mono text-xs text-[#38BDF8]">$ {exchange.q}</p>
+                  <p className="font-sans text-sm leading-relaxed text-[#E6EDF3]">
+                    {exchange.a}
+                  </p>
+                  {exchange.citations && exchange.citations.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-0.5">
+                      {exchange.citations.map((c) => (
+                        <Link
+                          key={c.href}
+                          href={c.href}
+                          className="rounded-md border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-2 py-0.5 font-mono text-xs text-[#7DD3FC] hover:bg-[#38BDF8]/20"
+                        >
+                          {c.label} ↗
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
-              {loading && (
-                <div className="text-[#38BDF8]">Evaluating query...</div>
-              )}
             </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-2.5 sm:flex-row">
-              <label htmlFor="ask-terminal-input" className="sr-only">
-                Ask a question about Mehedi Hasan&apos;s systems
-              </label>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
               <input
-                id="ask-terminal-input"
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ask about Cinch, FlyRank, benchmarks, or stack..."
-                className="h-11 min-w-0 flex-1 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#0D1117] px-4 font-mono text-sm text-[#E6EDF3] placeholder:text-[#6E7681] focus:border-[#38BDF8] focus:outline-none"
+                aria-label="Ask a grounded engineering question"
+                placeholder="Ask about benchmarks, FlyRank, latency, or stack..."
+                className="min-h-[44px] flex-1 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#0D1117] px-4 font-sans text-sm text-[#E6EDF3] placeholder:text-[#8B949E] focus:border-[#38BDF8] focus:outline-none"
               />
               <button
                 type="submit"
                 disabled={loading || !query.trim()}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#38BDF8] px-5 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#0D1117] transition-all duration-300 hover:bg-[#7DD3FC] active:scale-[0.98] disabled:opacity-45"
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[#38BDF8] px-6 font-mono text-xs font-semibold uppercase tracking-[0.12em] text-[#0D1117] transition-colors hover:bg-[#7DD3FC] disabled:opacity-45"
               >
-                <span>Run</span>
-                <PaperPlaneRight className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
+                <span>{loading ? "Streaming..." : "Send"}</span>
+                <PaperPlaneRight className="h-4 w-4" weight="regular" aria-hidden="true" />
               </button>
             </form>
           </div>

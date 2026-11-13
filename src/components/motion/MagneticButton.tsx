@@ -37,32 +37,37 @@ export function MagneticButton({
     };
   }, []);
 
-  const tick = useCallback(() => {
-    const el = wrapRef.current;
-    if (!el) {
-      rafRef.current = null;
-      return;
-    }
+  const scheduleTick = useCallback(() => {
+    if (rafRef.current !== null) return;
+    const step = () => {
+      const el = wrapRef.current;
+      if (!el) {
+        rafRef.current = null;
+        return;
+      }
 
-    const cur = currentRef.current;
-    const tgt = targetRef.current;
-    cur.x += (tgt.x - cur.x) * 0.16;
-    cur.y += (tgt.y - cur.y) * 0.16;
+      const cur = currentRef.current;
+      const tgt = targetRef.current;
+      cur.x += (tgt.x - cur.x) * 0.16;
+      cur.y += (tgt.y - cur.y) * 0.16;
 
-    el.style.transform = `translate3d(${cur.x.toFixed(2)}px, ${cur.y.toFixed(2)}px, 0)`;
+      el.style.transform = `translate3d(${cur.x.toFixed(2)}px, ${cur.y.toFixed(2)}px, 0)`;
 
-    if (
-      Math.abs(tgt.x - cur.x) < 0.08 &&
-      Math.abs(tgt.y - cur.y) < 0.08 &&
-      tgt.x === 0 &&
-      tgt.y === 0
-    ) {
-      el.style.transform = "translate3d(0px, 0px, 0)";
-      rafRef.current = null;
-      return;
-    }
+      if (
+        Math.abs(tgt.x - cur.x) < 0.08 &&
+        Math.abs(tgt.y - cur.y) < 0.08 &&
+        tgt.x === 0 &&
+        tgt.y === 0
+      ) {
+        el.style.transform = "translate3d(0px, 0px, 0)";
+        rafRef.current = null;
+        return;
+      }
 
-    rafRef.current = window.requestAnimationFrame(tick);
+      rafRef.current = window.requestAnimationFrame(step);
+    };
+
+    rafRef.current = window.requestAnimationFrame(step);
   }, []);
 
   const handlePointerMove = useCallback(
@@ -80,19 +85,17 @@ export function MagneticButton({
         y: Math.max(-10, Math.min(10, dy * strength)),
       };
 
-      if (rafRef.current === null) {
-        rafRef.current = window.requestAnimationFrame(tick);
-      }
+      scheduleTick();
     },
-    [strength, tick]
+    [strength, scheduleTick]
   );
 
   const handlePointerLeave = useCallback(() => {
     targetRef.current = { x: 0, y: 0 };
-    if (enabledRef.current && rafRef.current === null) {
-      rafRef.current = window.requestAnimationFrame(tick);
+    if (enabledRef.current) {
+      scheduleTick();
     }
-  }, [tick]);
+  }, [scheduleTick]);
 
   return (
     <div

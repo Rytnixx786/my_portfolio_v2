@@ -8,6 +8,7 @@ import {
   projects,
   type ProjectCategory,
 } from "@/data/projects";
+import { getCategoryHue } from "@/lib/palette";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { ProjectPreviewPlate } from "./ProjectPreviewPlate";
 import { SectionReveal } from "./SectionReveal";
@@ -24,72 +25,73 @@ const FILTER_OPTIONS: ReadonlyArray<{ label: string; value: FilterValue }> = [
 
 export function SelectedWorkSection() {
   const [activeFilter, setActiveFilter] = useState<FilterValue>("All");
+  const [showAllSystems, setShowAllSystems] = useState(false);
 
   const indexedProjects = projects.map((project, idx) => ({
     project,
     num: String(idx + 1).padStart(2, "0"),
   }));
 
-  const filtered =
+  const byCategory =
     activeFilter === "All"
       ? indexedProjects
       : indexedProjects.filter(({ project }) => project.category === activeFilter);
 
+  const visibleProjects =
+    activeFilter === "All" && !showAllSystems
+      ? byCategory.filter(({ project }) => project.featured)
+      : byCategory;
+
+  const hiddenCount = byCategory.length - visibleProjects.length;
+
   function getCardSpanClass(position: number, total: number): string {
     if (position === 0) return "lg:col-span-12";
-
     const remaining = total - 1;
     const remIndex = position - 1;
-    const isLastOdd = remaining % 2 === 1 && remIndex === remaining - 1;
-    if (isLastOdd) return "lg:col-span-12";
-
-    const pairIndex = Math.floor(remIndex / 2);
-    const isFirstInPair = remIndex % 2 === 0;
-    if (pairIndex % 2 === 0) {
-      return isFirstInPair ? "lg:col-span-7" : "lg:col-span-5";
-    }
-    return isFirstInPair ? "lg:col-span-5" : "lg:col-span-7";
+    if (remaining % 2 === 1 && remIndex === remaining - 1) return "lg:col-span-12";
+    return remIndex % 2 === 0 ? "lg:col-span-6" : "lg:col-span-6";
   }
 
   return (
     <section
       id="work"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-24 sm:py-32"
+      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-20 sm:py-28"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
-          <div className="flex flex-col justify-between gap-8 border-b border-[rgba(240,246,252,0.08)] pb-10 lg:flex-row lg:items-end">
+          <div className="flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#7DD3FC]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#7DD3FC]">
                 <span>Selected Work</span>
               </div>
-              <h2 className="mt-4 font-display text-[clamp(2.4rem,5vw,4.5rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]">
-                PRODUCTION ARCHITECTURES,{" "}
+              <h2 className="mt-4 font-display text-[clamp(2.4rem,5vw,4.3rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]">
+                SYSTEM ARCHITECTURES,{" "}
                 <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
                   benchmarked.
                 </span>
               </h2>
             </div>
 
-            <p className="max-w-[46ch] font-sans text-base leading-relaxed text-[#8B949E]">
-              Six end-to-end engineering builds—hover or tap any pipeline stage directly
-              inside a topology plate to trace live contracts, or open its deep dive.
+            <p className="max-w-[48ch] font-sans text-base leading-relaxed text-[#9DA7B3]">
+              Three flagship builds highlighted first, plus full archive filtering across all six
+              case studies with interactive 3D mini-labs and stage graphs.
             </p>
           </div>
 
-          {/* Interactive Filter Pills */}
+          {/* Interactive Category Filter Pills */}
           <div
             role="group"
             aria-label="Filter projects by engineering category"
-            className="mt-8 flex flex-wrap items-center gap-2.5"
+            className="mt-7 flex flex-wrap items-center gap-2.5"
           >
-            <span className="mr-1 inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-[#6E7681]">
+            <span className="mr-1 inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.14em] text-[#8B949E]">
               <FunnelSimple className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
               <span>Filter</span>
             </span>
 
             {FILTER_OPTIONS.map((option) => {
               const isActive = activeFilter === option.value;
+              const hue = option.value === "All" ? null : getCategoryHue(option.value);
               const count =
                 option.value === "All"
                   ? projects.length
@@ -99,165 +101,151 @@ export function SelectedWorkSection() {
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => setActiveFilter(option.value)}
                   aria-pressed={isActive}
-                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98] ${
-                    isActive
-                      ? "border-[#38BDF8] bg-[#38BDF8] font-semibold text-[#0D1117]"
-                      : "border-[rgba(240,246,252,0.1)] bg-[#161B22] text-[#8B949E] hover:border-[#38BDF8]/45 hover:text-[#E6EDF3]"
+                  onClick={() => setActiveFilter(option.value)}
+                  style={
+                    isActive && hue
+                      ? {
+                          borderColor: hue.hex,
+                          backgroundColor: hue.softBg,
+                          color: "#E6EDF3",
+                        }
+                      : undefined
+                  }
+                  className={`inline-flex min-h-[40px] items-center gap-2 rounded-full border px-4 py-1.5 font-mono text-xs transition-all duration-300 ${
+                    isActive && !hue
+                      ? "border-[#38BDF8] bg-[#38BDF8]/15 font-semibold text-[#E6EDF3]"
+                      : isActive
+                        ? "font-semibold"
+                        : "border-[rgba(240,246,252,0.1)] bg-[#161B22] text-[#9DA7B3] hover:border-[rgba(240,246,252,0.25)] hover:text-[#E6EDF3]"
                   }`}
                 >
+                  {hue && (
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: hue.hex }}
+                      aria-hidden="true"
+                    />
+                  )}
                   <span>{option.label}</span>
-                  <span
-                    className={`rounded-full px-1.5 py-0.5 text-[10px] leading-none tabular-nums ${
-                      isActive
-                        ? "bg-[#0D1117]/20 text-[#0D1117]"
-                        : "bg-[#1C222B] text-[#6E7681]"
-                    }`}
-                  >
-                    {String(count).padStart(2, "0")}
-                  </span>
+                  <span className="text-[#8B949E] tabular-nums">({count})</span>
                 </button>
               );
             })}
           </div>
         </SectionReveal>
 
-        {/* Gapless Dense Asymmetric Project Grid */}
-        <div
-          key={activeFilter}
-          className="mt-10 grid grid-flow-dense grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8"
-        >
-          {filtered.map(({ project, num }, position) => {
-            const spanClass = getCardSpanClass(position, filtered.length);
-            const isWideSpread = spanClass === "lg:col-span-12";
-            const isFlippedSpread = isWideSpread && position % 2 === 1;
+        <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {visibleProjects.map(({ project, num }, position) => {
+            const isHeroFeature = position === 0;
+            const spanClass = getCardSpanClass(position, visibleProjects.length);
+            const hue = getCategoryHue(project.category);
 
             return (
-              <article
-                key={project.slug}
-                id={`system-${project.slug}`}
-                className={`min-w-0 ${spanClass}`}
-              >
-                <div className="double-bezel-outer group h-full transition-colors duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:border-[#38BDF8]/40">
-                  <div
-                    className={`double-bezel-core flex h-full flex-col justify-between p-5 sm:p-7 ${
-                      isWideSpread
-                        ? "lg:grid lg:grid-cols-12 lg:items-center lg:gap-10 lg:p-9"
-                        : "gap-6"
-                    }`}
-                  >
-                    {/* Interactive Architecture Topology Plate */}
-                    <div
-                      className={`min-w-0 ${
-                        isWideSpread
-                          ? `lg:col-span-6 ${isFlippedSpread ? "lg:order-2" : ""}`
-                          : ""
-                      }`}
-                    >
-                      <ProjectPreviewPlate
-                        project={project}
-                        indexLabel={num}
-                        variant={isWideSpread ? "featured" : "compact"}
-                      />
-                    </div>
-
-                    {/* Editorial Copy & Verified Benchmarks */}
-                    <div
-                      className={`flex min-w-0 flex-1 flex-col justify-between ${
-                        isWideSpread
-                          ? `mt-6 lg:col-span-6 lg:mt-0 ${isFlippedSpread ? "lg:order-1" : ""}`
-                          : ""
-                      }`}
-                    >
-                      <div>
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[rgba(240,246,252,0.08)] pb-3 font-mono text-[11px] uppercase tracking-[0.14em]">
-                          <div className="flex min-w-0 items-center gap-2.5">
-                            <span className="font-semibold text-[#38BDF8] tabular-nums">
-                              {num}
+              <div key={project.slug} className={spanClass}>
+                <SectionReveal delayMs={Math.min(position * 60, 180)}>
+                  <article className="double-bezel-outer group h-full transition-colors duration-300 hover:border-[rgba(240,246,252,0.22)]">
+                    <div className="double-bezel-core flex h-full flex-col justify-between p-5 sm:p-7">
+                      <div className={isHeroFeature ? "grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-center" : "flex flex-col gap-6"}>
+                        <div className={isHeroFeature ? "lg:col-span-6" : ""}>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span
+                              className="inline-flex items-center gap-2 rounded-full border px-3 py-1 font-mono text-xs uppercase tracking-[0.12em]"
+                              style={{
+                                borderColor: hue.border,
+                                backgroundColor: hue.softBg,
+                                color: hue.labelText,
+                              }}
+                            >
+                              <span>{num}</span>
+                              <span aria-hidden="true">·</span>
+                              <span>{project.category}</span>
                             </span>
-                            <span className="text-[#6E7681]" aria-hidden="true">
-                              /
-                            </span>
-                            <span className="truncate text-[#8B949E]">
-                              {project.category}
+                            <span className="font-mono text-xs text-[#8B949E]">
+                              {project.role}
                             </span>
                           </div>
-                          <span className="shrink-0 text-[#6E7681] tabular-nums">
-                            {project.year}
-                          </span>
-                        </div>
 
-                        <div className="mt-4">
-                          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#8B949E]">
+                          <h3 className="mt-4 font-display text-[clamp(2rem,3.6vw,3rem)] font-bold uppercase leading-[0.98] tracking-tight text-[#E6EDF3]">
+                            {project.name}
+                          </h3>
+                          <p className="mt-1 font-mono text-xs uppercase tracking-[0.12em] text-[#38BDF8]">
                             {project.eyebrow}
                           </p>
-                          <h3 className="mt-1.5 font-display text-3xl font-bold uppercase tracking-[-0.01em] text-[#E6EDF3] sm:text-4xl">
-                            <Link
-                              href={`/work/${project.slug}`}
-                              className="transition-colors duration-300 hover:text-[#38BDF8]"
+                          <p className="mt-3 max-w-[58ch] font-sans text-sm leading-relaxed text-[#9DA7B3] sm:text-base">
+                            {project.description}
+                          </p>
+
+                          <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            {project.highlightMetrics.map((m) => (
+                              <div
+                                key={m.label}
+                                className="rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] px-3 py-2.5"
+                              >
+                                <dd className="font-display text-xl font-bold leading-none text-[#E6EDF3] tabular-nums sm:text-2xl">
+                                  {m.value}
+                                </dd>
+                                <dt className="mt-1 font-mono text-xs text-[#8B949E]">
+                                  {m.label}
+                                </dt>
+                              </div>
+                            ))}
+                          </dl>
+
+                          <div className="mt-6 flex flex-wrap items-center gap-3">
+                            <MagneticButton>
+                              <Link
+                                href={`/work/${project.slug}`}
+                                className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[#38BDF8] px-5 py-2 font-sans text-sm font-semibold text-[#0D1117] transition-colors hover:bg-[#7DD3FC]"
+                              >
+                                <span>Read case study</span>
+                                <ArrowUpRight className="h-4 w-4" weight="regular" aria-hidden="true" />
+                              </Link>
+                            </MagneticButton>
+                            <a
+                              href={project.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.12)] px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
                             >
-                              {project.name}
-                            </Link>
-                          </h3>
-                        </div>
-
-                        <p className="mt-3 max-w-[60ch] font-sans text-base leading-relaxed text-[#8B949E]">
-                          {project.description}
-                        </p>
-
-                        <dl
-                          className={`mt-6 grid gap-3 border-y border-[rgba(240,246,252,0.08)] py-4 ${
-                            isWideSpread ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2"
-                          }`}
-                        >
-                          {(isWideSpread
-                            ? project.highlightMetrics
-                            : project.highlightMetrics.slice(0, 2)
-                          ).map((metric) => (
-                            <div key={metric.label} className="min-w-0">
-                              <dt className="truncate font-mono text-[10px] uppercase tracking-[0.12em] text-[#6E7681]">
-                                {metric.label}
-                              </dt>
-                              <dd className="mt-1 font-display text-2xl font-bold tracking-tight text-[#E6EDF3] tabular-nums">
-                                {metric.value}
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                      </div>
-
-                      <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex flex-wrap gap-1.5">
-                          {project.services.map((service) => (
-                            <span
-                              key={service}
-                              className="rounded-full border border-[rgba(240,246,252,0.08)] bg-[#1C222B] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[#8B949E]"
-                            >
-                              {service}
-                            </span>
-                          ))}
-                        </div>
-
-                        <MagneticButton strength={0.18}>
-                          <Link
-                            href={`/work/${project.slug}`}
-                            className="group/btn inline-flex items-center gap-2.5 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#1C222B] py-1.5 pl-4 pr-1.5 font-sans text-xs font-medium text-[#E6EDF3] transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:border-[#38BDF8] hover:bg-[#38BDF8] hover:text-[#0D1117] active:scale-[0.98]"
-                          >
-                            <span>View Case Study</span>
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0D1117]/60 text-[#38BDF8] transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 group-hover/btn:scale-105 group-hover/btn:bg-[#0D1117]/20 group-hover/btn:text-[#0D1117]">
+                              <span>Source</span>
                               <ArrowUpRight className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
-                            </span>
-                          </Link>
-                        </MagneticButton>
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className={isHeroFeature ? "lg:col-span-6" : ""}>
+                          <ProjectPreviewPlate
+                            project={project}
+                            indexLabel={num}
+                            variant={isHeroFeature ? "featured" : "compact"}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </article>
+                  </article>
+                </SectionReveal>
+              </div>
             );
           })}
         </div>
+
+        {activeFilter === "All" && (
+          <div className="mt-8 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowAllSystems((v) => !v)}
+              aria-expanded={showAllSystems}
+              className="inline-flex min-h-[44px] items-center gap-2.5 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22] px-6 py-2.5 font-mono text-xs uppercase tracking-[0.14em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8]"
+            >
+              <span>
+                {showAllSystems
+                  ? "Show top 3 featured systems"
+                  : `Show all ${projects.length} systems (+${hiddenCount}: MindStack, OFFBoarder, MaSheba AI)`}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

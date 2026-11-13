@@ -9,6 +9,7 @@ import { profile } from "@/data/site";
 import { LenisProvider } from "@/components/chrome/LenisProvider";
 import { Navbar } from "@/components/chrome/Navbar";
 import { CommandPalette } from "@/components/chrome/CommandPalette";
+import { Footer } from "@/components/chrome/Footer";
 import { WebGLContextProvider } from "@/components/canvas/WebGLContextProvider";
 import { QualityToggleHUD } from "@/components/canvas/QualityToggleHUD";
 import "./globals.css";
@@ -17,18 +18,21 @@ const antonio = Antonio({
   subsets: ["latin"],
   variable: "--font-antonio",
   display: "swap",
+  preload: true,
 });
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-plus-jakarta",
   display: "swap",
+  preload: true,
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains-mono",
   display: "swap",
+  preload: false,
 });
 
 const instrumentSerif = Instrument_Serif({
@@ -37,9 +41,10 @@ const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
   variable: "--font-instrument-serif",
   display: "swap",
+  preload: false,
 });
 
-const siteTitle = `${profile.name} — ${profile.role}`;
+const siteTitle = `${profile.name} - ${profile.role}`;
 const siteDescription =
   "AI & Backend Systems Engineer in Dhaka. I build the deterministic systems around stochastic models: quantized LLM serving gateways, stateful LangGraph orchestration, grounded hybrid RAG, and CI-gated ML promotion.";
 
@@ -47,7 +52,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(profile.url),
   title: {
     default: siteTitle,
-    template: `%s — ${profile.name}`,
+    template: `%s - ${profile.name}`,
   },
   description: siteDescription,
   authors: [{ name: profile.name }],
@@ -113,6 +118,17 @@ const personJsonLd = {
   },
 };
 
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: siteTitle,
+  url: profile.url,
+  author: {
+    "@type": "Person",
+    name: profile.name,
+  },
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -127,7 +143,9 @@ export default function RootLayout({
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify([personJsonLd, websiteJsonLd]),
+          }}
         />
       </head>
       <body className="min-h-[100dvh] bg-[#0D1117] text-[#E6EDF3] font-sans antialiased">
@@ -143,6 +161,7 @@ export default function RootLayout({
             <Navbar />
             <CommandPalette />
             <main id="main-content">{children}</main>
+            <Footer />
             <QualityToggleHUD />
           </LenisProvider>
         </WebGLContextProvider>

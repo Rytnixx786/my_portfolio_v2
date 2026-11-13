@@ -5,12 +5,40 @@ import { useFrame } from "@react-three/fiber";
 import { Html, OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import type { Project } from "@/data/projects";
+import {
+  CATEGORY_HUES,
+  STATE_HEALTHY,
+  STATE_WARN,
+  UI_ACCENT,
+} from "@/lib/palette";
 import { ViewportCanvas } from "@/components/canvas/ViewportCanvas";
 
 interface ArchitectureDiagram3DProps {
   architecture: Project["architecture"];
   activeIndex: number;
   onSelectNode: (index: number) => void;
+}
+
+function classifyNodeKind(id: string): "entry" | "storage" | "guard" | "compute" {
+  const k = id.toLowerCase();
+  if (/db|sql|pg|audit|ledger|golden|cache|queue|rls/.test(k)) return "storage";
+  if (/gate|guard|breaker|refusal|sod|finops|hitl|filter|middleware/.test(k)) return "guard";
+  if (/client|ui|query|ci|planner/.test(k)) return "entry";
+  return "compute";
+}
+
+function nodeColor(kind: ReturnType<typeof classifyNodeKind>, active: boolean) {
+  if (active) return UI_ACCENT;
+  switch (kind) {
+    case "storage":
+      return CATEGORY_HUES["MLOps & Security"].hex;
+    case "guard":
+      return STATE_WARN;
+    case "entry":
+      return STATE_HEALTHY;
+    default:
+      return CATEGORY_HUES["Inference & Serving"].hex;
+  }
 }
 
 function SpatialDagScene({
@@ -26,12 +54,13 @@ function SpatialDagScene({
   const positioned = useMemo(() => {
     const count = nodes.length;
     return nodes.map((n, idx) => {
-      const x = (idx - (count - 1) / 2) * 1.45;
+      const x = (idx - (count - 1) / 2) * 1.48;
       const y = Math.sin(idx * 1.1) * 0.45;
-      const z = idx % 2 === 0 ? 0.55 : -0.55;
+      const z = idx % 2 === 0 ? 0.56 : -0.56;
       return {
         ...n,
         idx,
+        kind: classifyNodeKind(n.id),
         vec: new THREE.Vector3(x, y, z),
       };
     });
@@ -65,47 +94,41 @@ function SpatialDagScene({
 
   const activeNode = positioned[activeIndex] ?? positioned[0];
 
-  useFrame((state, delta) => {
-    const dt = Math.min(delta, 0.05);
-    if (controlsRef.current && activeNode) {
-      controlsRef.current.target.lerp(activeNode.vec, Math.min(1, dt * 4));
-      controlsRef.current.update();
-    }
+  useEffect(() => {
+    if (!controlsRef.current || !activeNode) return;
+    controlsRef.current.target.lerp(activeNode.vec, 0.45);
+    controlsRef.current.update();
+  }, [activeNode]);
 
-    curves.forEach((item, idx) => {
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    curves.forEach((c, idx) => {
       const mesh = pulseRefs.current[idx];
       if (!mesh) return;
-      const t = (state.clock.elapsedTime * 0.42 + idx * 0.17) % 1;
-      item.curve.getPointAt(t, mesh.position);
+      const u = (t * 0.48 + idx * 0.16) % 1;
+      c.curve.getPointAt(u, mesh.position);
     });
   });
 
-  useEffect(() => {
-    return () => {
-      document.body.style.cursor = "auto";
-    };
-  }, []);
-
   return (
-    <>
-      <ambientLight intensity={0.75} />
-      <directionalLight position={[4, 6, 5]} intensity={1.2} color="#E6EDF3" />
-      <pointLight position={[0, 3, 2]} intensity={1.5} color="#38BDF8" />
+    <group>
+      <ambientLight intensity={0.65} />
+      <directionalLight position={[5, 6, 5]} intensity={1.35} color="#E6EDF3" />
+      <pointLight position={[-4, 3, 4]} intensity={1.0} color={UI_ACCENT} />
 
-      <gridHelper args={[14, 24, "#38BDF8", "#1C222B"]} position={[0, -1.1, 0]} />
+      <gridHelper args={[14, 24, "#243040", "#171E28"]} position={[0, -1.25, 0]} />
 
-      {/* 3D Curved Tube Edges & Streaming Signal Spheres */}
-      {curves.map((item, idx) => {
-        const isActiveEdge =
-          item.fromId === activeNode?.id || item.toId === activeNode?.id;
+      {curves.map((c, idx) => {
+        const highlighted = c.fromId === activeNode?.id || c.toId === activeNode?.id;
         return (
-          <group key={item.key}>
+          <group key={c.key}>
             <mesh>
-              <tubeGeometry args={[item.curve, 28, isActiveEdge ? 0.028 : 0.015, 8, false]} />
+              <tubeGeometry args={[c.curve, 24, highlighted ? 0.032 : 0.017, 8, false]} />
               <meshBasicMaterial
-                color={isActiveEdge ? "#38BDF8" : "#4A5568"}
+                color={highlighted ? UI_ACCENT : "#384659"}
                 transparent
-                opacity={isActiveEdge ? 0.85 : 0.35}
+                opacity={highlighted ? 0.92 : 0.46}
+                toneMapped={!highlighted}
               />
             </mesh>
             <mesh
@@ -113,56 +136,90 @@ function SpatialDagScene({
                 pulseRefs.current[idx] = el;
               }}
             >
-              <sphereGeometry args={[isActiveEdge ? 0.065 : 0.035, 12, 12]} />
-              <meshBasicMaterial color={isActiveEdge ? "#10B981" : "#38BDF8"} />
+              <sphereGeometry args={[highlighted ? 0.068 : 0.045, 10, 10]} />
+              <meshBasicMaterial
+                color={highlighted ? STATE_HEALTHY : UI_ACCENT}
+                toneMapped={!highlighted}
+              />
             </mesh>
           </group>
         );
       })}
 
-      {/* 3D Interactive Stage Nodes */}
       {positioned.map((node) => {
-        const isSelected = node.idx === activeIndex;
+        const isActive = node.idx === activeIndex;
+        const hue = nodeColor(node.kind, isActive);
+
         return (
           <group key={node.id} position={node.vec}>
-            <RoundedBox
-              args={[0.85, 0.42, 0.56]}
-              radius={0.07}
-              smoothness={3}
-              scale={isSelected ? 1.15 : 1}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectNode(node.idx);
-              }}
-              onPointerOver={(e) => {
-                e.stopPropagation();
-                document.body.style.cursor = "pointer";
-              }}
-              onPointerOut={() => {
-                document.body.style.cursor = "auto";
-              }}
-            >
-              <meshStandardMaterial
-                color={isSelected ? "#38BDF8" : "#161B22"}
-                emissive={isSelected ? "#38BDF8" : "#000000"}
-                emissiveIntensity={isSelected ? 0.45 : 0}
-                roughness={0.32}
-                metalness={0.62}
-              />
-            </RoundedBox>
+            {node.kind === "guard" ? (
+              <mesh
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectNode(node.idx);
+                }}
+              >
+                <octahedronGeometry args={[0.38, 0]} />
+                <meshStandardMaterial
+                  color={isActive ? "#1D2A3A" : "#151B23"}
+                  emissive={hue}
+                  emissiveIntensity={isActive ? 0.72 : 0.22}
+                  roughness={0.32}
+                  metalness={0.72}
+                />
+              </mesh>
+            ) : node.kind === "storage" ? (
+              <mesh
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectNode(node.idx);
+                }}
+              >
+                <cylinderGeometry args={[0.36, 0.36, 0.46, 18]} />
+                <meshStandardMaterial
+                  color={isActive ? "#1D2A3A" : "#151B23"}
+                  emissive={hue}
+                  emissiveIntensity={isActive ? 0.72 : 0.22}
+                  roughness={0.35}
+                  metalness={0.68}
+                />
+              </mesh>
+            ) : (
+              <RoundedBox
+                args={[0.96, 0.46, 0.6]}
+                radius={0.08}
+                smoothness={3}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectNode(node.idx);
+                }}
+                onPointerOver={() => {
+                  document.body.style.cursor = "pointer";
+                }}
+                onPointerOut={() => {
+                  document.body.style.cursor = "auto";
+                }}
+              >
+                <meshStandardMaterial
+                  color={isActive ? "#1E2B3D" : "#161B22"}
+                  roughness={0.32}
+                  metalness={0.78}
+                  emissive={hue}
+                  emissiveIntensity={isActive ? 0.68 : 0.14}
+                />
+              </RoundedBox>
+            )}
 
-            <Html position={[0, 0.46, 0]} center distanceFactor={7.8} zIndexRange={[10, 0]}>
-              <button
-                type="button"
-                onClick={() => onSelectNode(node.idx)}
-                className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 font-mono text-[10px] transition-colors ${
-                  isSelected
-                    ? "border-[#38BDF8] bg-[#0D1117]/95 font-semibold text-[#7DD3FC]"
-                    : "border-[rgba(240,246,252,0.14)] bg-[#161B22]/90 text-[#8B949E] hover:text-[#E6EDF3]"
+            <Html position={[0, 0.46, 0]} center style={{ pointerEvents: "none" }}>
+              <span
+                className={`whitespace-nowrap rounded-md border px-2 py-0.5 font-mono text-xs ${
+                  isActive
+                    ? "border-[#38BDF8] bg-[#0D1117]/95 font-semibold text-[#E6EDF3]"
+                    : "border-[rgba(240,246,252,0.12)] bg-[#0D1117]/80 text-[#9DA7B3]"
                 }`}
               >
-                0{node.idx + 1} · {node.label}
-              </button>
+                {String(node.idx + 1).padStart(2, "0")} · {node.label}
+              </span>
             </Html>
           </group>
         );
@@ -170,30 +227,40 @@ function SpatialDagScene({
 
       <OrbitControls
         ref={controlsRef}
-        enableZoom={false}
         enablePan={false}
+        minDistance={4.2}
+        maxDistance={12}
         enableDamping
         dampingFactor={0.07}
-        minPolarAngle={0.35}
-        maxPolarAngle={Math.PI * 0.48}
       />
-    </>
+    </group>
   );
 }
 
 /**
- * Interactive 3D spatial DAG topology viewer for /work/[slug] case studies.
+ * Spatial 3D architecture topology stage with semantic node geometries and critical-path pulses.
  */
 export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
   return (
-    <ViewportCanvas
-      className="h-[310px] w-full bg-[#0D1117] sm:h-[360px]"
-      cameraPosition={[0, 2.35, 5.8]}
-      fov={42}
-      fallback={null}
-    >
-      <SpatialDagScene {...props} />
-    </ViewportCanvas>
+    <div className="relative h-[320px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[380px]">
+      <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-wrap items-center gap-3 rounded-lg border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-3 py-1 font-mono text-xs text-[#9DA7B3]">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-[#10B981]" /> Entry
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-[#59C5EE]" /> Compute
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-[#F59E0B]" /> Guard
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-[#A8CE6C]" /> Storage
+        </span>
+      </div>
+
+      <ViewportCanvas cameraPosition={[0, 2.6, 8.8]} fov={40} className="h-full w-full">
+        <SpatialDagScene {...props} />
+      </ViewportCanvas>
+    </div>
   );
 }
-

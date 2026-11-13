@@ -1,3 +1,7 @@
+export type CapabilityTier = "full" | "basic" | "none";
+export type MotionPreference = "full" | "reduced";
+
+// Backwards-compatible aliases kept for component contracts
 export type DeviceTier = "high" | "mid" | "low";
 export type QualityPreference = "auto" | "high" | "balanced" | "2d";
 
@@ -35,32 +39,33 @@ export function hasWebGLSupport(): boolean {
 }
 
 /**
- * Classifies client hardware and user motion preferences into a rendering tier
- * so heavy WebGL scenes never overwhelm constrained devices or reduced-motion setups.
+ * Signal 1 (Section 7.5): Pure hardware/network capability without conflating prefers-reduced-motion.
  */
-export function detectDeviceTier(): DeviceTier {
-  if (typeof window === "undefined") return "low";
-
-  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-    return "low";
+export function detectHardwareCapability(): {
+  capability: CapabilityTier;
+  tier: DeviceTier;
+  reason: string;
+} {
+  if (typeof window === "undefined") {
+    return { capability: "none", tier: "low", reason: "Server pre-render" };
   }
 
   const nav = navigator as NavigatorWithHints;
 
   if (nav.connection?.saveData) {
-    return "low";
+    return { capability: "none", tier: "low", reason: "Save-Data enabled" };
   }
 
   if (typeof nav.deviceMemory === "number" && nav.deviceMemory <= 2) {
-    return "low";
+    return { capability: "none", tier: "low", reason: "Low memory (<=2 GB)" };
   }
 
   if (typeof nav.hardwareConcurrency === "number" && nav.hardwareConcurrency <= 2) {
-    return "low";
+    return { capability: "none", tier: "low", reason: "Constrained CPU cores" };
   }
 
   if (!hasWebGLSupport()) {
-    return "low";
+    return { capability: "none", tier: "low", reason: "Software / no WebGL" };
   }
 
   const isSmallScreen = window.innerWidth < 768;
@@ -68,14 +73,30 @@ export function detectDeviceTier(): DeviceTier {
   const limitedCores = typeof nav.hardwareConcurrency === "number" && nav.hardwareConcurrency <= 4;
 
   if (isSmallScreen || limitedMemory || limitedCores) {
-    return "mid";
+    return {
+      capability: "basic",
+      tier: "mid",
+      reason: isSmallScreen ? "Mobile viewport" : "Mid-spec hardware",
+    };
   }
 
-  return "high";
+  return { capability: "full", tier: "high", reason: "Hardware WebGL2 ready" };
 }
 
 /**
- * Resolves the active runtime rendering tier from manual quality preference and hardware hints.
+ * Signal 2 (Section 7.5): User motion preference (controls idle spin / scrub, NOT hiding 3D geometry).
+ */
+export function detectMotionPreference(): MotionPreference {
+  if (typeof window === "undefined") return "reduced";
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full";
+}
+
+export function detectDeviceTier(): DeviceTier {
+  return detectHardwareCapability().tier;
+}
+
+/**
+ * Resolves the active runtime rendering tier from manual quality preference and hardware capability.
  */
 export function resolveEffectiveTier(
   preference: QualityPreference,
@@ -87,4 +108,17 @@ export function resolveEffectiveTier(
   if (preference === "balanced") return "mid";
   if (preference === "high") return "high";
   return hardwareTier;
+}
+
+export function resolveQualityReason(
+  preference: QualityPreference,
+  hardwareReason: string,
+  reducedMotion: boolean,
+  contextLost: boolean
+): string {
+  if (contextLost) return "GPU context paused - click to reload";
+  if (preference === "2d") return "Manual 2D plate mode";
+  if (preference === "high") return reducedMotion ? "Manual High (Static pose)" : "Manual High (Bloom + Shaders)";
+  if (preference === "balanced") return reducedMotion ? "Balanced (Static pose)" : "Balanced WebGL";
+  return reducedMotion ? `${hardwareReason} · Reduced motion` : hardwareReason;
 }

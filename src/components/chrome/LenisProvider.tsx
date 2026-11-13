@@ -9,15 +9,18 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.config({ ignoreMobileResize: true });
 
+export const NAV_SCROLL_OFFSET = -84;
+
 declare global {
   interface Window {
     __portfolioLenis?: Lenis;
+    __portfolioScrollTo?: (target: string | HTMLElement) => void;
   }
 }
 
 /**
- * Coordinates Lenis inertial smooth scrolling with GSAP ScrollTrigger ticks
- * while gracefully falling back to native scroll under prefers-reduced-motion.
+ * Coordinates Lenis smooth scrolling with GSAP ScrollTrigger ticks,
+ * handles initial deep-link URL hashes, and recovers scroll after modal/drawer locks.
  */
 export function LenisProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -26,23 +29,46 @@ export function LenisProvider({ children }: { children: ReactNode }) {
     const reduced =
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
+    const scrollToTarget = (
+      target: string | HTMLElement,
+      lenis?: Lenis
+    ) => {
+      const el =
+        typeof target === "string" ? document.getElementById(target.replace(/^#/, "")) : target;
+      if (!el) return;
+
+      if (lenis && !reduced) {
+        lenis.start();
+        lenis.scrollTo(el, { offset: NAV_SCROLL_OFFSET, force: true });
+      } else {
+        const top = el.getBoundingClientRect().top + window.scrollY + NAV_SCROLL_OFFSET;
+        window.scrollTo({ top: Math.max(0, top), behavior: reduced ? "auto" : "smooth" });
+      }
+    };
+
     if (reduced) {
+      window.__portfolioScrollTo = (target) => scrollToTarget(target);
       const refreshId = window.requestAnimationFrame(() => {
         ScrollTrigger.refresh();
+        if (window.location.hash) {
+          scrollToTarget(window.location.hash);
+        }
       });
       return () => {
         window.cancelAnimationFrame(refreshId);
+        delete window.__portfolioScrollTo;
       };
     }
 
     const lenis = new Lenis({
-      duration: 1.05,
+      duration: 1.0,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       smoothWheel: true,
       touchMultiplier: 1.4,
     });
 
     window.__portfolioLenis = lenis;
+    window.__portfolioScrollTo = (target) => scrollToTarget(target, lenis);
     lenis.on("scroll", ScrollTrigger.update);
 
     const onTick = (time: number) => {
@@ -72,7 +98,7 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       const destination = document.getElementById(id);
       if (destination) {
         event.preventDefault();
-        lenis.scrollTo(destination, { offset: -76 });
+        scrollToTarget(destination, lenis);
       }
     };
 
@@ -80,12 +106,32 @@ export function LenisProvider({ children }: { children: ReactNode }) {
 
     const refreshId = window.requestAnimationFrame(() => {
       ScrollTrigger.refresh();
+      if (window.location.hash) {
+        window.setTimeout(() => scrollToTarget(window.location.hash, lenis), 60);
+      }
     });
 
     if (document.fonts?.ready) {
       document.fonts.ready.then(() => {
         ScrollTrigger.refresh();
       });
+    }
+
+    // Debounced ResizeObserver on <main> keeps ScrollTrigger aligned when collapsible panels open
+    let resizeTimer: number | null = null;
+    const mainEl = document.getElementById("main-content");
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" && mainEl
+        ? new ResizeObserver(() => {
+            if (resizeTimer) window.clearTimeout(resizeTimer);
+            resizeTimer = window.setTimeout(() => {
+              ScrollTrigger.refresh();
+            }, 140);
+          })
+        : null;
+
+    if (mainEl && resizeObserver) {
+      resizeObserver.observe(mainEl);
     }
 
     const onResize = () => {
@@ -95,6 +141,8 @@ export function LenisProvider({ children }: { children: ReactNode }) {
 
     return () => {
       window.cancelAnimationFrame(refreshId);
+      if (resizeTimer) window.clearTimeout(resizeTimer);
+      resizeObserver?.disconnect();
       document.removeEventListener("click", onHashClick);
       window.removeEventListener("resize", onResize);
       gsap.ticker.remove(onTick);
@@ -102,6 +150,7 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       if (window.__portfolioLenis === lenis) {
         delete window.__portfolioLenis;
       }
+      delete window.__portfolioScrollTo;
     };
   }, [pathname]);
 
