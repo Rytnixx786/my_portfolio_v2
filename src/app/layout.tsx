@@ -1,0 +1,152 @@
+import type { Metadata, Viewport } from "next";
+import {
+  Antonio,
+  Instrument_Serif,
+  JetBrains_Mono,
+  Plus_Jakarta_Sans,
+} from "next/font/google";
+import { profile } from "@/data/site";
+import { LenisProvider } from "@/components/chrome/LenisProvider";
+import { Navbar } from "@/components/chrome/Navbar";
+import { CommandPalette } from "@/components/chrome/CommandPalette";
+import { WebGLContextProvider } from "@/components/canvas/WebGLContextProvider";
+import { QualityToggleHUD } from "@/components/canvas/QualityToggleHUD";
+import "./globals.css";
+
+const antonio = Antonio({
+  subsets: ["latin"],
+  variable: "--font-antonio",
+  display: "swap",
+});
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-plus-jakarta",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+
+const instrumentSerif = Instrument_Serif({
+  weight: "400",
+  style: ["normal", "italic"],
+  subsets: ["latin"],
+  variable: "--font-instrument-serif",
+  display: "swap",
+});
+
+const siteTitle = `${profile.name} — ${profile.role}`;
+const siteDescription =
+  "AI & Backend Systems Engineer in Dhaka. I build the deterministic systems around stochastic models: quantized LLM serving gateways, stateful LangGraph orchestration, grounded hybrid RAG, and CI-gated ML promotion.";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(profile.url),
+  title: {
+    default: siteTitle,
+    template: `%s — ${profile.name}`,
+  },
+  description: siteDescription,
+  authors: [{ name: profile.name }],
+  creator: profile.name,
+  alternates: {
+    canonical: profile.url,
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  keywords: [
+    "Mehedi Hasan",
+    "AI Systems Engineer",
+    "Backend Engineer",
+    "vLLM",
+    "LangGraph",
+    "FastAPI",
+    "RAG",
+    "MLOps",
+    "Cinch",
+    "Nexus Researcher",
+    "ARES",
+  ],
+  openGraph: {
+    title: siteTitle,
+    description: siteDescription,
+    type: "website",
+    siteName: siteTitle,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0D1117",
+  viewportFit: "cover",
+};
+
+const personJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: profile.name,
+  jobTitle: profile.role,
+  url: profile.url,
+  email: `mailto:${profile.email}`,
+  sameAs: [profile.github, profile.linkedin],
+  alumniOf: {
+    "@type": "CollegeOrUniversity",
+    name: "BRAC University",
+    url: "https://www.bracu.ac.bd",
+  },
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Dhaka",
+    addressCountry: "Bangladesh",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html
+      lang="en"
+      className={`${antonio.variable} ${plusJakartaSans.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+        />
+      </head>
+      <body className="min-h-[100dvh] bg-[#0D1117] text-[#E6EDF3] font-sans antialiased">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-[#38BDF8] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[#0D1117]"
+        >
+          Skip to content
+        </a>
+        <div className="paper-grain" aria-hidden="true" />
+        <WebGLContextProvider>
+          <LenisProvider>
+            <Navbar />
+            <CommandPalette />
+            <main id="main-content">{children}</main>
+            <QualityToggleHUD />
+          </LenisProvider>
+        </WebGLContextProvider>
+      </body>
+    </html>
+  );
+}
