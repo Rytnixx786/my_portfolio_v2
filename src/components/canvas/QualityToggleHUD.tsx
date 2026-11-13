@@ -10,7 +10,7 @@ const OPTIONS: ReadonlyArray<{
   shortLabel: string;
   desc: string;
 }> = [
-  { id: "high", shortLabel: "3D HIGH", desc: "Bloom, shaders & particles" },
+  { id: "high", shortLabel: "3D HIGH", desc: "Shaders, AA & HD DPR" },
   { id: "balanced", shortLabel: "3D BAL", desc: "Mid-density WebGL view" },
   { id: "2d", shortLabel: "2D SAFE", desc: "Zero-GPU vector fallback" },
 ];

@@ -138,7 +138,7 @@ export function StackRack3D({
 
   return (
     <div className="relative h-[225px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[255px]">
-      <div className="pointer-events-none absolute left-3 top-2.5 z-10 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3]">
+      <div className="pointer-events-none absolute left-3 top-2.5 z-30 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3]">
         <span className="font-semibold" style={{ color: accentHue }}>
           {layerCode}
         </span>

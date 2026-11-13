@@ -70,7 +70,7 @@ export function Scene3DRoot({
         width: "100vw",
         height: "100vh",
         pointerEvents: "none",
-        zIndex: 5,
+        zIndex: 20,
       }}
     >
       <PerformanceMonitor

@@ -227,6 +227,7 @@ function SpatialDagScene({
 
       <OrbitControls
         ref={controlsRef}
+        enableZoom={false}
         enablePan={false}
         minDistance={4.2}
         maxDistance={12}
@@ -243,7 +244,7 @@ function SpatialDagScene({
 export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
   return (
     <div className="relative h-[320px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[380px]">
-      <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-wrap items-center gap-3 rounded-lg border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-3 py-1 font-mono text-xs text-[#9DA7B3]">
+      <div className="pointer-events-none absolute left-3 top-3 z-30 flex flex-wrap items-center gap-3 rounded-lg border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-3 py-1 font-mono text-xs text-[#9DA7B3]">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-[#10B981]" /> Entry
         </span>

@@ -209,7 +209,7 @@ export function TelemetryGlobe3D() {
         />
       </ViewportCanvas>
 
-      <div className="absolute bottom-2 left-2 right-2 z-20 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-3 py-1.5 backdrop-blur-md">
+      <div className="absolute bottom-2 left-2 right-2 z-30 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-3 py-1.5 backdrop-blur-md">
         <div className="flex items-center gap-1.5">
           {REGIONS.map((region) => (
             <button

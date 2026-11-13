@@ -118,7 +118,7 @@ export function resolveQualityReason(
 ): string {
   if (contextLost) return "GPU context paused - click to reload";
   if (preference === "2d") return "Manual 2D plate mode";
-  if (preference === "high") return reducedMotion ? "Manual High (Static pose)" : "Manual High (Bloom + Shaders)";
+  if (preference === "high") return reducedMotion ? "Manual High (Static pose)" : "Manual High (AA + Shaders)";
   if (preference === "balanced") return reducedMotion ? "Balanced (Static pose)" : "Balanced WebGL";
   return reducedMotion ? `${hardwareReason} · Reduced motion` : hardwareReason;
 }

@@ -43,7 +43,7 @@ export function HeroEditorial() {
       id="hero"
       className="relative flex min-h-[100dvh] items-center border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] pt-24 pb-10 sm:pt-28 sm:pb-12"
     >
-      <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 sm:px-8">
+      <div className="relative mx-auto w-full max-w-[1400px] px-4 sm:px-8">
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-12">
           {/* Left 7 Cols: Focused Editorial Identity */}
           <div className="lg:col-span-7">

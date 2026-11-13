@@ -261,7 +261,7 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
       </ViewportCanvas>
 
       {/* Bottom Mini-Lab Control Bar */}
-      <div className="absolute bottom-2.5 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(240,246,252,0.12)] bg-[#161B22]/90 px-3 py-1.5 backdrop-blur-md">
+      <div className="absolute bottom-2.5 left-3 right-3 z-30 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(240,246,252,0.12)] bg-[#161B22]/90 px-3 py-1.5 backdrop-blur-md">
         {slug === "cinch" && (
           <>
             <span className="font-mono text-xs text-[#9DA7B3]">Route Probe:</span>
