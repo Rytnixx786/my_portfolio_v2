@@ -75,10 +75,6 @@ function loadHeroPortraitImage(): Promise<HTMLImageElement> {
   return portraitImagePromise;
 }
 
-if (typeof window !== "undefined") {
-  void loadHeroPortraitImage().catch(() => {});
-}
-
 interface HeroOrbitalCore3DProps {
   activeSystemIndex: number;
   onSelectSystem: (index: number) => void;
@@ -92,60 +88,54 @@ interface HeroOrbitalCore3DProps {
 function PortraitDepthSlab({
   accentHue,
   onTextureReady,
+  onTextureReset,
 }: {
   accentHue: string;
   onTextureReady?: () => void;
+  onTextureReset?: () => void;
 }) {
-  const preloaded = useMemo(
-    () => (cachedPortraitImage ? createPortraitTexture(cachedPortraitImage) : null),
-    []
-  );
-  const [asyncLoaded, setAsyncLoaded] = useState<{
+  const [entry, setEntry] = useState<{
     texture: THREE.Texture;
     aspect: number;
   } | null>(null);
-  const activeEntry = preloaded ?? asyncLoaded;
-  const texture = activeEntry?.texture ?? null;
-  const imgAspect = activeEntry?.aspect ?? 1;
+  const texture = entry?.texture ?? null;
+  const imgAspect = entry?.aspect ?? 1;
 
   const shaderRef = useRef<THREE.ShaderMaterial>(null);
   const backMatRef = useRef<THREE.MeshStandardMaterial>(null);
   const textureRef = useRef<THREE.Texture | null>(texture);
   const imgAspectRef = useRef(imgAspect);
+  const readyNotifiedRef = useRef(false);
   const currentAccentRef = useRef(new THREE.Color(accentHue));
   const targetAccentRef = useRef(new THREE.Color(accentHue));
   const { frameloop, invalidate } = useThree();
 
   useEffect(() => {
-    if (preloaded) {
-      onTextureReady?.();
-      return;
-    }
-
     let active = true;
+    let createdTexture: THREE.Texture | null = null;
+    readyNotifiedRef.current = false;
+
     loadHeroPortraitImage()
       .then((img) => {
         if (!active) return;
-        setAsyncLoaded(createPortraitTexture(img));
+        const created = createPortraitTexture(img);
+        createdTexture = created.texture;
+        setEntry(created);
         invalidate();
-        window.requestAnimationFrame(() => {
-          if (active) onTextureReady?.();
-        });
       })
       .catch(() => {
-        if (active) onTextureReady?.();
+        if (active && !readyNotifiedRef.current) {
+          readyNotifiedRef.current = true;
+          onTextureReady?.();
+        }
       });
 
     return () => {
       active = false;
+      createdTexture?.dispose();
+      onTextureReset?.();
     };
-  }, [preloaded, invalidate, onTextureReady]);
-
-  useEffect(() => {
-    return () => {
-      texture?.dispose();
-    };
-  }, [texture]);
+  }, [invalidate, onTextureReady, onTextureReset]);
 
   useEffect(() => {
     textureRef.current = texture;
@@ -174,14 +164,12 @@ function PortraitDepthSlab({
 
   const uniforms = useMemo(
     () => ({
-      uMap: { value: texture },
-      uHasMap: { value: texture ? 1.0 : 0.0 },
+      uMap: { value: null as THREE.Texture | null },
+      uHasMap: { value: 0.0 },
       uAccent: { value: new THREE.Color(HERO_ORBIT_HUES[0]) },
       uPlaneAspect: { value: 1.98 / 2.26 },
-      uImgAspect: { value: imgAspect },
+      uImgAspect: { value: 1 },
     }),
-    // Initialized once per ShaderMaterial mount; subsequent updates mutate uniforms directly
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
@@ -201,6 +189,18 @@ function PortraitDepthSlab({
     }
     if (backMatRef.current) {
       backMatRef.current.emissive.copy(currentAccentRef.current);
+    }
+
+    if (
+      !readyNotifiedRef.current &&
+      textureRef.current &&
+      shaderRef.current &&
+      shaderRef.current.uniforms.uHasMap.value > 0.5
+    ) {
+      readyNotifiedRef.current = true;
+      window.requestAnimationFrame(() => {
+        onTextureReady?.();
+      });
     }
   });
 
@@ -292,11 +292,13 @@ function HeroOrbitalScene({
   onSelectSystem,
   onHoverSystem,
   onPortraitReady,
+  onPortraitReset,
   enableWheelZoom,
   zoomSignal,
 }: HeroOrbitalCore3DProps & {
   onHoverSystem: (index: number | null) => void;
   onPortraitReady: () => void;
+  onPortraitReset: () => void;
   enableWheelZoom: boolean;
   zoomSignal: ZoomSignal;
 }) {
@@ -430,6 +432,7 @@ function HeroOrbitalScene({
         <PortraitDepthSlab
           accentHue={activeSystem.hue}
           onTextureReady={onPortraitReady}
+          onTextureReset={onPortraitReset}
         />
 
         {/* Synchronized Inclined Orbital Plane (dips below face in front, rises behind head in back) */}
@@ -855,8 +858,14 @@ export function HeroOrbitalCore3D({
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [wheelEngaged, setWheelEngaged] = useState(false);
   const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
-  const [portraitReady, setPortraitReady] = useState(() => Boolean(cachedPortraitImage));
+  const [portraitReady, setPortraitReady] = useState(false);
   const [stageReady, setStageReady] = useState(false);
+
+  useEffect(() => {
+    if (canRender3D) {
+      void loadHeroPortraitImage().catch(() => {});
+    }
+  }, [canRender3D]);
 
   const triggerZoom = useCallback((action: ZoomAction) => {
     setZoomSignal((prev) => ({ action, seq: prev.seq + 1 }));
@@ -864,6 +873,10 @@ export function HeroOrbitalCore3D({
 
   const handlePortraitReady = useCallback(() => {
     setPortraitReady(true);
+  }, []);
+
+  const handlePortraitReset = useCallback(() => {
+    setPortraitReady(false);
   }, []);
 
   const displaySys =
@@ -921,6 +934,7 @@ export function HeroOrbitalCore3D({
           onSelectSystem={onSelectSystem}
           onHoverSystem={setHoveredIdx}
           onPortraitReady={handlePortraitReady}
+          onPortraitReset={handlePortraitReset}
           enableWheelZoom={wheelEngaged}
           zoomSignal={zoomSignal}
         />

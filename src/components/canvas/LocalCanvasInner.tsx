@@ -168,7 +168,7 @@ export function LocalCanvasInner({
           if (!unmountingRef.current && canvas.isConnected) {
             notifyReady();
           }
-        }, 150);
+        }, 600);
       }}
       style={{
         width: "100%",

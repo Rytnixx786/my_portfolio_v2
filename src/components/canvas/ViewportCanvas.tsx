@@ -50,6 +50,7 @@ export function ViewportCanvas({
     canRender3D,
     effectiveTier,
     isStaticPose,
+    maxSlots,
     activeSlotIds,
     requestSlot,
     releaseSlot,
@@ -122,12 +123,13 @@ export function ViewportCanvas({
   }, [slotId, releaseSlot]);
 
   const hasSlot = canRender3D && nearView && activeSlotIds.has(slotId);
+  const isPoolSaturated = maxSlots > 0 && activeSlotIds.size >= maxSlots;
   const canvasReady = hasSlot && glReady && readyGate;
   const dpr: [number, number] =
     maxDpr ?? (effectiveTier === "high" ? [1, 1.5] : [1, 1.25]);
 
   useEffect(() => {
-    if (hasMounted && canRender3D && nearView && !hasSlot) {
+    if (hasMounted && canRender3D && nearView && !hasSlot && isPoolSaturated) {
       const timer = window.setTimeout(() => {
         setSlotWaitElapsed(true);
       }, 80);
@@ -137,7 +139,7 @@ export function ViewportCanvas({
       setSlotWaitElapsed(false);
     });
     return () => window.cancelAnimationFrame(raf);
-  }, [hasMounted, canRender3D, nearView, hasSlot]);
+  }, [hasMounted, canRender3D, nearView, hasSlot, isPoolSaturated]);
 
   useEffect(() => {
     if (!hasSlot) {
@@ -145,11 +147,7 @@ export function ViewportCanvas({
         setGlReady(false);
         setFallbackDismissed(false);
       });
-      return () => {
-        window.cancelAnimationFrame(raf);
-        setGlReady(false);
-        setFallbackDismissed(false);
-      };
+      return () => window.cancelAnimationFrame(raf);
     }
     if (!canvasReady) return;
     const delayMs = isStaticPose ? 0 : Math.round(MOTION.durations.crossfade * 1000);
@@ -167,10 +165,14 @@ export function ViewportCanvas({
     setGlReady(true);
   }, []);
 
-  // Only render the 2D fallback when 3D is genuinely disabled, offscreen, or denied a pool slot.
-  // Never flash the "2D Safe" fallback during initial mount or active WebGL boot.
+  // Only render the 2D fallback when 3D is genuinely disabled or denied a saturated pool slot.
+  // When a dedicated loadingFallback is provided (e.g., HeroOrbitalCore3D), never mount the 2D
+  // fallback just because the viewport is offscreen or booting, avoiding duplicate asset loads and flashes.
   const shouldRender2DFallback =
-    hasMounted && (!canRender3D || !nearView || (!hasSlot && slotWaitElapsed));
+    hasMounted &&
+    (!canRender3D ||
+      (!loadingFallback && !nearView) ||
+      (!hasSlot && isPoolSaturated && slotWaitElapsed));
   const showUnderlay = !hasSlot || !fallbackDismissed;
   const crossfadeDuration = isStaticPose
     ? "0ms"

@@ -145,6 +145,7 @@ interface WebGLContextValue {
   webglSupported: boolean;
   contextLost: boolean;
   qualityReason: string;
+  maxSlots: number;
   eventSourceRef: React.RefObject<HTMLDivElement | null>;
   activeSlotIds: ReadonlySet<string>;
   requestSlot: (id: string, pinned?: boolean) => void;
@@ -162,6 +163,7 @@ const WebGLContext = createContext<WebGLContextValue>({
   webglSupported: false,
   contextLost: false,
   qualityReason: "Initializing",
+  maxSlots: 0,
   eventSourceRef: { current: null },
   activeSlotIds: new Set(),
   requestSlot: () => {},
@@ -251,6 +253,7 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
       webglSupported,
       contextLost,
       qualityReason,
+      maxSlots,
       eventSourceRef,
       activeSlotIds,
       requestSlot,
@@ -267,6 +270,7 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
       webglSupported,
       contextLost,
       qualityReason,
+      maxSlots,
       activeSlotIds,
       requestSlot,
       releaseSlot,

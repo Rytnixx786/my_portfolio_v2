@@ -5,6 +5,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import type { Project } from "@/data/projects";
+import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { classifyNodeKind, type ArchitectureNodeKind } from "@/lib/architecture";
 import {
   CATEGORY_HUES,
@@ -463,6 +464,7 @@ function SpatialDagScene({
  * directional critical-path trace pulses, crisp legible sprite labels, and zoom controls.
  */
 export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
+  const { canRender3D } = useCanRender3D();
   const count = props.architecture.nodes.length;
   const defaultCamPos = useMemo<[number, number, number]>(
     () => [0, 3.8, count <= 6 ? 6.6 : 7.4],
@@ -471,6 +473,7 @@ export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
   const defaultTarget = useMemo<[number, number, number]>(() => [0, 0.35, 0], []);
   const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
   const [wheelEngaged, setWheelEngaged] = useState(false);
+  const [stageReady, setStageReady] = useState(false);
 
   const triggerZoom = useCallback((action: ZoomAction) => {
     setZoomSignal((prev) => ({ action, seq: prev.seq + 1 }));
@@ -479,7 +482,9 @@ export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
   return (
     <div
       data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
-      onPointerDown={() => setWheelEngaged(true)}
+      onPointerDown={() => {
+        if (canRender3D) setWheelEngaged(true);
+      }}
       onPointerLeave={() => setWheelEngaged(false)}
       className="relative h-[340px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[410px]"
     >
@@ -500,16 +505,20 @@ export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
       </div>
 
       {/* Zoom In / Zoom Out / Reset Controls */}
-      <CanvasZoomHUD
-        onZoomIn={() => triggerZoom("in")}
-        onZoomOut={() => triggerZoom("out")}
-        onReset={() => triggerZoom("reset")}
-      />
+      {canRender3D && stageReady && (
+        <CanvasZoomHUD
+          onZoomIn={() => triggerZoom("in")}
+          onZoomOut={() => triggerZoom("out")}
+          onReset={() => triggerZoom("reset")}
+        />
+      )}
 
       {/* Interaction Hint */}
-      <div className="pointer-events-none absolute bottom-3 left-3 z-30 hidden rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/95 px-3 py-1 font-mono text-xs uppercase tracking-[0.1em] text-[#8B949E] sm:inline-flex">
-        Drag to orbit · +/- or click &amp; scroll to zoom · Click stage
-      </div>
+      {canRender3D && stageReady && (
+        <div className="pointer-events-none absolute bottom-3 left-3 z-30 hidden rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/95 px-3 py-1 font-mono text-xs uppercase tracking-[0.1em] text-[#8B949E] sm:inline-flex">
+          Drag to orbit · +/- or click &amp; scroll to zoom · Click stage
+        </div>
+      )}
 
       {/* Live Trace Indicator */}
       {props.playing && (
@@ -523,8 +532,14 @@ export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
       )}
 
       <ViewportCanvas
+        onCanvasReadyChange={setStageReady}
         cameraPosition={defaultCamPos}
         fov={40}
+        loadingFallback={
+          <div className="flex h-full w-full items-center justify-center bg-[#0D1117] font-mono text-xs text-[#8B949E]">
+            Loading spatial 3D topology...
+          </div>
+        }
         className="h-full w-full"
       >
         <SpatialDagScene
