@@ -455,7 +455,7 @@ export function ArchitectureDiagram({
                         x={14}
                         y={22}
                         fill={isActive ? "#38BDF8" : "#8B949E"}
-                        fontSize="11"
+                        fontSize="12"
                         fontWeight="600"
                         fontFamily="var(--font-mono), monospace"
                       >
@@ -465,7 +465,7 @@ export function ArchitectureDiagram({
                         x={14}
                         y={41}
                         fill="#E6EDF3"
-                        fontSize="11.5"
+                        fontSize="12"
                         fontWeight="600"
                         fontFamily="var(--font-sans), sans-serif"
                       >
@@ -480,7 +480,7 @@ export function ArchitectureDiagram({
                   const isOutgoing = edge.fromId === activeNode?.id;
                   const isIncoming = edge.toId === activeNode?.id;
                   if ((!isOutgoing && !isIncoming) || !edge.label) return null;
-                  const pillW = Math.max(72, edge.label.length * 6.6 + 18);
+                  const pillW = Math.max(80, edge.label.length * 7.6 + 20);
 
                   return (
                     <g
@@ -490,10 +490,10 @@ export function ArchitectureDiagram({
                     >
                       <rect
                         x={-pillW / 2}
-                        y={-10}
+                        y={-11}
                         width={pillW}
-                        height={20}
-                        rx={10}
+                        height={22}
+                        rx={11}
                         fill="#0D1117"
                         stroke={isOutgoing ? "#10B981" : "#38BDF8"}
                         strokeOpacity={0.75}
@@ -501,10 +501,10 @@ export function ArchitectureDiagram({
                       />
                       <text
                         x={0}
-                        y={3.5}
+                        y={4}
                         textAnchor="middle"
                         fill={isOutgoing ? "#10B981" : "#7DD3FC"}
-                        fontSize="9.5"
+                        fontSize="12"
                         fontWeight="600"
                         fontFamily="var(--font-mono), monospace"
                       >

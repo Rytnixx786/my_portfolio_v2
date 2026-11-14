@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, type KeyboardEvent } from "react";
-import Link from "next/link";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ArrowUpRight, Cpu, GitBranch, Lightning, Sliders } from "@phosphor-icons/react";
 import type { PlaygroundCameraPreset } from "@/components/canvas/PlaygroundPipeline3D";
 import {
@@ -12,10 +13,13 @@ import {
   RAG_STAGES,
   type SimulatorTab,
 } from "@/data/playground";
+import { TransitionLink } from "@/components/chrome/TransitionLink";
 import { KineticHeading, ScrambleMetric } from "@/components/motion/KineticText";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { PlaygroundPipeline2D } from "./PlaygroundPipeline2D";
 import { SectionReveal } from "./SectionReveal";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const LazyPlaygroundPipeline3D = dynamic(
   () =>
@@ -43,6 +47,27 @@ export function SystemsPlayground() {
   const [piiGuardEnabled, setPiiGuardEnabled] = useState<boolean>(true);
   const [semanticCacheEnabled, setSemanticCacheEnabled] = useState<boolean>(true);
   const [focusedStageId, setFocusedStageId] = useState<string | null>(null);
+  const [lastStageId, setLastStageId] = useState<string | null>(null);
+  const didToggleInspectorRef = useRef(false);
+
+  useEffect(() => {
+    if (!didToggleInspectorRef.current) {
+      didToggleInspectorRef.current = true;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      ScrollTrigger.refresh();
+    }, 320);
+    return () => window.clearTimeout(timer);
+  }, [focusedStageId, tab]);
+
+  const toggleStageFocus = (stageId: string) => {
+    setFocusedStageId((prev) => {
+      const next = prev === stageId ? null : stageId;
+      if (next !== null) setLastStageId(next);
+      return next;
+    });
+  };
 
   const scenarios = tab === "cinch" ? CINCH_SCENARIOS : RAG_SCENARIOS;
   const stages = tab === "cinch" ? CINCH_STAGES : RAG_STAGES;
@@ -72,9 +97,9 @@ export function SystemsPlayground() {
         <SectionReveal>
           <div className="flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#7DD3FC]">
-                <span>Interactive Pipeline Simulator</span>
-              </div>
+              <p className="font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#38BDF8]">
+                02 / Interactive Pipeline Simulator
+              </p>
               <KineticHeading
                 as="h2"
                 className="mt-4 font-display text-[clamp(2.4rem,5vw,4.2rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
@@ -266,9 +291,7 @@ export function SystemsPlayground() {
                   presetTrigger={presetTrigger}
                   focusedStageId={focusedStageId}
                   rpsMultiplier={rpsMultiplier}
-                  onSelectStage={(stageId) =>
-                    setFocusedStageId((prev) => (prev === stageId ? null : stageId))
-                  }
+                  onSelectStage={toggleStageFocus}
                 />
               ) : (
                 <PlaygroundPipeline2D
@@ -279,9 +302,7 @@ export function SystemsPlayground() {
                   statusColor={activeScenario.statusColor}
                   focusedStageId={focusedStageId}
                   rpsMultiplier={rpsMultiplier}
-                  onSelectStage={(stageId) =>
-                    setFocusedStageId((prev) => (prev === stageId ? null : stageId))
-                  }
+                  onSelectStage={toggleStageFocus}
                 />
               )}
 
@@ -294,9 +315,7 @@ export function SystemsPlayground() {
                     <li key={stage.id}>
                       <button
                         type="button"
-                        onClick={() =>
-                          setFocusedStageId((prev) => (prev === stage.id ? null : stage.id))
-                        }
+                        onClick={() => toggleStageFocus(stage.id)}
                         aria-pressed={isFocused}
                         className={`flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left font-mono text-xs transition-colors ${
                           isFocused
@@ -321,47 +340,64 @@ export function SystemsPlayground() {
 
               {/* Focused Stage Inspector (live feedback on stage selection) */}
               {(() => {
-                const inspectedStage = stages.find((s) => s.id === focusedStageId);
-                if (!inspectedStage) return null;
-                const inspectedActive = effectiveStages.includes(inspectedStage.id);
+                const activeInspectorStage = stages.find(
+                  (s) => s.id === focusedStageId
+                );
+                const displayStage =
+                  activeInspectorStage ??
+                  stages.find((s) => s.id === lastStageId);
+                const isInspectorOpen = Boolean(activeInspectorStage);
+                const inspectedActive = displayStage
+                  ? effectiveStages.includes(displayStage.id)
+                  : false;
                 return (
                   <div
-                    role="status"
-                    aria-live="polite"
-                    className="rounded-2xl border border-[#38BDF8]/35 bg-[#38BDF8]/[0.07] p-4 sm:p-5"
+                    data-open={isInspectorOpen ? "true" : "false"}
+                    inert={!isInspectorOpen ? true : undefined}
+                    className="reveal-collapsible"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-                        <span className="font-semibold text-[#7DD3FC]">
-                          STAGE INSPECTOR · {inspectedStage.label}
-                        </span>
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs ${
-                            inspectedActive
-                              ? "bg-[#10B981]/15 text-[#10B981]"
-                              : "bg-[#161B22] text-[#8B949E]"
-                          }`}
+                    <div className="overflow-hidden">
+                      {displayStage && (
+                        <div
+                          role="status"
+                          aria-live="polite"
+                          className="rounded-2xl border border-[#38BDF8]/35 bg-[#38BDF8]/[0.07] p-4 sm:p-5"
                         >
-                          {inspectedActive ? "Active in Scenario" : "Bypassed / Skipped"}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setFocusedStageId(null)}
-                        className="min-h-[44px] rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117] px-3.5 py-1.5 font-mono text-xs text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
-                      >
-                        Clear focus
-                      </button>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                              <span className="font-semibold text-[#7DD3FC]">
+                                STAGE INSPECTOR · {displayStage.label}
+                              </span>
+                              <span
+                                className={`rounded-full px-2.5 py-0.5 text-xs ${
+                                  inspectedActive
+                                    ? "bg-[#10B981]/15 text-[#10B981]"
+                                    : "bg-[#161B22] text-[#8B949E]"
+                                }`}
+                              >
+                                {inspectedActive ? "Active in Scenario" : "Bypassed / Skipped"}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setFocusedStageId(null)}
+                              className="min-h-[44px] rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117] px-3.5 py-1.5 font-mono text-xs text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
+                            >
+                              Clear focus
+                            </button>
+                          </div>
+                          <p className="mt-2 font-mono text-xs text-[#9DA7B3]">
+                            Role: <span className="text-[#E6EDF3]">{displayStage.role}</span>
+                          </p>
+                          <p className="mt-1.5 font-sans text-sm leading-relaxed text-[#E6EDF3]">
+                            {displayStage.contract}
+                          </p>
+                          <p className="mt-1.5 font-sans text-sm leading-relaxed text-[#9DA7B3]">
+                            Fault behavior: {displayStage.faultBehavior}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <p className="mt-2 font-mono text-xs text-[#9DA7B3]">
-                      Role: <span className="text-[#E6EDF3]">{inspectedStage.role}</span>
-                    </p>
-                    <p className="mt-1.5 font-sans text-sm leading-relaxed text-[#E6EDF3]">
-                      {inspectedStage.contract}
-                    </p>
-                    <p className="mt-1.5 font-sans text-sm leading-relaxed text-[#9DA7B3]">
-                      Fault behavior: {inspectedStage.faultBehavior}
-                    </p>
                   </div>
                 );
               })()}
@@ -382,13 +418,17 @@ export function SystemsPlayground() {
                     {activeScenario.summary}
                   </p>
                   <div className="pt-1">
-                    <Link
+                    <TransitionLink
                       href={tab === "cinch" ? "/work/cinch" : "/work/nexus-researcher"}
-                      className="inline-flex min-h-[44px] items-center gap-1.5 font-mono text-xs uppercase tracking-[0.12em] text-[#38BDF8] hover:text-[#7DD3FC]"
+                      className="group inline-flex min-h-[44px] items-center gap-1.5 font-mono text-xs uppercase tracking-[0.12em] text-[#38BDF8] hover:text-[#7DD3FC]"
                     >
                       <span>Open full architecture notes</span>
-                      <ArrowUpRight className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
-                    </Link>
+                      <ArrowUpRight
+                        className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                        weight="regular"
+                        aria-hidden="true"
+                      />
+                    </TransitionLink>
                   </div>
                 </div>
 

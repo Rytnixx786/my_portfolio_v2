@@ -89,7 +89,7 @@ export function QualityToggleHUD() {
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-label={`Graphics mode ${activeMeta.shortLabel}. ${qualityReason}. Click to adjust.`}
-        className="inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-lg border border-[rgba(240,246,252,0.12)] bg-[#161B22]/85 px-2.5 py-2 font-mono text-[11px] uppercase tracking-[0.1em] text-[#E6EDF3] transition-colors duration-200 hover:border-[#38BDF8]/60 hover:text-[#38BDF8] sm:gap-2 sm:px-3 sm:text-xs"
+        className="inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-lg border border-[rgba(240,246,252,0.12)] bg-[#161B22]/85 px-2.5 py-2 font-mono text-xs uppercase tracking-[0.1em] text-[#E6EDF3] transition-colors duration-200 hover:border-[#38BDF8]/60 hover:text-[#38BDF8] sm:gap-2 sm:px-3 sm:tracking-[0.1em]"
       >
         {activeId === "2d" ? (
           <Desktop className="h-3.5 w-3.5 shrink-0 text-[#F59E0B]" weight="regular" aria-hidden="true" />

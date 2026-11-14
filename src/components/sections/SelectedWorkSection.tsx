@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, type CSSProperties, type PointerEvent } from "react";
-import Link from "next/link";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
 import { ArrowUpRight, FunnelSimple } from "@phosphor-icons/react";
 import {
   PROJECT_CATEGORIES,
@@ -9,10 +11,14 @@ import {
   type ProjectCategory,
 } from "@/data/projects";
 import { getCategoryHue } from "@/lib/palette";
+import { MOTION } from "@/lib/motion";
+import { TransitionLink } from "@/components/chrome/TransitionLink";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { ProjectPreviewPlate } from "./ProjectPreviewPlate";
 import { SectionReveal } from "./SectionReveal";
 import { KineticHeading, ScrambleMetric } from "@/components/motion/KineticText";
+
+gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 type FilterValue = "All" | ProjectCategory;
 
@@ -27,6 +33,51 @@ const FILTER_OPTIONS: ReadonlyArray<{ label: string; value: FilterValue }> = [
 export function SelectedWorkSection() {
   const [activeFilter, setActiveFilter] = useState<FilterValue>("All");
   const [showAllSystems, setShowAllSystems] = useState(false);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const hasInteractedRef = useRef(false);
+
+  useGSAP(
+    () => {
+      if (!hasInteractedRef.current) {
+        hasInteractedRef.current = true;
+        return;
+      }
+      const grid = gridRef.current;
+      if (!grid) return;
+
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const items = grid.querySelectorAll("[data-bento-item]");
+        if (items.length === 0) return;
+
+        const staggerStep =
+          items.length > 1
+            ? Math.min(0.05, MOTION.stagger.bentoCap / (items.length - 1))
+            : 0;
+
+        gsap.fromTo(
+          items,
+          { y: 14, opacity: 0 },
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.36,
+            stagger: staggerStep,
+            ease: MOTION.gsapEase,
+            clearProps: "transform,opacity",
+          }
+        );
+      });
+    },
+    { scope: gridRef, dependencies: [activeFilter, showAllSystems] }
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      ScrollTrigger.refresh();
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [activeFilter, showAllSystems]);
 
   const indexedProjects = projects.map((project, idx) => ({
     project,
@@ -62,9 +113,9 @@ export function SelectedWorkSection() {
         <SectionReveal>
           <div className="flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#7DD3FC]">
-                <span>Selected Work</span>
-              </div>
+              <p className="font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#38BDF8]">
+                01 / Selected Work
+              </p>
               <KineticHeading
                 as="h2"
                 className="mt-4 font-display text-[clamp(2.4rem,5vw,4.3rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
@@ -145,28 +196,31 @@ export function SelectedWorkSection() {
           </div>
         </SectionReveal>
 
-        <div className="mt-10 grid grid-flow-dense grid-cols-1 gap-6 lg:grid-cols-12">
-          {visibleProjects.map(({ project, num }, position) => {
-            const spanClass = getCardSpanClass(position, visibleProjects.length);
-            const isWideCard = spanClass === "lg:col-span-12";
-            const hue = getCategoryHue(project.category);
+        <SectionReveal variant="bento-cascade">
+          <div
+            ref={gridRef}
+            className="mt-10 grid grid-flow-dense grid-cols-1 gap-6 lg:grid-cols-12"
+          >
+            {visibleProjects.map(({ project, num }, position) => {
+              const spanClass = getCardSpanClass(position, visibleProjects.length);
+              const isWideCard = spanClass === "lg:col-span-12";
+              const hue = getCategoryHue(project.category);
 
-            const handleSpotlightMove = (event: PointerEvent<HTMLDivElement>) => {
-              if (event.pointerType === "touch") return;
-              const rect = event.currentTarget.getBoundingClientRect();
-              event.currentTarget.style.setProperty(
-                "--mouse-x",
-                `${event.clientX - rect.left}px`
-              );
-              event.currentTarget.style.setProperty(
-                "--mouse-y",
-                `${event.clientY - rect.top}px`
-              );
-            };
+              const handleSpotlightMove = (event: PointerEvent<HTMLDivElement>) => {
+                if (event.pointerType === "touch") return;
+                const rect = event.currentTarget.getBoundingClientRect();
+                event.currentTarget.style.setProperty(
+                  "--mouse-x",
+                  `${event.clientX - rect.left}px`
+                );
+                event.currentTarget.style.setProperty(
+                  "--mouse-y",
+                  `${event.clientY - rect.top}px`
+                );
+              };
 
-            return (
-              <div key={project.slug} className={spanClass}>
-                <SectionReveal delayMs={Math.min(position * 60, 180)} variant="bento-cascade" className="h-full">
+              return (
+                <div key={project.slug} data-bento-item className={spanClass}>
                   <article className="double-bezel-outer group h-full transition-colors duration-300 hover:border-[rgba(240,246,252,0.22)]">
                     <div
                       onPointerMove={handleSpotlightMove}
@@ -221,13 +275,15 @@ export function SelectedWorkSection() {
 
                           <div className="mt-6 flex flex-wrap items-center gap-3">
                             <MagneticButton>
-                              <Link
+                              <TransitionLink
                                 href={`/work/${project.slug}`}
-                                className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-[#38BDF8] px-5 py-2 font-sans text-sm font-semibold text-[#0D1117] transition-colors hover:bg-[#7DD3FC]"
+                                className="group/cta inline-flex min-h-[44px] items-center gap-3 rounded-full bg-[#38BDF8] py-2 pl-5 pr-2.5 font-sans text-sm font-semibold text-[#0D1117] transition-colors hover:bg-[#7DD3FC]"
                               >
                                 <span>Read case study</span>
-                                <ArrowUpRight className="h-4 w-4" weight="regular" aria-hidden="true" />
-                              </Link>
+                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15 transition-transform duration-200 group-hover/cta:translate-x-0.5 group-hover/cta:-translate-y-0.5">
+                                  <ArrowUpRight className="h-4 w-4" weight="regular" aria-hidden="true" />
+                                </span>
+                              </TransitionLink>
                             </MagneticButton>
                             <a
                               href={project.href}
@@ -251,11 +307,11 @@ export function SelectedWorkSection() {
                       </div>
                     </div>
                   </article>
-                </SectionReveal>
-              </div>
-            );
-          })}
-        </div>
+                </div>
+              );
+            })}
+          </div>
+        </SectionReveal>
 
         {activeFilter === "All" && (
           <div className="mt-8 flex justify-center">

@@ -29,10 +29,14 @@ export function MagneticButton({
     const finePointer =
       window.matchMedia?.("(pointer: fine)").matches ?? false;
     enabledRef.current = !reduced && finePointer;
+    const el = wrapRef.current;
 
     return () => {
       if (rafRef.current !== null) {
         window.cancelAnimationFrame(rafRef.current);
+      }
+      if (el) {
+        el.style.willChange = "auto";
       }
     };
   }, []);
@@ -60,6 +64,7 @@ export function MagneticButton({
         tgt.y === 0
       ) {
         el.style.transform = "translate3d(0px, 0px, 0)";
+        el.style.willChange = "auto";
         rafRef.current = null;
         return;
       }
@@ -76,6 +81,7 @@ export function MagneticButton({
       const el = wrapRef.current;
       if (!el) return;
 
+      el.style.willChange = "transform";
       const rect = el.getBoundingClientRect();
       const dx = e.clientX - (rect.left + rect.width * 0.5);
       const dy = e.clientY - (rect.top + rect.height * 0.5);
@@ -102,7 +108,7 @@ export function MagneticButton({
       ref={wrapRef}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
-      className={`inline-block will-change-transform ${className}`}
+      className={`inline-block ${className}`}
     >
       {children}
     </div>

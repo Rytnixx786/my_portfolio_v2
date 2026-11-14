@@ -1,17 +1,23 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
-
-const LazyLocalCanvas = dynamic(
-  () => import("./LocalCanvasInner").then((mod) => mod.LocalCanvasInner),
-  { ssr: false }
-);
+import { MOTION } from "@/lib/motion";
+import { LocalCanvasInner } from "./LocalCanvasInner";
 
 interface ViewportCanvasProps {
   children: ReactNode;
   fallback?: ReactNode;
+  loadingFallback?: ReactNode;
+  readyGate?: boolean;
+  onCanvasReadyChange?: (ready: boolean) => void;
   className?: string;
   cameraPosition?: [number, number, number];
   fov?: number;
@@ -28,6 +34,9 @@ interface ViewportCanvasProps {
 export function ViewportCanvas({
   children,
   fallback = null,
+  loadingFallback,
+  readyGate = true,
+  onCanvasReadyChange,
   className = "h-full w-full",
   cameraPosition = [0, 0, 5.5],
   fov = 42,
@@ -37,6 +46,7 @@ export function ViewportCanvas({
 }: ViewportCanvasProps) {
   const slotId = useId();
   const {
+    hasMounted,
     canRender3D,
     effectiveTier,
     isStaticPose,
@@ -49,6 +59,9 @@ export function ViewportCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(eager);
   const [nearView, setNearView] = useState(eager);
+  const [glReady, setGlReady] = useState(false);
+  const [fallbackDismissed, setFallbackDismissed] = useState(false);
+  const [slotWaitElapsed, setSlotWaitElapsed] = useState(false);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -56,7 +69,7 @@ export function ViewportCanvas({
 
     const rect = el.getBoundingClientRect();
     const vh = window.innerHeight || document.documentElement.clientHeight;
-    if (rect.bottom >= -100 && rect.top <= vh + 100) {
+    if (rect.bottom >= -280 && rect.top <= vh + 280) {
       setNearView(true);
     }
     if (rect.bottom >= -40 && rect.top <= vh + 40) {
@@ -69,7 +82,7 @@ export function ViewportCanvas({
           setNearView(entry.isIntersecting);
         }
       },
-      { rootMargin: "100px 0px" }
+      { rootMargin: "280px 0px" }
     );
 
     const activeObserver = new IntersectionObserver(
@@ -109,8 +122,59 @@ export function ViewportCanvas({
   }, [slotId, releaseSlot]);
 
   const hasSlot = canRender3D && nearView && activeSlotIds.has(slotId);
+  const canvasReady = hasSlot && glReady && readyGate;
   const dpr: [number, number] =
     maxDpr ?? (effectiveTier === "high" ? [1, 1.5] : [1, 1.25]);
+
+  useEffect(() => {
+    if (hasMounted && canRender3D && nearView && !hasSlot) {
+      const timer = window.setTimeout(() => {
+        setSlotWaitElapsed(true);
+      }, 80);
+      return () => window.clearTimeout(timer);
+    }
+    const raf = window.requestAnimationFrame(() => {
+      setSlotWaitElapsed(false);
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [hasMounted, canRender3D, nearView, hasSlot]);
+
+  useEffect(() => {
+    if (!hasSlot) {
+      const raf = window.requestAnimationFrame(() => {
+        setGlReady(false);
+        setFallbackDismissed(false);
+      });
+      return () => {
+        window.cancelAnimationFrame(raf);
+        setGlReady(false);
+        setFallbackDismissed(false);
+      };
+    }
+    if (!canvasReady) return;
+    const delayMs = isStaticPose ? 0 : Math.round(MOTION.durations.crossfade * 1000);
+    const timer = window.setTimeout(() => {
+      setFallbackDismissed(true);
+    }, delayMs);
+    return () => window.clearTimeout(timer);
+  }, [hasSlot, canvasReady, isStaticPose]);
+
+  useEffect(() => {
+    onCanvasReadyChange?.(canvasReady);
+  }, [canvasReady, onCanvasReadyChange]);
+
+  const handleCanvasReady = useCallback(() => {
+    setGlReady(true);
+  }, []);
+
+  // Only render the 2D fallback when 3D is genuinely disabled, offscreen, or denied a pool slot.
+  // Never flash the "2D Safe" fallback during initial mount or active WebGL boot.
+  const shouldRender2DFallback =
+    hasMounted && (!canRender3D || !nearView || (!hasSlot && slotWaitElapsed));
+  const showUnderlay = !hasSlot || !fallbackDismissed;
+  const crossfadeDuration = isStaticPose
+    ? "0ms"
+    : `${Math.round(MOTION.durations.crossfade * 1000)}ms`;
 
   return (
     <div
@@ -127,23 +191,42 @@ export function ViewportCanvas({
       className={`relative overflow-hidden ${className}`}
       style={{ touchAction: "pan-y", ...style }}
     >
-      {hasSlot ? (
-        <LazyLocalCanvas
-          cameraPosition={cameraPosition}
-          fov={fov}
-          dpr={dpr}
-          antialias={effectiveTier !== "low"}
-          activeLoop={!isStaticPose && inView}
-          onDecline={() => {
-            // Keep slot count stable; local DPR adaptation avoids context thrashing
+      {showUnderlay && (
+        <div className="relative z-0 h-full w-full">
+          {shouldRender2DFallback
+            ? fallback
+            : (loadingFallback ?? (
+                <div className="h-full w-full bg-[#0D1117]" aria-hidden="true" />
+              ))}
+        </div>
+      )}
+
+      {hasSlot && (
+        <div
+          className="absolute inset-0 z-10 transition-opacity"
+          style={{
+            opacity: canvasReady ? 1 : 0,
+            transitionDuration: crossfadeDuration,
+            transitionTimingFunction: MOTION.easeEditorial,
           }}
-          onContextLost={() => setContextLost(true)}
-          onContextRestored={() => setContextLost(false)}
         >
-          {children}
-        </LazyLocalCanvas>
-      ) : (
-        fallback
+          <LocalCanvasInner
+            cameraPosition={cameraPosition}
+            fov={fov}
+            dpr={dpr}
+            antialias={effectiveTier !== "low"}
+            activeLoop={!isStaticPose && inView}
+            isStaticPose={isStaticPose}
+            onCanvasReady={handleCanvasReady}
+            onDecline={() => {
+              // Keep slot count stable; local DPR adaptation avoids context thrashing
+            }}
+            onContextLost={() => setContextLost(true)}
+            onContextRestored={() => setContextLost(false)}
+          >
+            {children}
+          </LocalCanvasInner>
+        </div>
       )}
     </div>
   );

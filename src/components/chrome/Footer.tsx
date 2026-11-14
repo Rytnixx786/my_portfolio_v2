@@ -1,5 +1,9 @@
-import Link from "next/link";
+"use client";
+
+import { ArrowUp } from "@phosphor-icons/react";
 import { profile } from "@/data/site";
+import { TransitionLink } from "@/components/chrome/TransitionLink";
+import { SectionReveal } from "@/components/sections/SectionReveal";
 
 export function Footer() {
   return (
@@ -7,7 +11,7 @@ export function Footer() {
       role="contentinfo"
       className="border-t border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-8 text-[#8B949E] sm:py-10"
     >
-      <div className="mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-4 px-4 font-mono text-xs sm:flex-row sm:items-center sm:px-8">
+      <SectionReveal className="mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-4 px-4 font-mono text-xs sm:flex-row sm:items-center sm:px-8">
         <div className="flex flex-wrap items-center gap-3">
           <span className="font-semibold text-[#E6EDF3]">{profile.name}</span>
           <span aria-hidden="true">·</span>
@@ -17,18 +21,18 @@ export function Footer() {
         </div>
 
         <nav aria-label="Footer navigation" className="flex flex-wrap items-center gap-x-5 gap-y-1">
-          <Link
+          <TransitionLink
             href="/brief"
             className="inline-flex min-h-[44px] items-center transition-colors hover:text-[#38BDF8]"
           >
             Recruiter Brief
-          </Link>
-          <Link
+          </TransitionLink>
+          <TransitionLink
             href="/uses"
             className="inline-flex min-h-[44px] items-center transition-colors hover:text-[#38BDF8]"
           >
             Uses
-          </Link>
+          </TransitionLink>
           <a
             href={profile.github}
             target="_blank"
@@ -51,8 +55,20 @@ export function Footer() {
           >
             Email
           </a>
+          <button
+            type="button"
+            onClick={() => window.__portfolioScrollTo?.(0)}
+            className="group inline-flex min-h-[44px] items-center gap-1.5 text-[#9DA7B3] transition-colors hover:text-[#38BDF8]"
+          >
+            <span>Return to top</span>
+            <ArrowUp
+              className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5"
+              weight="regular"
+              aria-hidden="true"
+            />
+          </button>
         </nav>
-      </div>
+      </SectionReveal>
     </footer>
   );
 }

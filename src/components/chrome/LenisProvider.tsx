@@ -5,15 +5,76 @@ import { usePathname } from "next/navigation";
 import Lenis from "lenis";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { completePendingViewTransition, MOTION } from "@/lib/motion";
 
 gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.config({ ignoreMobileResize: true });
 
 export const NAV_SCROLL_OFFSET = -84;
 
+export type PortfolioScrollTarget = string | HTMLElement | number;
+
+export interface PortfolioScrollAdapters {
+  lenis: {
+    start: () => void;
+    scrollTo: (
+      target: number | HTMLElement,
+      options?: { offset?: number; duration?: number }
+    ) => void;
+  } | null;
+  reduced: boolean;
+  getElementById: (id: string) => HTMLElement | null;
+  getElementTop: (el: HTMLElement) => number;
+  scrollToWindow: (options: { top: number; behavior: ScrollBehavior }) => void;
+}
+
+export function executePortfolioScroll(
+  target: PortfolioScrollTarget,
+  adapters: PortfolioScrollAdapters
+): boolean {
+  if (typeof target === "number") {
+    const safeTop = Math.max(0, target);
+    if (adapters.lenis && !adapters.reduced) {
+      adapters.lenis.start();
+      adapters.lenis.scrollTo(safeTop, {
+        duration: MOTION.durations.scroll,
+      });
+      return true;
+    }
+
+    adapters.scrollToWindow({
+      top: safeTop,
+      behavior: adapters.reduced ? "auto" : "smooth",
+    });
+    return true;
+  }
+
+  const el =
+    typeof target === "string"
+      ? adapters.getElementById(target.replace(/^#/, ""))
+      : target;
+  if (!el) return false;
+
+  if (adapters.lenis && !adapters.reduced) {
+    adapters.lenis.start();
+    adapters.lenis.scrollTo(el, {
+      offset: NAV_SCROLL_OFFSET,
+      duration: MOTION.durations.scroll,
+    });
+    return true;
+  }
+
+  const top = adapters.getElementTop(el) + NAV_SCROLL_OFFSET;
+  adapters.scrollToWindow({
+    top: Math.max(0, top),
+    behavior: adapters.reduced ? "auto" : "smooth",
+  });
+  return true;
+}
+
 declare global {
   interface Window {
-    __portfolioScrollTo?: (target: string | HTMLElement) => void;
+    __portfolioScrollTo?: (target: PortfolioScrollTarget) => void;
   }
 }
 
@@ -80,27 +141,13 @@ export function LenisProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener("portfolio:scroll-lock", onScrollLock);
 
-    const scrollToTarget = (target: string | HTMLElement) => {
-      const el =
-        typeof target === "string"
-          ? document.getElementById(target.replace(/^#/, ""))
-          : target;
-      if (!el) return;
-
-      if (lenisRef.current && !reducedRef.current) {
-        lenisRef.current.start();
-        lenisRef.current.scrollTo(el, {
-          offset: NAV_SCROLL_OFFSET,
-          duration: 1.05,
-        });
-        return;
-      }
-
-      const top =
-        el.getBoundingClientRect().top + window.scrollY + NAV_SCROLL_OFFSET;
-      window.scrollTo({
-        top: Math.max(0, top),
-        behavior: reducedRef.current ? "auto" : "smooth",
+    const scrollToTarget = (target: PortfolioScrollTarget) => {
+      executePortfolioScroll(target, {
+        lenis: lenisRef.current,
+        reduced: reducedRef.current,
+        getElementById: (id) => document.getElementById(id),
+        getElementTop: (el) => el.getBoundingClientRect().top + window.scrollY,
+        scrollToWindow: (opts) => window.scrollTo(opts),
       });
     };
 
@@ -110,7 +157,9 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       ScrollTrigger.update();
       updateProgress();
     };
-    window.addEventListener("scroll", onNativeScroll, { passive: true });
+    if (!lenis) {
+      window.addEventListener("scroll", onNativeScroll, { passive: true });
+    }
 
     const onHashClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
@@ -125,7 +174,9 @@ export function LenisProvider({ children }: { children: ReactNode }) {
 
       const pathPart = href.slice(0, hashIdx);
       const id = href.slice(hashIdx + 1);
-      if (!id || (pathPart && pathPart !== "/" && pathPart !== pathnameRef.current)) {
+      const currentPath = (pathnameRef.current || "/").replace(/\/+$/, "") || "/";
+      const normalizedTarget = pathPart ? pathPart.replace(/\/+$/, "") || "/" : "";
+      if (!id || (normalizedTarget && normalizedTarget !== currentPath)) {
         return;
       }
 
@@ -186,7 +237,9 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       }
       resizeObserver?.disconnect();
       window.removeEventListener("portfolio:scroll-lock", onScrollLock);
-      window.removeEventListener("scroll", onNativeScroll);
+      if (!lenis) {
+        window.removeEventListener("scroll", onNativeScroll);
+      }
       document.removeEventListener("click", onHashClick);
       window.removeEventListener("resize", onResize);
       if (tickFn) {
@@ -201,6 +254,7 @@ export function LenisProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const raf = window.requestAnimationFrame(() => {
+      completePendingViewTransition();
       lenisRef.current?.resize();
       ScrollTrigger.refresh();
       if (window.location.hash) {
@@ -220,7 +274,7 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       >
         <div
           ref={progressBarRef}
-          className="h-full w-full origin-left bg-gradient-to-r from-[#38BDF8] via-[#7DD3FC] to-[#10B981]"
+          className="h-full w-full origin-left bg-gradient-to-r from-[#38BDF8] to-[#7DD3FC]"
           style={{ transform: "scaleX(0)" }}
         />
       </div>

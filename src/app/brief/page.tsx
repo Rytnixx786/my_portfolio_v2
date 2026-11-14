@@ -1,8 +1,8 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowLeft, ArrowUpRight, FilePdf } from "@phosphor-icons/react/dist/ssr";
 import { evidence, experience, lab, profile, stack } from "@/data/site";
 import { projects } from "@/data/projects";
+import { TransitionLink } from "@/components/chrome/TransitionLink";
 
 export const metadata: Metadata = {
   title: "Recruiter Brief & Technical Summary",
@@ -16,10 +16,10 @@ export default function BriefPage() {
     <section className="min-h-[100dvh] bg-[#0D1117] pt-28 pb-20 text-[#E6EDF3] sm:pt-32">
       <div className="mx-auto max-w-[980px] px-4 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[rgba(240,246,252,0.08)] pb-5 font-mono text-xs uppercase tracking-[0.14em]">
-          <Link href="/" className="inline-flex items-center gap-2 text-[#9DA7B3] hover:text-[#38BDF8]">
-            <ArrowLeft className="h-4 w-4" weight="regular" aria-hidden="true" />
+          <TransitionLink href="/" className="group inline-flex min-h-[44px] items-center gap-2 text-[#9DA7B3] hover:text-[#38BDF8]">
+            <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" weight="regular" aria-hidden="true" />
             <span>Back to Portfolio</span>
-          </Link>
+          </TransitionLink>
           <a
             href={profile.resume}
             target="_blank"
@@ -101,10 +101,10 @@ export default function BriefPage() {
                     <td className="p-3.5 text-[#8B949E]">{row.from}</td>
                     <td className="p-3.5 text-[#10B981]">{row.to}</td>
                     <td className="p-3.5">
-                      <Link href={row.href} className="inline-flex items-center gap-1 text-[#38BDF8]">
+                      <TransitionLink href={row.href} className="inline-flex items-center gap-1 text-[#38BDF8] hover:text-[#7DD3FC]">
                         <span>Open</span>
                         <ArrowUpRight className="h-3 w-3" weight="regular" aria-hidden="true" />
-                      </Link>
+                      </TransitionLink>
                     </td>
                   </tr>
                 ))}
@@ -121,9 +121,9 @@ export default function BriefPage() {
             <ul className="mt-4 space-y-2.5 font-sans text-sm text-[#9DA7B3]">
               {projects.map((p) => (
                 <li key={p.slug}>
-                  <Link href={`/work/${p.slug}`} className="font-semibold text-[#E6EDF3] hover:text-[#38BDF8]">
+                  <TransitionLink href={`/work/${p.slug}`} className="font-semibold text-[#E6EDF3] hover:text-[#38BDF8]">
                     {p.name}
-                  </Link>{" "}
+                  </TransitionLink>{" "}
                   - {p.eyebrow}
                 </li>
               ))}

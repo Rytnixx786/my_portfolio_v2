@@ -74,7 +74,7 @@ export function ProjectPreviewPlate({
   const activeNode = coords[activeIdx] ?? coords[0];
 
   return (
-    <div className="relative overflow-hidden rounded-[calc(1.5rem-0.375rem)] border border-[rgba(240,246,252,0.08)] bg-[#0D1117] transition-transform duration-700 ease-out group-hover:scale-[1.015]">
+    <div className="relative overflow-hidden rounded-[calc(1.5rem-0.375rem)] border border-[rgba(240,246,252,0.08)] bg-[#0D1117]">
       {/* Category Hue Hairline */}
       <div className="h-[2px] w-full" style={{ backgroundColor: hue.hex }} aria-hidden="true" />
 

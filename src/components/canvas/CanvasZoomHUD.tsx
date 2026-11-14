@@ -33,7 +33,7 @@ export function CanvasZoomHUD({
     <div
       role="group"
       aria-label="3D viewport zoom controls"
-      className={`absolute z-30 inline-flex items-center gap-0.5 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22]/90 p-0.5 shadow-lg backdrop-blur-md ${className}`}
+      className={`absolute z-30 inline-flex items-center gap-0.5 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22]/95 p-0.5 shadow-lg ${className}`}
     >
       <button
         type="button"

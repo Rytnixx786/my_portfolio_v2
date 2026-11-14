@@ -6,6 +6,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SplitText } from "gsap/SplitText";
 import { ScrambleTextPlugin } from "gsap/ScrambleTextPlugin";
 import { useGSAP } from "@gsap/react";
+import { MOTION, splitNumericMetricTokens } from "@/lib/motion";
 
 gsap.registerPlugin(ScrollTrigger, SplitText, ScrambleTextPlugin, useGSAP);
 
@@ -30,28 +31,39 @@ export function KineticHeading({
   delay = 0,
 }: KineticHeadingProps) {
   const ref = useRef<HTMLHeadingElement>(null);
-  const [fontsReady, setFontsReady] = useState(immediate);
+  const [fontsReady, setFontsReady] = useState(false);
 
   useEffect(() => {
-    if (immediate) return;
     let alive = true;
+    let settled = false;
+
+    const markReady = () => {
+      if (!alive || settled) return;
+      settled = true;
+      setFontsReady(true);
+    };
+
+    const fallbackTimer = window.setTimeout(
+      markReady,
+      MOTION.fontReadyTimeoutMs
+    );
+
     if (typeof document !== "undefined" && document.fonts?.ready) {
-      document.fonts.ready.then(() => {
-        if (alive) setFontsReady(true);
-      });
+      document.fonts.ready.then(markReady, markReady);
     } else {
-      const raf = window.requestAnimationFrame(() => {
-        if (alive) setFontsReady(true);
-      });
+      const raf = window.requestAnimationFrame(markReady);
       return () => {
         alive = false;
+        window.clearTimeout(fallbackTimer);
         window.cancelAnimationFrame(raf);
       };
     }
+
     return () => {
       alive = false;
+      window.clearTimeout(fallbackTimer);
     };
-  }, [immediate]);
+  }, []);
 
   useGSAP(
     () => {
@@ -71,10 +83,12 @@ export function KineticHeading({
 
         gsap.from(split.words, {
           yPercent: 112,
-          duration: immediate ? 0.72 : 0.78,
+          duration: immediate
+            ? MOTION.durations.kinetic
+            : MOTION.durations.kineticScroll,
           delay,
-          stagger: 0.032,
-          ease: "power4.out",
+          stagger: MOTION.stagger.splitWords,
+          ease: MOTION.gsapHeadingEase,
           clearProps: "transform",
           ...(alreadyNearTop
             ? {}
@@ -114,36 +128,45 @@ interface ScrambleMetricProps {
 export function ScrambleMetric({ value, className = "" }: ScrambleMetricProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const hasAnimatedRef = useRef(false);
+  const tokens = splitNumericMetricTokens(value);
 
   useGSAP(
     () => {
       const el = ref.current;
       if (!el) return;
 
+      const digitSpans = Array.from(
+        el.querySelectorAll<HTMLElement>("[data-scramble-digit]")
+      );
+      if (digitSpans.length === 0) return;
+
       const mm = gsap.matchMedia();
       mm.add("(prefers-reduced-motion: no-preference)", () => {
         const rect = el.getBoundingClientRect();
         const inView = rect.top < window.innerHeight * 0.96;
 
-        gsap.to(el, {
-          duration: 0.42,
-          scrambleText: {
-            text: value,
-            chars: "0123456789.%ms",
-            revealDelay: hasAnimatedRef.current ? 0.04 : 0.1,
-            speed: 0.7,
-          },
-          ease: "power2.out",
-          ...(inView || hasAnimatedRef.current
-            ? {}
-            : {
-                scrollTrigger: {
-                  trigger: el,
-                  start: "top 92%",
-                  once: true,
-                },
-              }),
-        });
+        for (const span of digitSpans) {
+          const targetText = span.dataset.target ?? span.textContent ?? "";
+          gsap.to(span, {
+            duration: MOTION.durations.metric,
+            scrambleText: {
+              text: targetText,
+              chars: "0123456789.",
+              revealDelay: hasAnimatedRef.current ? 0.04 : 0.08,
+              speed: 0.7,
+            },
+            ease: MOTION.gsapMetricEase,
+            ...(inView || hasAnimatedRef.current
+              ? {}
+              : {
+                  scrollTrigger: {
+                    trigger: el,
+                    start: MOTION.scrollTrigger.metricStart,
+                    once: true,
+                  },
+                }),
+          });
+        }
         hasAnimatedRef.current = true;
       });
     },
@@ -152,7 +175,19 @@ export function ScrambleMetric({ value, className = "" }: ScrambleMetricProps) {
 
   return (
     <span ref={ref} className={`tabular-nums ${className}`}>
-      {value}
+      {tokens.map((token, idx) =>
+        token.isNumeric ? (
+          <span
+            key={`${idx}-${token.text}`}
+            data-scramble-digit
+            data-target={token.text}
+          >
+            {token.text}
+          </span>
+        ) : (
+          <span key={`${idx}-${token.text}`}>{token.text}</span>
+        )
+      )}
     </span>
   );
 }

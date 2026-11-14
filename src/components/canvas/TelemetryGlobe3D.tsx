@@ -88,7 +88,7 @@ function GlobeAssembly({
   const focusAngleRef = useRef<number | null>(null);
   const lastSelectedRef = useRef<string>(selectedId);
   const lastResetSeqRef = useRef<number>(resetSeq);
-  const { frameloop, invalidate } = useThree();
+  const { frameloop, gl, invalidate } = useThree();
 
   const dhakaPos = useMemo(() => latLonToVec3(DHAKA_LAT, DHAKA_LON, 1.32), []);
 
@@ -151,10 +151,11 @@ function GlobeAssembly({
   }, [resetSeq, invalidate]);
 
   useEffect(() => {
+    const dom = gl.domElement;
     return () => {
-      document.body.style.cursor = "auto";
+      dom.style.cursor = "auto";
     };
-  }, []);
+  }, [gl]);
 
   useFrame((_, delta) => {
     const isStatic = frameloop === "demand";
@@ -322,10 +323,10 @@ function GlobeAssembly({
               }}
               onPointerOver={(e) => {
                 e.stopPropagation();
-                document.body.style.cursor = "pointer";
+                gl.domElement.style.cursor = "pointer";
               }}
               onPointerOut={() => {
-                document.body.style.cursor = "auto";
+                gl.domElement.style.cursor = "auto";
               }}
             >
               <sphereGeometry args={[isSelected ? 0.072 : 0.052, 14, 14]} />
@@ -539,7 +540,7 @@ function Globe2DFallback({
                 y={region.svgPos.y - 10}
                 textAnchor="middle"
                 fill={isSelected ? "#E6EDF3" : "#9DA7B3"}
-                fontSize="11"
+                fontSize="12"
                 fontWeight={isSelected ? "700" : "500"}
                 fontFamily="var(--font-mono), monospace"
               >
@@ -557,7 +558,7 @@ function Globe2DFallback({
           y={dhaka.y + 15}
           textAnchor="middle"
           fill="#10B981"
-          fontSize="9.5"
+          fontSize="12"
           fontWeight="600"
           fontFamily="var(--font-mono), monospace"
         >
@@ -574,6 +575,7 @@ export function TelemetryGlobe3D() {
   const { canRender3D } = useCanRender3D();
   const [selectedId, setSelectedId] = useState<string>(REGIONS[0].id);
   const [wheelEngaged, setWheelEngaged] = useState(false);
+  const [stageReady, setStageReady] = useState(false);
   const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
   const [resetSeq, setResetSeq] = useState(0);
   const draggingRef = useRef(false);
@@ -596,12 +598,12 @@ export function TelemetryGlobe3D() {
       onPointerLeave={() => setWheelEngaged(false)}
       className="relative h-[265px] w-full overflow-hidden rounded-2xl sm:h-[295px]"
     >
-      <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 inline-flex items-center gap-2 rounded-full border border-[#10B981]/40 bg-[#0D1117]/90 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#10B981] backdrop-blur-md">
+      <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 inline-flex items-center gap-2 rounded-full border border-[#10B981]/40 bg-[#0D1117]/95 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#10B981]">
         <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]" aria-hidden="true" />
         <span>Dhaka · UTC+6</span>
       </div>
 
-      {canRender3D && (
+      {canRender3D && stageReady && (
         <CanvasZoomHUD
           className="right-2.5 top-2.5"
           onZoomIn={() => triggerZoom("in")}
@@ -611,6 +613,7 @@ export function TelemetryGlobe3D() {
       )}
 
       <ViewportCanvas
+        onCanvasReadyChange={setStageReady}
         cameraPosition={GLOBE_CAM_POS}
         fov={38}
         fallback={
@@ -664,7 +667,7 @@ export function TelemetryGlobe3D() {
         />
       </ViewportCanvas>
 
-      <div className="absolute bottom-2 left-2 right-2 z-30 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-3 py-1 backdrop-blur-md">
+      <div className="absolute bottom-2 left-2 right-2 z-30 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(240,246,252,0.1)] bg-[#161B22]/95 px-3 py-1">
         <div className="flex items-center gap-1">
           {REGIONS.map((region) => (
             <button

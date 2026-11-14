@@ -34,7 +34,14 @@ function CinchGpuSculpture({
   const pulseRef = useRef<THREE.Mesh>(null);
   const elapsedRef = useRef(0);
   const hue = CATEGORY_HUES["Inference & Serving"].hex;
-  const { frameloop, invalidate } = useThree();
+  const { frameloop, gl, invalidate } = useThree();
+
+  useEffect(() => {
+    const dom = gl.domElement;
+    return () => {
+      dom.style.cursor = "auto";
+    };
+  }, [gl]);
 
   useEffect(() => {
     invalidate();
@@ -121,7 +128,14 @@ function NexusDagSculpture({
   const groupRef = useRef<THREE.Group>(null);
   const nodeRefs = useRef<Array<THREE.Mesh | null>>([]);
   const rose = CATEGORY_HUES["Agents & RAG"].hex;
-  const { frameloop, invalidate } = useThree();
+  const { frameloop, gl, invalidate } = useThree();
+
+  useEffect(() => {
+    const dom = gl.domElement;
+    return () => {
+      dom.style.cursor = "auto";
+    };
+  }, [gl]);
 
   useEffect(() => {
     invalidate();
@@ -209,10 +223,10 @@ function NexusDagSculpture({
                 onSelectNode(idx, node.id);
               }}
               onPointerOver={() => {
-                document.body.style.cursor = "pointer";
+                gl.domElement.style.cursor = "pointer";
               }}
               onPointerOut={() => {
-                document.body.style.cursor = "auto";
+                gl.domElement.style.cursor = "auto";
               }}
             >
               <sphereGeometry args={[0.16, 20, 20]} />
@@ -245,7 +259,14 @@ function AresGateSculpture({
   const groupRef = useRef<THREE.Group>(null);
   const planeRef = useRef<THREE.Mesh>(null);
   const lime = CATEGORY_HUES["MLOps & Security"].hex;
-  const { frameloop, invalidate } = useThree();
+  const { frameloop, gl, invalidate } = useThree();
+
+  useEffect(() => {
+    const dom = gl.domElement;
+    return () => {
+      dom.style.cursor = "auto";
+    };
+  }, [gl]);
 
   const slices = useMemo(
     () => [
@@ -366,6 +387,7 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
   });
   const [aresThreshold, setAresThreshold] = useState(0.82);
   const [wheelEngaged, setWheelEngaged] = useState(false);
+  const [stageReady, setStageReady] = useState(false);
   const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
   const draggingRef = useRef(false);
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
@@ -383,7 +405,7 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
       onPointerLeave={() => setWheelEngaged(false)}
       className={`relative h-[252px] w-full overflow-hidden rounded-b-[calc(1.5rem-0.375rem)] sm:h-[260px] ${className}`}
     >
-      {canRender3D && (
+      {canRender3D && stageReady && (
         <CanvasZoomHUD
           onZoomIn={() => triggerZoom("in")}
           onZoomOut={() => triggerZoom("out")}
@@ -392,6 +414,7 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
       )}
 
       <ViewportCanvas
+        onCanvasReadyChange={setStageReady}
         cameraPosition={TOPOLOGY_CAM_POS}
         fov={38}
         fallback={<TopologySlotFallback slug={slug} />}
@@ -444,7 +467,7 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
       </ViewportCanvas>
 
       {/* Bottom Mini-Lab Control Bar */}
-      <div className="absolute bottom-2.5 left-2.5 right-2.5 z-30 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(240,246,252,0.12)] bg-[#161B22]/90 px-2.5 py-1.5 backdrop-blur-md sm:left-3 sm:right-3 sm:px-3">
+      <div className="absolute bottom-2.5 left-2.5 right-2.5 z-30 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(240,246,252,0.12)] bg-[#161B22]/95 px-2.5 py-1.5 sm:left-3 sm:right-3 sm:px-3">
         {slug === "cinch" && (
           <>
             <span className="hidden font-mono text-xs text-[#9DA7B3] sm:inline">Route Probe:</span>
@@ -454,7 +477,7 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
                   key={m}
                   type="button"
                   onClick={() => setCinchMode(m)}
-                  className={`min-h-[44px] flex-1 whitespace-nowrap rounded-md px-2 py-2 font-mono text-[11px] uppercase transition-colors sm:flex-initial sm:px-2.5 sm:text-xs ${
+                  className={`min-h-[44px] flex-1 whitespace-nowrap rounded-md px-2 py-2 font-mono text-xs uppercase transition-colors sm:flex-initial sm:px-2.5 ${
                     cinchMode === m
                       ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                       : "bg-[#0D1117] text-[#9DA7B3] hover:text-[#E6EDF3]"

@@ -26,6 +26,7 @@ export function AboutSection() {
   const sectionRef = useRef<HTMLElement>(null);
   const tracePathRef = useRef<SVGPathElement>(null);
   const [selectedLabIdx, setSelectedLabIdx] = useState(0);
+  const [activeMilestone, setActiveMilestone] = useState(0);
 
   useGSAP(
     () => {
@@ -50,6 +51,9 @@ export function AboutSection() {
             start: "top 70%",
             end: "bottom 75%",
             scrub: 0.65,
+            onUpdate: (self) => {
+              setActiveMilestone(self.progress >= 0.5 ? 1 : 0);
+            },
           },
         });
       });
@@ -77,9 +81,9 @@ export function AboutSection() {
           {/* Left Sticky Engineering Dial (5 cols) */}
           <div className="lg:col-span-5">
             <div className="lg:sticky lg:top-24">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#7DD3FC]">
-                <span>Background &amp; Track</span>
-              </div>
+              <p className="font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#38BDF8]">
+                03 / Background &amp; Track
+              </p>
 
               <KineticHeading
                 as="h2"
@@ -187,15 +191,25 @@ export function AboutSection() {
               </div>
 
               <div className="relative space-y-6 border-l border-[rgba(240,246,252,0.12)] pl-6 sm:pl-8">
-                {experience.map((item) => (
-                  <article
-                    key={item.org}
-                    className="relative rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/75 p-5 transition-colors hover:border-[rgba(240,246,252,0.18)] sm:p-6"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="absolute -left-[31px] top-7 h-3 w-3 rounded-full border-2 border-[#38BDF8] bg-[#0D1117] sm:-left-[39px]"
-                    />
+                {experience.map((item, idx) => {
+                  const isMilestoneActive = idx === activeMilestone;
+                  return (
+                    <article
+                      key={item.org}
+                      className={`relative rounded-2xl border bg-[#161B22]/75 p-5 transition-colors duration-300 sm:p-6 ${
+                        isMilestoneActive
+                          ? "border-[#38BDF8]/35"
+                          : "border-[rgba(240,246,252,0.08)] hover:border-[rgba(240,246,252,0.18)]"
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`absolute -left-[31px] top-7 h-3 w-3 rounded-full border-2 border-[#38BDF8] transition-all duration-300 sm:-left-[39px] ${
+                          isMilestoneActive
+                            ? "bg-[#38BDF8]/30 shadow-[0_0_0_4px_rgba(56,189,248,0.16)]"
+                            : "bg-[#0D1117]"
+                        }`}
+                      />
 
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#38BDF8]">
@@ -241,7 +255,8 @@ export function AboutSection() {
                       )}
                     </div>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             </SectionReveal>
 
@@ -312,7 +327,10 @@ export function AboutSection() {
                 </div>
 
                 {activeLab && (
-                  <div className="mt-4 flex flex-col justify-between gap-4 rounded-xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] p-4 sm:flex-row sm:items-center">
+                  <div
+                    key={activeLab.name}
+                    className="panel-enter mt-4 flex flex-col justify-between gap-4 rounded-xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] p-4 sm:flex-row sm:items-center"
+                  >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs uppercase tracking-[0.12em] text-[#38BDF8]">

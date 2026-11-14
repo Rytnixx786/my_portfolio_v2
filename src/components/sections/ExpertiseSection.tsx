@@ -20,6 +20,8 @@ const LazyStackRack3D = dynamic(
   }
 );
 
+let sharedAudioCtx: AudioContext | null = null;
+
 function playMechanicalClick(muted: boolean) {
   if (muted || typeof window === "undefined") return;
   try {
@@ -28,7 +30,13 @@ function playMechanicalClick(muted: boolean) {
       (window as unknown as { webkitAudioContext: typeof AudioContext })
         .webkitAudioContext;
     if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    if (!sharedAudioCtx) {
+      sharedAudioCtx = new AudioCtx();
+    }
+    const ctx = sharedAudioCtx;
+    if (ctx.state === "suspended") {
+      void ctx.resume();
+    }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "triangle";
@@ -40,7 +48,6 @@ function playMechanicalClick(muted: boolean) {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.05);
-    window.setTimeout(() => void ctx.close(), 90);
   } catch {
     // Ignore blocked audio context
   }
@@ -63,23 +70,27 @@ export function ExpertiseSection() {
   const handleTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "ArrowDown" || e.key === "ArrowRight") {
       e.preventDefault();
+      playMechanicalClick(!soundEnabled);
       const next = (activeLayerIdx + 1) % stack.length;
       setActiveLayerIdx(next);
       setSelectedTool(null);
       tabRefs.current[next]?.focus();
     } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
       e.preventDefault();
+      playMechanicalClick(!soundEnabled);
       const prev = (activeLayerIdx - 1 + stack.length) % stack.length;
       setActiveLayerIdx(prev);
       setSelectedTool(null);
       tabRefs.current[prev]?.focus();
     } else if (e.key === "Home") {
       e.preventDefault();
+      playMechanicalClick(!soundEnabled);
       setActiveLayerIdx(0);
       setSelectedTool(null);
       tabRefs.current[0]?.focus();
     } else if (e.key === "End") {
       e.preventDefault();
+      playMechanicalClick(!soundEnabled);
       const last = stack.length - 1;
       setActiveLayerIdx(last);
       setSelectedTool(null);
@@ -96,9 +107,9 @@ export function ExpertiseSection() {
         <SectionReveal>
           <div className="flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#7DD3FC]">
-                <span>Capabilities</span>
-              </div>
+              <p className="font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#38BDF8]">
+                04 / Capabilities
+              </p>
               <KineticHeading
                 as="h2"
                 className="mt-4 font-display text-[clamp(2.4rem,5vw,4.3rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
@@ -185,7 +196,10 @@ export function ExpertiseSection() {
               aria-labelledby={`stack-tab-${activeLayer.code}`}
               className="double-bezel-outer lg:col-span-7"
             >
-              <div className="double-bezel-core space-y-5 p-5 sm:p-6">
+              <div
+                key={activeLayer.code}
+                className="panel-enter double-bezel-core space-y-5 p-5 sm:p-6"
+              >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div
                     className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em]"

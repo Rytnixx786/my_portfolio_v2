@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import {
   ArrowUpRight,
   Check,
@@ -11,6 +10,8 @@ import {
 } from "@phosphor-icons/react";
 import { profile } from "@/data/site";
 import { useCopy } from "@/hooks/usePortfolioUtils";
+import { TransitionLink } from "@/components/chrome/TransitionLink";
+import { KineticHeading } from "@/components/motion/KineticText";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { AskTerminal } from "./AskTerminal";
 import { SectionReveal } from "./SectionReveal";
@@ -23,8 +24,49 @@ const LazyTelemetryGlobe3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[265px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/60 font-mono text-xs text-[#8B949E] sm:h-[295px]">
-        Loading telemetry globe...
+      <div className="relative flex h-[265px] w-full flex-col items-center justify-center overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/60 sm:h-[295px]">
+        <svg
+          viewBox="0 0 240 240"
+          className="h-44 w-44 opacity-50"
+          aria-hidden="true"
+        >
+          <circle
+            cx="120"
+            cy="120"
+            r="84"
+            fill="none"
+            stroke="rgba(56,189,248,0.28)"
+            strokeWidth="1.2"
+          />
+          <ellipse
+            cx="120"
+            cy="120"
+            rx="42"
+            ry="84"
+            fill="none"
+            stroke="rgba(240,246,252,0.12)"
+            strokeWidth="1"
+          />
+          <line
+            x1="36"
+            y1="120"
+            x2="204"
+            y2="120"
+            stroke="rgba(240,246,252,0.12)"
+            strokeWidth="1"
+          />
+          <line
+            x1="120"
+            y1="36"
+            x2="120"
+            y2="204"
+            stroke="rgba(240,246,252,0.12)"
+            strokeWidth="1"
+          />
+        </svg>
+        <span className="mt-2 font-mono text-xs uppercase tracking-[0.14em] text-[#8B949E]">
+          Initializing telemetry globe...
+        </span>
       </div>
     ),
   }
@@ -47,10 +89,13 @@ export function ContactSection() {
                 <span>{profile.status}</span>
               </div>
 
-              <h2 className="mt-5 max-w-4xl font-display text-[clamp(2.7rem,6.5vw,5.4rem)] font-bold uppercase leading-[0.9] tracking-[-0.02em] text-[#E6EDF3]">
+              <KineticHeading
+                as="h2"
+                className="mt-5 max-w-4xl font-display text-[clamp(2.7rem,6.5vw,5.4rem)] font-bold uppercase leading-[0.9] tracking-[-0.02em] text-[#E6EDF3]"
+              >
                 LET&apos;S BUILD SOMETHING{" "}
                 <span className="text-[#38BDF8]">DETERMINISTIC.</span>
-              </h2>
+              </KineticHeading>
 
               <p className="mt-5 max-w-[46ch] font-sans text-base leading-relaxed text-[#9DA7B3] sm:text-lg">
                 Available for AI engineering, LLM serving, and backend teams.
@@ -88,13 +133,17 @@ export function ContactSection() {
                   )}
                 </button>
 
-                <Link
+                <TransitionLink
                   href="/brief"
-                  className="inline-flex min-h-[46px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8]"
+                  className="group inline-flex min-h-[46px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8]"
                 >
                   <span>Recruiter Brief</span>
-                  <ArrowUpRight className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
-                </Link>
+                  <ArrowUpRight
+                    className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                    weight="regular"
+                    aria-hidden="true"
+                  />
+                </TransitionLink>
 
                 <a
                   href={profile.resume}

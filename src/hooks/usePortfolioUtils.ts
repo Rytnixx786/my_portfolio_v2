@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWebGLContext } from "@/components/canvas/WebGLContextProvider";
+import type { DeviceTier } from "@/lib/device-tier";
 
 /**
  * Shared clipboard copy hook with auto-reset feedback.
@@ -230,12 +231,18 @@ export function useQueryConsole(initialHistory: QueryExchange[]) {
   return { query, setQuery, loading, history, submitQuestion };
 }
 
+export interface Render3DContextInput {
+  hasMounted: boolean;
+  webglSupported: boolean;
+  effectiveTier: DeviceTier;
+  contextLost: boolean;
+  reducedMotion: boolean;
+}
+
 /**
- * Unified WebGL + static-pose decision hook (Section 7.5).
- * Reduced-motion preserves interactive 3D geometry in a crisp static pose rather than erasing it.
+ * Pure selector computing 3D eligibility and static-pose mode from WebGL context state.
  */
-export function useCanRender3D() {
-  const ctx = useWebGLContext();
+export function deriveRender3DState<T extends Render3DContextInput>(ctx: T) {
   const canRender3D =
     ctx.hasMounted && ctx.webglSupported && ctx.effectiveTier !== "low" && !ctx.contextLost;
 
@@ -248,6 +255,15 @@ export function useCanRender3D() {
     isStaticPose: false,
     dprCap: ctx.effectiveTier === "high" ? 1.75 : 1.25,
   };
+}
+
+/**
+ * Unified WebGL + static-pose decision hook (Section 7.5).
+ * Reduced-motion preserves interactive 3D geometry in a crisp static pose rather than erasing it.
+ */
+export function useCanRender3D() {
+  const ctx = useWebGLContext();
+  return deriveRender3DState(ctx);
 }
 
 /**

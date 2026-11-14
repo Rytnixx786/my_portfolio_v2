@@ -70,6 +70,7 @@ function SpatialDagScene({
   const size = useThree((s) => s.size);
   const camera = useThree((s) => s.camera);
   const frameloop = useThree((s) => s.frameloop);
+  const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
 
   const aspect = size.width / Math.max(1, size.height);
@@ -98,10 +99,11 @@ function SpatialDagScene({
   }, [camera, responsiveCamPos, defaultTarget, invalidate]);
 
   useEffect(() => {
+    const dom = gl.domElement;
     return () => {
-      document.body.style.cursor = "auto";
+      dom.style.cursor = "auto";
     };
-  }, []);
+  }, [gl]);
 
   const layoutCols = nodes.length <= 4 ? nodes.length : Math.ceil(nodes.length / 2);
   const stepX = layoutCols <= 3 ? 2.15 : 1.92;
@@ -323,11 +325,11 @@ function SpatialDagScene({
         const handleOver = (e: { stopPropagation: () => void }) => {
           e.stopPropagation();
           setHoveredIdx(node.idx);
-          document.body.style.cursor = "pointer";
+          gl.domElement.style.cursor = "pointer";
         };
         const handleOut = () => {
           setHoveredIdx((prev) => (prev === node.idx ? null : prev));
-          document.body.style.cursor = "auto";
+          gl.domElement.style.cursor = "auto";
         };
         const handleClick = (e: { stopPropagation: () => void }) => {
           e.stopPropagation();
@@ -482,7 +484,7 @@ export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
       className="relative h-[340px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[410px]"
     >
       {/* Legend Pill (bottom-left on narrow mobile so it never collides with Zoom HUD; top-left on sm+) */}
-      <div className="pointer-events-none absolute bottom-2.5 left-2.5 z-30 flex flex-wrap items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22]/90 px-2.5 py-1 font-mono text-xs uppercase tracking-[0.1em] text-[#9DA7B3] backdrop-blur-md sm:bottom-auto sm:left-3 sm:top-3 sm:gap-3 sm:px-3">
+      <div className="pointer-events-none absolute bottom-2.5 left-2.5 z-30 flex flex-wrap items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22]/95 px-2.5 py-1 font-mono text-xs uppercase tracking-[0.1em] text-[#9DA7B3] sm:bottom-auto sm:left-3 sm:top-3 sm:gap-3 sm:px-3">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-[#10B981]" /> Entry
         </span>
@@ -505,13 +507,13 @@ export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
       />
 
       {/* Interaction Hint */}
-      <div className="pointer-events-none absolute bottom-3 left-3 z-30 hidden rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/85 px-3 py-1 font-mono text-xs uppercase tracking-[0.1em] text-[#8B949E] backdrop-blur-md sm:inline-flex">
+      <div className="pointer-events-none absolute bottom-3 left-3 z-30 hidden rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/95 px-3 py-1 font-mono text-xs uppercase tracking-[0.1em] text-[#8B949E] sm:inline-flex">
         Drag to orbit · +/- or click &amp; scroll to zoom · Click stage
       </div>
 
       {/* Live Trace Indicator */}
       {props.playing && (
-        <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 inline-flex items-center gap-1.5 rounded-full border border-[#10B981]/40 bg-[#0D1117]/90 px-2.5 py-1 font-mono text-xs uppercase tracking-[0.1em] text-[#10B981] backdrop-blur-md sm:bottom-3 sm:left-auto sm:right-3 sm:top-auto sm:gap-2 sm:px-3">
+        <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 inline-flex items-center gap-1.5 rounded-full border border-[#10B981]/40 bg-[#0D1117]/95 px-2.5 py-1 font-mono text-xs uppercase tracking-[0.1em] text-[#10B981] sm:bottom-3 sm:left-auto sm:right-3 sm:top-auto sm:gap-2 sm:px-3">
           <span className="h-2 w-2 rounded-full bg-[#10B981]" aria-hidden="true" />
           <span className="tabular-nums">
             Tracing {String(props.activeIndex + 1).padStart(2, "0")}/

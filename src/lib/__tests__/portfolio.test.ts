@@ -7,8 +7,18 @@ import {
   matchPortfolioQuery,
 } from "@/lib/query-engine";
 import { CATEGORY_HUES } from "@/lib/palette";
-import { resolveEffectiveTier, resolveQualityReason } from "@/lib/device-tier";
+import { resolveEffectiveTier, resolveQualityReason, detectMotionPreference } from "@/lib/device-tier";
 import { classifyNodeKind } from "@/lib/architecture";
+import {
+  MOTION,
+  completePendingViewTransition,
+  normalizeRoutePath,
+  prefersReducedMotion,
+  runViewTransition,
+  splitNumericMetricTokens,
+} from "@/lib/motion";
+import { deriveRender3DState } from "@/hooks/usePortfolioUtils";
+import { executePortfolioScroll, NAV_SCROLL_OFFSET } from "@/components/chrome/LenisProvider";
 import { projects } from "@/data/projects";
 import { profile } from "@/data/site";
 import {
@@ -95,6 +105,12 @@ describe("palette, device tier, and project data integrity", () => {
     expect(resolveEffectiveTier("balanced", "high", true)).toBe("mid");
     expect(resolveQualityReason("high", "Hardware WebGL2 ready", false, false)).toBe(
       "Manual High (AA + Shaders)"
+    );
+    expect(resolveQualityReason("high", "Hardware WebGL2 ready", true, false)).toBe(
+      "Manual High (AA + Shaders)"
+    );
+    expect(resolveQualityReason("balanced", "Hardware WebGL2 ready", true, false)).toBe(
+      "Balanced WebGL"
     );
   });
 });
@@ -363,5 +379,217 @@ describe("architecture topology integrity & semantic classification", () => {
       expect(p).toBeDefined();
       expect(p?.highlightMetrics[0]?.value.trim().length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("motion contract, ScrambleMetric numeric parsing, scroll-to-top, and 3D reduced motion", () => {
+  it("exposes bounded MOTION tokens and prefersReducedMotion handles SSR and matchMedia", () => {
+    expect(MOTION.stagger.bentoCap).toBeLessThanOrEqual(0.3);
+    expect(MOTION.navScrollOffset).toBe(NAV_SCROLL_OFFSET);
+    expect(MOTION.viewTransitionTimeoutMs).toBe(500);
+    expect(MOTION.fontReadyTimeoutMs).toBe(250);
+
+    // SSR (no window) -> false
+    expect(prefersReducedMotion()).toBe(false);
+
+    vi.stubGlobal("window", {
+      matchMedia: (query: string) => ({
+        matches: query.includes("prefers-reduced-motion: reduce"),
+      }),
+    });
+    try {
+      expect(prefersReducedMotion()).toBe(true);
+      expect(detectMotionPreference()).toBe("reduced");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("runViewTransition falls back safely and completes pending transitions on timeout or commit", async () => {
+    let navigated = 0;
+    await runViewTransition(() => {
+      navigated += 1;
+    });
+    expect(navigated).toBe(1);
+
+    // When document.startViewTransition is available and waitForCommit is true
+    vi.stubGlobal("document", {
+      startViewTransition: (cb: () => Promise<void> | void) => {
+        const updatePromise = Promise.resolve(cb());
+        return { finished: updatePromise };
+      },
+    });
+    try {
+      let committed = false;
+      const vtPromise = runViewTransition(
+        () => {
+          committed = true;
+        },
+        { waitForCommit: true, timeoutMs: 250 }
+      );
+      expect(committed).toBe(true);
+      completePendingViewTransition();
+      await vtPromise;
+
+      // Timeout fallback resolves cleanly if commit callback never runs
+      const timeoutPromise = runViewTransition(() => {}, {
+        waitForCommit: true,
+        timeoutMs: 15,
+      });
+      await timeoutPromise;
+    } finally {
+      completePendingViewTransition();
+      vi.unstubAllGlobals();
+    }
+
+    // Synchronous throw in document.startViewTransition still invokes navigate() and does not reject
+    vi.stubGlobal("document", {
+      startViewTransition: () => {
+        throw new Error("Transition aborted");
+      },
+    });
+    try {
+      let fallbackNav = 0;
+      await expect(
+        runViewTransition(
+          () => {
+            fallbackNav += 1;
+          },
+          { waitForCommit: true, timeoutMs: 50 }
+        )
+      ).resolves.toBeUndefined();
+      expect(fallbackNav).toBe(1);
+    } finally {
+      completePendingViewTransition();
+      vi.unstubAllGlobals();
+    }
+
+    expect(normalizeRoutePath("/work/cinch/")).toBe("/work/cinch");
+    expect(normalizeRoutePath("/#work")).toBe("/");
+    expect(normalizeRoutePath("/brief?ref=nav#top")).toBe("/brief");
+  });
+
+  it("splitNumericMetricTokens isolates numeric runs without garbling labels", () => {
+    expect(splitNumericMetricTokens("")).toEqual([]);
+
+    expect(splitNumericMetricTokens("10/15 Refusal (n=15)")).toEqual([
+      { text: "10", isNumeric: true },
+      { text: "/", isNumeric: false },
+      { text: "15", isNumeric: true },
+      { text: " Refusal (n=", isNumeric: false },
+      { text: "15", isNumeric: true },
+      { text: ")", isNumeric: false },
+    ]);
+
+    expect(splitNumericMetricTokens("SoD Enforced")).toEqual([
+      { text: "SoD Enforced", isNumeric: false },
+    ]);
+
+    expect(splitNumericMetricTokens("4.12ms")).toEqual([
+      { text: "4.12", isNumeric: true },
+      { text: "ms", isNumeric: false },
+    ]);
+
+    expect(splitNumericMetricTokens("331.0 tok/s")).toEqual([
+      { text: "331.0", isNumeric: true },
+      { text: " tok/s", isNumeric: false },
+    ]);
+
+    expect(splitNumericMetricTokens("SHA-256")).toEqual([
+      { text: "SHA-", isNumeric: false },
+      { text: "256", isNumeric: true },
+    ]);
+  });
+
+  it("executePortfolioScroll handles numeric 0 (Return to top) for Lenis and reduced motion", () => {
+    const lenisScrollTo = vi.fn();
+    const lenisStart = vi.fn();
+    const scrollToWindow = vi.fn();
+
+    const lenisOk = executePortfolioScroll(0, {
+      lenis: { start: lenisStart, scrollTo: lenisScrollTo },
+      reduced: false,
+      getElementById: () => null,
+      getElementTop: () => 0,
+      scrollToWindow,
+    });
+    expect(lenisOk).toBe(true);
+    expect(lenisStart).toHaveBeenCalledTimes(1);
+    expect(lenisScrollTo).toHaveBeenCalledWith(0, {
+      duration: MOTION.durations.scroll,
+    });
+    expect(scrollToWindow).not.toHaveBeenCalled();
+
+    // Negative clamp & reduced-motion native window.scrollTo fallback
+    const nativeOk = executePortfolioScroll(-40, {
+      lenis: { start: lenisStart, scrollTo: lenisScrollTo },
+      reduced: true,
+      getElementById: () => null,
+      getElementTop: () => 0,
+      scrollToWindow,
+    });
+    expect(nativeOk).toBe(true);
+    expect(scrollToWindow).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
+
+    // Missing selector returns false safely
+    expect(
+      executePortfolioScroll("#nonexistent", {
+        lenis: null,
+        reduced: false,
+        getElementById: () => null,
+        getElementTop: () => 0,
+        scrollToWindow,
+      })
+    ).toBe(false);
+  });
+
+  it("deriveRender3DState keeps interactive 3D live under reduced motion while honoring low tier and context loss", () => {
+    const reducedHigh = deriveRender3DState({
+      hasMounted: true,
+      webglSupported: true,
+      effectiveTier: "high",
+      contextLost: false,
+      reducedMotion: true,
+    });
+    expect(reducedHigh.canRender3D).toBe(true);
+    expect(reducedHigh.isStaticPose).toBe(false);
+    expect(reducedHigh.dprCap).toBe(1.75);
+
+    const reducedMid = deriveRender3DState({
+      hasMounted: true,
+      webglSupported: true,
+      effectiveTier: "mid",
+      contextLost: false,
+      reducedMotion: true,
+    });
+    expect(reducedMid.canRender3D).toBe(true);
+    expect(reducedMid.isStaticPose).toBe(false);
+    expect(reducedMid.dprCap).toBe(1.25);
+
+    const reducedLow = deriveRender3DState({
+      hasMounted: true,
+      webglSupported: true,
+      effectiveTier: "low",
+      contextLost: false,
+      reducedMotion: true,
+    });
+    expect(reducedLow.canRender3D).toBe(false);
+    expect(reducedLow.isStaticPose).toBe(false);
+
+    const lostContext = deriveRender3DState({
+      hasMounted: true,
+      webglSupported: true,
+      effectiveTier: "high",
+      contextLost: true,
+      reducedMotion: false,
+    });
+    expect(lostContext.canRender3D).toBe(false);
+    expect(lostContext.isStaticPose).toBe(false);
+
+    // Effective tier resolver under reduced motion remains "high" unless hardware/override is low or WebGL unsupported
+    expect(resolveEffectiveTier("auto", "high", true)).toBe("high");
+    expect(resolveEffectiveTier("2d", "high", true)).toBe("low");
+    expect(resolveEffectiveTier("auto", "low", true)).toBe("low");
+    expect(resolveEffectiveTier("high", "high", false)).toBe("low");
   });
 });

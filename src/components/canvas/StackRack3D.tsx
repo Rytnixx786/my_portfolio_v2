@@ -93,6 +93,7 @@ function KeycapNode({
   rippleDelay,
   selectKey,
   onSelect,
+  onHoverChange,
 }: {
   label: string;
   position: [number, number, number];
@@ -101,6 +102,7 @@ function KeycapNode({
   rippleDelay: number;
   selectKey: string;
   onSelect: () => void;
+  onHoverChange?: (hovered: boolean) => void;
 }) {
   const { frameloop, invalidate } = useThree();
   const groupRef = useRef<THREE.Group>(null);
@@ -161,11 +163,11 @@ function KeycapNode({
           onPointerOver={(e) => {
             e.stopPropagation();
             setHovered(true);
-            document.body.style.cursor = "pointer";
+            onHoverChange?.(true);
           }}
           onPointerOut={() => {
             setHovered(false);
-            document.body.style.cursor = "auto";
+            onHoverChange?.(false);
           }}
         >
           <meshStandardMaterial
@@ -315,10 +317,16 @@ export function StackRack3D({
   const draggingRef = useRef(false);
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const [wheelEngaged, setWheelEngaged] = useState(false);
+  const [stageReady, setStageReady] = useState(false);
+  const [hoveredTool, setHoveredTool] = useState<string | null>(null);
   const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
 
   const triggerZoom = useCallback((action: ZoomAction) => {
     setZoomSignal((prev) => ({ action, seq: prev.seq + 1 }));
+  }, []);
+
+  const handleHoverTool = useCallback((tool: string, hovered: boolean) => {
+    setHoveredTool((prev) => (hovered ? tool : prev === tool ? null : prev));
   }, []);
 
   const defaultCamPos = useMemo<[number, number, number]>(
@@ -326,12 +334,6 @@ export function StackRack3D({
     [totalRows]
   );
   const defaultTarget = useMemo<[number, number, number]>(() => [0, 0.08, 0], []);
-
-  useEffect(() => {
-    return () => {
-      document.body.style.cursor = "auto";
-    };
-  }, []);
 
   const positions = tools.map((_, idx) => {
     const col = idx % cols;
@@ -351,8 +353,13 @@ export function StackRack3D({
       onPointerDown={() => {
         if (canRender3D) setWheelEngaged(true);
       }}
-      onPointerLeave={() => setWheelEngaged(false)}
-      className="relative h-[290px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[265px]"
+      onPointerLeave={() => {
+        setWheelEngaged(false);
+        setHoveredTool(null);
+      }}
+      className={`relative h-[290px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[265px] ${
+        hoveredTool ? "cursor-pointer" : ""
+      }`}
     >
       <div className="pointer-events-none absolute left-3 top-2.5 z-30 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3]">
         <span className="font-semibold" style={{ color: accentHue }}>
@@ -361,7 +368,7 @@ export function StackRack3D({
         <span>{layerName}</span>
       </div>
 
-      {canRender3D && (
+      {canRender3D && stageReady && (
         <CanvasZoomHUD
           className="right-3 top-2.5"
           onZoomIn={() => triggerZoom("in")}
@@ -371,6 +378,7 @@ export function StackRack3D({
       )}
 
       <ViewportCanvas
+        onCanvasReadyChange={setStageReady}
         cameraPosition={defaultCamPos}
         fov={40}
         fallback={
@@ -420,6 +428,7 @@ export function StackRack3D({
             rippleDelay={Math.abs(idx - selectedIndex) * 0.05}
             selectKey={selectKey}
             onSelect={() => onSelectTool(tool)}
+            onHoverChange={(isHovered) => handleHoverTool(tool, isHovered)}
           />
         ))}
 

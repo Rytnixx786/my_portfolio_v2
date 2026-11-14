@@ -4,10 +4,10 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import {
@@ -21,6 +21,120 @@ import {
 } from "@/lib/device-tier";
 
 const STORAGE_KEY = "portfolio-v2-3d-quality";
+
+interface ClientEnvSnapshot {
+  hasMounted: boolean;
+  hardwareTier: DeviceTier;
+  hardwareReason: string;
+  webglSupported: boolean;
+  reducedMotion: boolean;
+  preference: QualityPreference;
+}
+
+const SERVER_ENV_SNAPSHOT: ClientEnvSnapshot = {
+  hasMounted: false,
+  hardwareTier: "low",
+  hardwareReason: "Checking GPU",
+  webglSupported: false,
+  reducedMotion: false,
+  preference: "auto",
+};
+
+let cachedClientEnv: ClientEnvSnapshot | null = null;
+const envListeners = new Set<() => void>();
+
+function readStoredPreference(): QualityPreference {
+  try {
+    const saved =
+      (window.localStorage.getItem(STORAGE_KEY) as QualityPreference | null) ??
+      (window.sessionStorage.getItem(STORAGE_KEY) as QualityPreference | null);
+    if (saved === "auto" || saved === "high" || saved === "balanced" || saved === "2d") {
+      return saved;
+    }
+  } catch {
+    // Ignore private browsing storage restrictions
+  }
+  return "auto";
+}
+
+function getClientEnvSnapshot(): ClientEnvSnapshot {
+  if (typeof window === "undefined") {
+    return SERVER_ENV_SNAPSHOT;
+  }
+  if (!cachedClientEnv) {
+    const detected = detectHardwareCapability();
+    cachedClientEnv = {
+      hasMounted: true,
+      hardwareTier: detected.tier,
+      hardwareReason: detected.reason,
+      webglSupported: hasWebGLSupport(),
+      reducedMotion: detectMotionPreference() === "reduced",
+      preference: readStoredPreference(),
+    };
+  }
+  return cachedClientEnv;
+}
+
+function getServerEnvSnapshot(): ClientEnvSnapshot {
+  return SERVER_ENV_SNAPSHOT;
+}
+
+function emitClientEnvChange() {
+  for (const listener of envListeners) {
+    listener();
+  }
+}
+
+function subscribeClientEnv(listener: () => void): () => void {
+  envListeners.add(listener);
+
+  if (typeof window === "undefined") {
+    return () => {
+      envListeners.delete(listener);
+    };
+  }
+
+  const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+  const onMediaChange = (event: MediaQueryListEvent) => {
+    const current = getClientEnvSnapshot();
+    if (current.reducedMotion !== event.matches) {
+      cachedClientEnv = { ...current, reducedMotion: event.matches };
+      emitClientEnvChange();
+    }
+  };
+
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== STORAGE_KEY) return;
+    const nextPref = readStoredPreference();
+    const current = getClientEnvSnapshot();
+    if (current.preference !== nextPref) {
+      cachedClientEnv = { ...current, preference: nextPref };
+      emitClientEnvChange();
+    }
+  };
+
+  media?.addEventListener?.("change", onMediaChange);
+  window.addEventListener("storage", onStorage);
+
+  return () => {
+    envListeners.delete(listener);
+    media?.removeEventListener?.("change", onMediaChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+function updateStoredPreference(next: QualityPreference) {
+  const current = getClientEnvSnapshot();
+  if (current.preference !== next) {
+    cachedClientEnv = { ...current, preference: next };
+    emitClientEnvChange();
+  }
+  try {
+    window.localStorage.setItem(STORAGE_KEY, next);
+  } catch {
+    // Ignore storage write errors
+  }
+}
 
 interface WebGLContextValue {
   hasMounted: boolean;
@@ -62,62 +176,26 @@ const WebGLContext = createContext<WebGLContextValue>({
  * WebGL scenes stay 100% locked to their DOM containers on scroll without hitting browser context limits.
  */
 export function WebGLContextProvider({ children }: { children: ReactNode }) {
-  const [hasMounted, setHasMounted] = useState(false);
-  const [hardwareTier, setHardwareTier] = useState<DeviceTier>("low");
-  const [hardwareReason, setHardwareReason] = useState("Checking GPU");
-  const [preference, setPreferenceState] = useState<QualityPreference>("auto");
-  const [reducedMotion, setReducedMotion] = useState(false);
-  const [webglSupported, setWebglSupported] = useState(false);
+  const {
+    hasMounted,
+    hardwareTier,
+    hardwareReason,
+    webglSupported,
+    reducedMotion,
+    preference,
+  } = useSyncExternalStore(
+    subscribeClientEnv,
+    getClientEnvSnapshot,
+    getServerEnvSnapshot
+  );
   const [contextLost, setContextLost] = useState(false);
   const [slotOrder, setSlotOrder] = useState<Array<{ id: string; pinned: boolean }>>([]);
 
   const eventSourceRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    const rafId = window.requestAnimationFrame(() => {
-      const motion = detectMotionPreference();
-      setReducedMotion(motion === "reduced");
-
-      const detected = detectHardwareCapability();
-      const supported = hasWebGLSupport();
-      setHardwareTier(detected.tier);
-      setHardwareReason(detected.reason);
-      setWebglSupported(supported);
-
-      try {
-        const saved =
-          (window.localStorage.getItem(STORAGE_KEY) as QualityPreference | null) ??
-          (window.sessionStorage.getItem(STORAGE_KEY) as QualityPreference | null);
-        if (saved === "auto" || saved === "high" || saved === "balanced" || saved === "2d") {
-          setPreferenceState(saved);
-        }
-      } catch {
-        // Ignore private browsing storage restrictions
-      }
-
-      setHasMounted(true);
-    });
-
-    const media = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    const onMediaChange = (event: MediaQueryListEvent) => {
-      setReducedMotion(event.matches);
-    };
-
-    media?.addEventListener?.("change", onMediaChange);
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      media?.removeEventListener?.("change", onMediaChange);
-    };
-  }, []);
-
   const setPreference = useCallback((next: QualityPreference) => {
-    setPreferenceState(next);
     setContextLost(false);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // Ignore storage write errors
-    }
+    updateStoredPreference(next);
   }, []);
 
   const effectiveTier = useMemo(() => {

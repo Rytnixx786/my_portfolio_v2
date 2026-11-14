@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
 // Filter upstream @react-three/fiber internal THREE.Clock deprecation noise on Three r183+
@@ -53,6 +53,29 @@ function CanvasLifecycle({ activeLoop }: { activeLoop: boolean }) {
   return null;
 }
 
+function FirstFrameNotifier({
+  onReady,
+  unmountingRef,
+}: {
+  onReady?: () => void;
+  unmountingRef: React.RefObject<boolean>;
+}) {
+  const firedRef = useRef(false);
+  const { gl } = useThree();
+
+  useFrame(() => {
+    if (firedRef.current) return;
+    firedRef.current = true;
+    window.requestAnimationFrame(() => {
+      if (!unmountingRef.current && gl.domElement.isConnected) {
+        onReady?.();
+      }
+    });
+  });
+
+  return null;
+}
+
 export function LocalCanvasInner({
   children,
   cameraPosition,
@@ -60,6 +83,8 @@ export function LocalCanvasInner({
   dpr,
   antialias,
   activeLoop,
+  isStaticPose = false,
+  onCanvasReady,
   onContextLost,
   onContextRestored,
 }: {
@@ -69,24 +94,44 @@ export function LocalCanvasInner({
   dpr: [number, number];
   antialias: boolean;
   activeLoop: boolean;
+  isStaticPose?: boolean;
+  onCanvasReady?: () => void;
   onDecline?: () => void;
   onContextLost: () => void;
   onContextRestored: () => void;
 }) {
   const unmountingRef = useRef(false);
+  const readyFiredRef = useRef(false);
+  const safetyTimerRef = useRef<number | null>(null);
+  const loopEnabled = activeLoop && !isStaticPose;
 
   useLayoutEffect(() => {
     unmountingRef.current = false;
+    readyFiredRef.current = false;
     return () => {
       unmountingRef.current = true;
+      if (safetyTimerRef.current !== null) {
+        window.clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
+      }
     };
   }, []);
+
+  const notifyReady = () => {
+    if (readyFiredRef.current || unmountingRef.current) return;
+    readyFiredRef.current = true;
+    if (safetyTimerRef.current !== null) {
+      window.clearTimeout(safetyTimerRef.current);
+      safetyTimerRef.current = null;
+    }
+    onCanvasReady?.();
+  };
 
   return (
     <Canvas
       className="r3f-local-canvas"
       dpr={dpr}
-      frameloop={activeLoop ? "always" : "demand"}
+      frameloop={loopEnabled ? "always" : "demand"}
       camera={{ position: cameraPosition, fov, near: 0.1, far: 100 }}
       gl={{
         antialias,
@@ -118,6 +163,12 @@ export function LocalCanvasInner({
           },
           false
         );
+
+        safetyTimerRef.current = window.setTimeout(() => {
+          if (!unmountingRef.current && canvas.isConnected) {
+            notifyReady();
+          }
+        }, 150);
       }}
       style={{
         width: "100%",
@@ -127,7 +178,8 @@ export function LocalCanvasInner({
       }}
     >
       {children}
-      <CanvasLifecycle activeLoop={activeLoop} />
+      <CanvasLifecycle activeLoop={loopEnabled} />
+      <FirstFrameNotifier onReady={notifyReady} unmountingRef={unmountingRef} />
     </Canvas>
   );
 }

@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowRight,
   Check,
@@ -16,6 +15,8 @@ import {
 import { projects } from "@/data/projects";
 import { nav, profile } from "@/data/site";
 import { useBodyScrollLock, useCopy, useQueryConsole } from "@/hooks/usePortfolioUtils";
+import { MOTION, normalizeRoutePath, runViewTransition } from "@/lib/motion";
+import { TransitionLink } from "@/components/chrome/TransitionLink";
 
 const SUGGESTIONS = [
   "How does Cinch achieve 4.12ms?",
@@ -25,9 +26,11 @@ const SUGGESTIONS = [
 ] as const;
 
 export function CommandPalette() {
+  const pathname = usePathname();
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
   const [open, setOpen] = useState(false);
 
   const { copied, copy } = useCopy(2000);
@@ -44,22 +47,32 @@ export function CommandPalette() {
   const openModal = useCallback(() => {
     const dlg = dialogRef.current;
     if (!dlg) return;
+    if (document.activeElement instanceof HTMLElement) {
+      lastFocusedRef.current = document.activeElement;
+    }
     if (!dlg.open) dlg.showModal();
     setOpen(true);
     window.setTimeout(() => inputRef.current?.focus(), 40);
   }, []);
 
-  const closeModal = useCallback(() => {
+  const closeModal = useCallback((restoreFocus = true) => {
     const dlg = dialogRef.current;
     if (dlg?.open) dlg.close();
     setOpen(false);
+    if (restoreFocus && lastFocusedRef.current?.isConnected) {
+      const trigger = lastFocusedRef.current;
+      lastFocusedRef.current = null;
+      window.requestAnimationFrame(() => trigger.focus());
+    } else if (!restoreFocus) {
+      lastFocusedRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        if (dialogRef.current?.open) closeModal();
+        if (dialogRef.current?.open) closeModal(true);
         else openModal();
       }
     };
@@ -74,8 +87,9 @@ export function CommandPalette() {
   }, [openModal, closeModal]);
 
   const handleNavigate = (href: string) => {
-    closeModal();
-    if (href.startsWith("/#")) {
+    closeModal(false);
+    const currentPath = normalizeRoutePath(pathname || "/");
+    if (href.startsWith("/#") && currentPath === "/") {
       const id = href.slice(2);
       const el = document.getElementById(id);
       if (el && window.__portfolioScrollTo) {
@@ -83,7 +97,22 @@ export function CommandPalette() {
         return;
       }
     }
-    router.push(href);
+
+    const targetPath = normalizeRoutePath(href);
+    if (targetPath === currentPath) {
+      router.push(href);
+      return;
+    }
+
+    void runViewTransition(
+      () => {
+        router.push(href);
+      },
+      {
+        waitForCommit: true,
+        timeoutMs: MOTION.viewTransitionTimeoutMs,
+      }
+    );
   };
 
   function handleSubmit(e: FormEvent) {
@@ -113,7 +142,7 @@ export function CommandPalette() {
           </div>
           <button
             type="button"
-            onClick={closeModal}
+            onClick={() => closeModal(true)}
             aria-label="Close command palette"
             className="flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#9DA7B3] hover:border-[#38BDF8] hover:text-[#E6EDF3]"
           >
@@ -173,14 +202,14 @@ export function CommandPalette() {
                 {item.citations && item.citations.length > 0 && (
                   <div className="flex flex-wrap gap-2 pt-1">
                     {item.citations.map((c) => (
-                      <Link
+                      <TransitionLink
                         key={c.href}
                         href={c.href}
-                        onClick={closeModal}
+                        onClick={() => closeModal(false)}
                         className="inline-flex min-h-[44px] items-center rounded-md border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs text-[#7DD3FC] hover:bg-[#38BDF8]/20"
                       >
                         {c.label} ↗
-                      </Link>
+                      </TransitionLink>
                     ))}
                   </div>
                 )}
@@ -245,7 +274,7 @@ export function CommandPalette() {
                     href={profile.resume}
                     target="_blank"
                     rel="noopener noreferrer"
-                    onClick={closeModal}
+                    onClick={() => closeModal(false)}
                     className="flex min-h-[44px] w-full items-center justify-between rounded-xl px-3 py-2 text-left font-mono text-xs text-[#38BDF8] hover:bg-[#1C222B]"
                   >
                     <span>Open Resume PDF</span>

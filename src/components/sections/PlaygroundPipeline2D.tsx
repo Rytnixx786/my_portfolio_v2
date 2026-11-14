@@ -178,9 +178,9 @@ export function PlaygroundPipeline2D({
           {isCacheBypass && (
             <g transform="translate(310, 48)">
               <rect
-                x="-82"
+                x="-92"
                 y="-13"
-                width="164"
+                width="184"
                 height="24"
                 rx="12"
                 fill="#0D1117"
@@ -190,10 +190,10 @@ export function PlaygroundPipeline2D({
               />
               <text
                 x="0"
-                y="3"
+                y="4"
                 textAnchor="middle"
                 fill="#10B981"
-                fontSize="10.5"
+                fontSize="12"
                 fontWeight="600"
                 fontFamily="var(--font-mono), monospace"
               >
@@ -221,10 +221,10 @@ export function PlaygroundPipeline2D({
               />
               <text
                 x="0"
-                y="60"
+                y="62"
                 textAnchor="middle"
                 fill={statusColor}
-                fontSize="10.5"
+                fontSize="12"
                 fontWeight="600"
                 fontFamily="var(--font-mono), monospace"
               >
@@ -246,10 +246,10 @@ export function PlaygroundPipeline2D({
               />
               <text
                 x="0"
-                y="56"
+                y="58"
                 textAnchor="middle"
                 fill="#7DD3FC"
-                fontSize="10.5"
+                fontSize="12"
                 fontWeight="600"
                 fontFamily="var(--font-mono), monospace"
               >
@@ -322,7 +322,7 @@ export function PlaygroundPipeline2D({
                   x="-38"
                   y="-5"
                   fill={isActive ? statusColor : "#8B949E"}
-                  fontSize="11"
+                  fontSize="12"
                   fontWeight="700"
                   fontFamily="var(--font-mono), monospace"
                 >
@@ -341,7 +341,7 @@ export function PlaygroundPipeline2D({
                   y="13"
                   textAnchor="middle"
                   fill={isActive ? "#E6EDF3" : "#8B949E"}
-                  fontSize="11"
+                  fontSize="12"
                   fontWeight="600"
                   fontFamily="var(--font-sans), sans-serif"
                 >

@@ -4,6 +4,7 @@ import { useRef, type ReactNode } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
+import { MOTION } from "@/lib/motion";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -50,9 +51,9 @@ export function SectionReveal({
               ease: "none",
               scrollTrigger: {
                 trigger: el,
-                start: "top 92%",
+                start: MOTION.scrollTrigger.revealStart,
                 end: "top 38%",
-                scrub: 0.65,
+                scrub: MOTION.scrollTrigger.scrub,
               },
             }
           );
@@ -62,6 +63,13 @@ export function SectionReveal({
         if (variant === "bento-cascade") {
           const items = el.querySelectorAll("[data-bento-item]");
           const targets = items.length > 0 ? items : el;
+          const staggerStep =
+            items.length > 1
+              ? Math.min(
+                  MOTION.stagger.bentoGrid,
+                  MOTION.stagger.bentoCap / (items.length - 1)
+                )
+              : 0;
           gsap.fromTo(
             targets,
             { y: 24, scale: 0.985, opacity: 0 },
@@ -69,14 +77,14 @@ export function SectionReveal({
               y: 0,
               scale: 1,
               opacity: 1,
-              duration: 0.68,
-              stagger: 0.08,
+              duration: MOTION.durations.reveal,
+              stagger: staggerStep,
               delay: Math.min(delayMs, 200) / 1000,
-              ease: "power3.out",
+              ease: MOTION.gsapEase,
               clearProps: "transform,opacity",
               scrollTrigger: {
                 trigger: el,
-                start: "top 88%",
+                start: MOTION.scrollTrigger.bentoStart,
                 once: true,
               },
             }
@@ -90,13 +98,13 @@ export function SectionReveal({
           {
             y: 0,
             opacity: 1,
-            duration: 0.65,
+            duration: MOTION.durations.reveal,
             delay: Math.min(delayMs, 220) / 1000,
-            ease: "power3.out",
+            ease: MOTION.gsapEase,
             clearProps: "transform,opacity",
             scrollTrigger: {
               trigger: el,
-              start: "top 92%",
+              start: MOTION.scrollTrigger.revealStart,
               once: true,
             },
           }

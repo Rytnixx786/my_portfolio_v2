@@ -26,6 +26,59 @@ const ORBITAL_SYSTEMS = [
 const ORBIT_RADIUS = 2.18;
 const INNER_ORBIT_RADIUS = 1.82;
 
+let portraitImagePromise: Promise<HTMLImageElement> | null = null;
+let cachedPortraitImage: HTMLImageElement | null = null;
+
+function createPortraitTexture(img: HTMLImageElement): {
+  texture: THREE.Texture;
+  aspect: number;
+} {
+  const texture = new THREE.Texture(img);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  const w = img.naturalWidth || img.width || 1;
+  const h = img.naturalHeight || img.height || 1;
+  return { texture, aspect: w / h };
+}
+
+function loadHeroPortraitImage(): Promise<HTMLImageElement> {
+  if (cachedPortraitImage) return Promise.resolve(cachedPortraitImage);
+  if (portraitImagePromise) return portraitImagePromise;
+
+  portraitImagePromise = new Promise<HTMLImageElement>((resolve, reject) => {
+    if (typeof window === "undefined") {
+      reject(new Error("Window unavailable"));
+      return;
+    }
+    const img = new window.Image();
+    img.decoding = "async";
+    img.onload = async () => {
+      try {
+        if (typeof img.decode === "function") {
+          await img.decode();
+        }
+      } catch {
+        // Ignore decode() rejection on already-decoded or unsupported browsers
+      }
+      cachedPortraitImage = img;
+      resolve(img);
+    };
+    img.onerror = () => {
+      portraitImagePromise = null;
+      reject(new Error("Failed to load hero portrait image"));
+    };
+    img.src = profile.heroPortrait;
+  });
+
+  return portraitImagePromise;
+}
+
+if (typeof window !== "undefined") {
+  void loadHeroPortraitImage().catch(() => {});
+}
+
 interface HeroOrbitalCore3DProps {
   activeSystemIndex: number;
   onSelectSystem: (index: number) => void;
@@ -36,47 +89,57 @@ interface HeroOrbitalCore3DProps {
  * anti-aliased hairline accent bezel rendered directly in the fragment shader
  * (zero z-fighting or stacked box artifacts).
  */
-function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
-  const [imgAspect, setImgAspect] = useState(1);
+function PortraitDepthSlab({
+  accentHue,
+  onTextureReady,
+}: {
+  accentHue: string;
+  onTextureReady?: () => void;
+}) {
+  const preloaded = useMemo(
+    () => (cachedPortraitImage ? createPortraitTexture(cachedPortraitImage) : null),
+    []
+  );
+  const [asyncLoaded, setAsyncLoaded] = useState<{
+    texture: THREE.Texture;
+    aspect: number;
+  } | null>(null);
+  const activeEntry = preloaded ?? asyncLoaded;
+  const texture = activeEntry?.texture ?? null;
+  const imgAspect = activeEntry?.aspect ?? 1;
+
   const shaderRef = useRef<THREE.ShaderMaterial>(null);
   const backMatRef = useRef<THREE.MeshStandardMaterial>(null);
-  const textureRef = useRef<THREE.Texture | null>(null);
-  const imgAspectRef = useRef(1);
+  const textureRef = useRef<THREE.Texture | null>(texture);
+  const imgAspectRef = useRef(imgAspect);
   const currentAccentRef = useRef(new THREE.Color(accentHue));
   const targetAccentRef = useRef(new THREE.Color(accentHue));
   const { frameloop, invalidate } = useThree();
 
   useEffect(() => {
+    if (preloaded) {
+      onTextureReady?.();
+      return;
+    }
+
     let active = true;
-    const loader = new THREE.TextureLoader();
-    loader.load(
-      profile.heroPortrait,
-      (loaded) => {
-        if (!active) {
-          loaded.dispose();
-          return;
-        }
-        const img = loaded.image as { width?: number; height?: number } | undefined;
-        if (img?.width && img?.height) {
-          setImgAspect(img.width / img.height);
-        }
-        loaded.colorSpace = THREE.SRGBColorSpace;
-        loaded.minFilter = THREE.LinearFilter;
-        loaded.magFilter = THREE.LinearFilter;
-        setTexture(loaded);
+    loadHeroPortraitImage()
+      .then((img) => {
+        if (!active) return;
+        setAsyncLoaded(createPortraitTexture(img));
         invalidate();
-      },
-      undefined,
-      () => {
-        // Fallback color slate
-      }
-    );
+        window.requestAnimationFrame(() => {
+          if (active) onTextureReady?.();
+        });
+      })
+      .catch(() => {
+        if (active) onTextureReady?.();
+      });
 
     return () => {
       active = false;
     };
-  }, [invalidate]);
+  }, [preloaded, invalidate, onTextureReady]);
 
   useEffect(() => {
     return () => {
@@ -111,12 +174,14 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
 
   const uniforms = useMemo(
     () => ({
-      uMap: { value: null as THREE.Texture | null },
-      uHasMap: { value: 0.0 },
+      uMap: { value: texture },
+      uHasMap: { value: texture ? 1.0 : 0.0 },
       uAccent: { value: new THREE.Color(HERO_ORBIT_HUES[0]) },
       uPlaneAspect: { value: 1.98 / 2.26 },
-      uImgAspect: { value: 1.0 },
+      uImgAspect: { value: imgAspect },
     }),
+    // Initialized once per ShaderMaterial mount; subsequent updates mutate uniforms directly
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
@@ -226,14 +291,16 @@ function HeroOrbitalScene({
   activeSystemIndex,
   onSelectSystem,
   onHoverSystem,
+  onPortraitReady,
   enableWheelZoom,
   zoomSignal,
 }: HeroOrbitalCore3DProps & {
   onHoverSystem: (index: number | null) => void;
+  onPortraitReady: () => void;
   enableWheelZoom: boolean;
   zoomSignal: ZoomSignal;
 }) {
-  const { camera, frameloop, invalidate, size } = useThree();
+  const { camera, frameloop, gl, invalidate, size } = useThree();
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const tiltGroupRef = useRef<THREE.Group>(null);
   const ringMatRef = useRef<THREE.MeshBasicMaterial>(null);
@@ -287,10 +354,11 @@ function HeroOrbitalScene({
   }, [hoveredIdx, invalidate]);
 
   useEffect(() => {
+    const dom = gl.domElement;
     return () => {
-      document.body.style.cursor = "auto";
+      dom.style.cursor = "auto";
     };
-  }, []);
+  }, [gl]);
 
   const activeSystem = ORBITAL_SYSTEMS[activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
 
@@ -359,7 +427,10 @@ function HeroOrbitalScene({
       <pointLight position={[3.2, 2.2, -2.5]} intensity={0.95} decay={0} color={STATE_HEALTHY} />
 
       <group ref={tiltGroupRef}>
-        <PortraitDepthSlab accentHue={activeSystem.hue} />
+        <PortraitDepthSlab
+          accentHue={activeSystem.hue}
+          onTextureReady={onPortraitReady}
+        />
 
         {/* Synchronized Inclined Orbital Plane (dips below face in front, rises behind head in back) */}
         <group rotation={[0.4, 0.12, -0.15]}>
@@ -401,12 +472,12 @@ function HeroOrbitalScene({
                     e.stopPropagation();
                     setHoveredIdx(idx);
                     onHoverSystem(idx);
-                    document.body.style.cursor = "pointer";
+                    gl.domElement.style.cursor = "pointer";
                   }}
                   onPointerOut={() => {
                     setHoveredIdx(null);
                     onHoverSystem(null);
-                    document.body.style.cursor = "auto";
+                    gl.domElement.style.cursor = "auto";
                   }}
                 >
                   <sphereGeometry args={[0.08, 20, 20]} />
@@ -649,7 +720,7 @@ function HeroOrbital2DFallback({
       {/* Proportional Machined Portrait Frame (z-10) */}
       <div
         ref={portraitRef}
-        className="relative z-10 rounded-[1.2rem] border bg-[#111720]/95 p-1 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.9)] transition-[border-color,transform] duration-200 ease-out will-change-transform"
+        className="relative z-10 rounded-[1.2rem] border bg-[#111720]/95 p-1 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.9)] transition-[border-color,transform] duration-200 ease-out"
         style={{ borderColor: `${active.hue}55` }}
       >
         <div className="relative h-40 w-36 overflow-hidden rounded-[0.95rem] border border-[rgba(240,246,252,0.1)] bg-[#0D1117] sm:h-48 sm:w-44 lg:h-52 lg:w-48">
@@ -758,7 +829,7 @@ function HeroOrbital2DFallback({
             {/* Compact Micro-Tag on Active / Hover */}
             {(isActive || isHovered) && (
               <span
-                className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border bg-[#0D1117]/95 px-2.5 py-0.5 font-mono text-xs font-semibold text-[#E6EDF3] shadow-lg backdrop-blur-md"
+                className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border bg-[#0D1117]/95 px-2.5 py-0.5 font-mono text-xs font-semibold text-[#E6EDF3] shadow-lg"
                 style={{ borderColor: `${sys.hue}66` }}
               >
                 {sys.label}
@@ -769,7 +840,7 @@ function HeroOrbital2DFallback({
       })}
 
       {/* 2D Safe Indicator positioned top-right away from bottom-right HUD pill */}
-      <span className="pointer-events-none absolute right-3 top-3 z-30 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117]/88 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E] backdrop-blur-md">
+      <span className="pointer-events-none absolute right-3 top-3 z-30 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117]/95 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E]">
         2D Safe
       </span>
     </div>
@@ -784,9 +855,15 @@ export function HeroOrbitalCore3D({
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [wheelEngaged, setWheelEngaged] = useState(false);
   const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
+  const [portraitReady, setPortraitReady] = useState(() => Boolean(cachedPortraitImage));
+  const [stageReady, setStageReady] = useState(false);
 
   const triggerZoom = useCallback((action: ZoomAction) => {
     setZoomSignal((prev) => ({ action, seq: prev.seq + 1 }));
+  }, []);
+
+  const handlePortraitReady = useCallback(() => {
+    setPortraitReady(true);
   }, []);
 
   const displaySys =
@@ -801,13 +878,15 @@ export function HeroOrbitalCore3D({
       onPointerLeave={() => setWheelEngaged(false)}
       className="relative h-[280px] w-full overflow-hidden rounded-2xl sm:h-[380px] lg:h-[420px]"
     >
-      <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex max-w-[calc(100%-174px)] items-center gap-1.5 truncate rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/88 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] backdrop-blur-md sm:max-w-none sm:gap-2 sm:px-3">
-        <span style={{ color: displaySys.hue }}>{displaySys.code}</span>
-        <span className="font-semibold">{displaySys.label}</span>
-        <span className="hidden text-[#9DA7B3] sm:inline">· {displaySys.metric}</span>
-      </div>
+      {(!canRender3D || stageReady) && (
+        <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex max-w-[calc(100%-174px)] items-center gap-1.5 truncate rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/95 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] sm:max-w-none sm:gap-2 sm:px-3">
+          <span style={{ color: displaySys.hue }}>{displaySys.code}</span>
+          <span className="font-semibold">{displaySys.label}</span>
+          <span className="hidden text-[#9DA7B3] sm:inline">· {displaySys.metric}</span>
+        </div>
+      )}
 
-      {canRender3D && (
+      {canRender3D && stageReady && (
         <CanvasZoomHUD
           className="right-2.5 top-2.5 sm:right-3 sm:top-3"
           onZoomIn={() => triggerZoom("in")}
@@ -818,8 +897,17 @@ export function HeroOrbitalCore3D({
 
       <ViewportCanvas
         eager
+        readyGate={portraitReady}
+        onCanvasReadyChange={setStageReady}
         cameraPosition={HERO_CAM_POS}
         fov={40}
+        loadingFallback={
+          <div className="flex h-full w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/40">
+            <span className="font-mono text-xs uppercase tracking-[0.16em] text-[#8B949E]">
+              Initializing Orbital Stage...
+            </span>
+          </div>
+        }
         fallback={
           <HeroOrbital2DFallback
             activeSystemIndex={activeSystemIndex}
@@ -832,6 +920,7 @@ export function HeroOrbitalCore3D({
           activeSystemIndex={activeSystemIndex}
           onSelectSystem={onSelectSystem}
           onHoverSystem={setHoveredIdx}
+          onPortraitReady={handlePortraitReady}
           enableWheelZoom={wheelEngaged}
           zoomSignal={zoomSignal}
         />

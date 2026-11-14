@@ -340,6 +340,7 @@ function StationPedestal({
   statusColor,
   pulsePhase,
   onSelect,
+  onHoverChange,
 }: {
   stage: { id: string; label: string };
   x: number;
@@ -348,6 +349,7 @@ function StationPedestal({
   statusColor: string;
   pulsePhase: number;
   onSelect?: () => void;
+  onHoverChange?: (hovered: boolean) => void;
 }) {
   const bodyRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Mesh>(null);
@@ -411,11 +413,11 @@ function StationPedestal({
           onPointerOver={(e) => {
             e.stopPropagation();
             setHovered(true);
-            document.body.style.cursor = "pointer";
+            onHoverChange?.(true);
           }}
           onPointerOut={() => {
             setHovered(false);
-            document.body.style.cursor = "auto";
+            onHoverChange?.(false);
           }}
         >
           <meshStandardMaterial
@@ -460,9 +462,11 @@ function PipelineDioramaScene({
   focusedStageId = null,
   rpsMultiplier = 1,
   onSelectStage,
+  onHoverStage,
   enableWheelZoom,
   zoomSignal,
 }: PlaygroundPipeline3DProps & {
+  onHoverStage: (stageId: string, hovered: boolean) => void;
   enableWheelZoom: boolean;
   zoomSignal: ZoomSignal;
 }) {
@@ -477,12 +481,6 @@ function PipelineDioramaScene({
     .filter((idx) => idx >= 0);
   const lastActiveIdx =
     activeIndices.length > 0 ? activeIndices[activeIndices.length - 1] : 0;
-
-  useEffect(() => {
-    return () => {
-      document.body.style.cursor = "auto";
-    };
-  }, []);
 
   return (
     <group>
@@ -530,6 +528,7 @@ function PipelineDioramaScene({
             statusColor={statusColor}
             pulsePhase={idx * 0.65}
             onSelect={() => onSelectStage?.(stage.id)}
+            onHoverChange={(isHovered) => onHoverStage(stage.id, isHovered)}
           />
         );
       })}
@@ -551,11 +550,17 @@ function PipelineDioramaScene({
 export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {
   const { canRender3D } = useCanRender3D();
   const [wheelEngaged, setWheelEngaged] = useState(false);
+  const [stageReady, setStageReady] = useState(false);
+  const [hoveredStageId, setHoveredStageId] = useState<string | null>(null);
   const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
   const initialPos = PRESET_VANTAGES[props.cameraPreset] ?? PRESET_VANTAGES.isometric;
 
   const triggerZoom = useCallback((action: ZoomAction) => {
     setZoomSignal((prev) => ({ action, seq: prev.seq + 1 }));
+  }, []);
+
+  const handleHoverStage = useCallback((stageId: string, hovered: boolean) => {
+    setHoveredStageId((prev) => (hovered ? stageId : prev === stageId ? null : prev));
   }, []);
 
   return (
@@ -564,10 +569,15 @@ export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {
       onPointerDown={() => {
         if (canRender3D) setWheelEngaged(true);
       }}
-      onPointerLeave={() => setWheelEngaged(false)}
-      className="relative h-[265px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[315px]"
+      onPointerLeave={() => {
+        setWheelEngaged(false);
+        setHoveredStageId(null);
+      }}
+      className={`relative h-[265px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[315px] ${
+        hoveredStageId ? "cursor-pointer" : ""
+      }`}
     >
-      {canRender3D && (
+      {canRender3D && stageReady && (
         <CanvasZoomHUD
           onZoomIn={() => triggerZoom("in")}
           onZoomOut={() => triggerZoom("out")}
@@ -576,6 +586,7 @@ export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {
       )}
 
       <ViewportCanvas
+        onCanvasReadyChange={setStageReady}
         cameraPosition={initialPos}
         fov={38}
         className="h-full w-full"
@@ -594,13 +605,14 @@ export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {
       >
         <PipelineDioramaScene
           {...props}
+          onHoverStage={handleHoverStage}
           enableWheelZoom={wheelEngaged}
           zoomSignal={zoomSignal}
         />
       </ViewportCanvas>
 
       {canRender3D && (
-        <span className="pointer-events-none absolute bottom-2.5 right-3 z-20 hidden rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/85 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.1em] text-[#8B949E] backdrop-blur-md sm:inline-flex">
+        <span className="pointer-events-none absolute bottom-2.5 right-3 z-20 hidden rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/95 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.1em] text-[#8B949E] sm:inline-flex">
           Drag to orbit · +/- or click &amp; scroll to zoom · Click station
         </span>
       )}

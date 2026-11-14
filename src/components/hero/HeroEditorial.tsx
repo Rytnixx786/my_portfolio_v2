@@ -6,9 +6,10 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ArrowDownRight, FilePdf } from "@phosphor-icons/react";
 import { profile } from "@/data/site";
+import { MOTION } from "@/lib/motion";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { KineticHeading } from "@/components/motion/KineticText";
-import { FloatingProjectStack3D } from "./FloatingProjectStack3D";
+import { HeroSystemSwitcher } from "./HeroSystemSwitcher";
 import { HeroCursorField } from "./HeroCursorField";
 
 gsap.registerPlugin(useGSAP);
@@ -45,9 +46,9 @@ export function HeroEditorial() {
       mm.add("(prefers-reduced-motion: no-preference)", () => {
         gsap.from("[data-hero-stagger]", {
           y: 14,
-          duration: 0.65,
-          stagger: 0.06,
-          ease: "power3.out",
+          duration: MOTION.durations.reveal,
+          stagger: MOTION.stagger.hero,
+          ease: MOTION.gsapEase,
           clearProps: "transform",
         });
       });
@@ -107,7 +108,7 @@ export function HeroEditorial() {
                   className="group inline-flex min-h-[44px] items-center gap-3 rounded-full bg-[#38BDF8] py-2 pl-6 pr-2.5 font-sans text-sm font-semibold text-[#0D1117] transition-colors duration-300 hover:bg-[#7DD3FC] active:scale-[0.98]"
                 >
                   <span>Explore Work</span>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:translate-y-0.5">
                     <ArrowDownRight className="h-4 w-4" weight="regular" aria-hidden="true" />
                   </span>
                 </a>
@@ -117,9 +118,13 @@ export function HeroEditorial() {
                 href={profile.resume}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22]/90 px-5 py-2.5 font-mono text-xs uppercase tracking-[0.14em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8]"
+                className="group inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22]/90 px-5 py-2.5 font-mono text-xs uppercase tracking-[0.14em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8]"
               >
-                <FilePdf className="h-4 w-4 text-[#38BDF8]" weight="regular" aria-hidden="true" />
+                <FilePdf
+                  className="h-4 w-4 text-[#38BDF8] transition-transform duration-200 group-hover:-translate-y-0.5"
+                  weight="regular"
+                  aria-hidden="true"
+                />
                 <span>Resume</span>
               </a>
             </div>
@@ -131,7 +136,7 @@ export function HeroEditorial() {
               activeSystemIndex={activeSystemIndex}
               onSelectSystem={setActiveSystemIndex}
             />
-            <FloatingProjectStack3D
+            <HeroSystemSwitcher
               activeIndex={activeSystemIndex}
               onActiveChange={setActiveSystemIndex}
             />

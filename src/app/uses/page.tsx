@@ -1,7 +1,7 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import { stack } from "@/data/site";
+import { TransitionLink } from "@/components/chrome/TransitionLink";
 
 export const metadata: Metadata = {
   title: "Uses & Engineering Tooling",
@@ -15,10 +15,10 @@ export default function UsesPage() {
     <section className="min-h-[100dvh] bg-[#0D1117] pt-28 pb-20 text-[#E6EDF3] sm:pt-32">
       <div className="mx-auto max-w-[980px] px-4 sm:px-8">
         <div className="border-b border-[rgba(240,246,252,0.08)] pb-5 font-mono text-xs uppercase tracking-[0.14em]">
-          <Link href="/" className="inline-flex items-center gap-2 text-[#9DA7B3] hover:text-[#38BDF8]">
-            <ArrowLeft className="h-4 w-4" weight="regular" aria-hidden="true" />
+          <TransitionLink href="/" className="group inline-flex min-h-[44px] items-center gap-2 text-[#9DA7B3] hover:text-[#38BDF8]">
+            <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" weight="regular" aria-hidden="true" />
             <span>Back to Portfolio</span>
-          </Link>
+          </TransitionLink>
         </div>
 
         <header className="py-10">
