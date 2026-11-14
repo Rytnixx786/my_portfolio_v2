@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Cube, Desktop, Gauge } from "@phosphor-icons/react";
 import type { QualityPreference } from "@/lib/device-tier";
 import { useWebGLContext } from "./WebGLContextProvider";
@@ -10,6 +10,7 @@ const OPTIONS: ReadonlyArray<{
   shortLabel: string;
   desc: string;
 }> = [
+  { id: "auto", shortLabel: "AUTO", desc: "Adaptive GPU tier detection" },
   { id: "high", shortLabel: "3D HIGH", desc: "Shaders, AA & HD DPR" },
   { id: "balanced", shortLabel: "3D BAL", desc: "Mid-density WebGL view" },
   { id: "2d", shortLabel: "2D SAFE", desc: "Zero-GPU vector fallback" },
@@ -29,6 +30,33 @@ export function QualityToggleHUD() {
     setPreference,
   } = useWebGLContext();
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null;
+      if (containerRef.current && target && !containerRef.current.contains(target)) {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("touchstart", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [open]);
 
   if (!hasMounted) return null;
 
@@ -41,10 +69,10 @@ export function QualityToggleHUD() {
           ? "balanced"
           : "2d";
 
-  const activeMeta = OPTIONS.find((o) => o.id === activeId) ?? OPTIONS[0];
+  const activeMeta = OPTIONS.find((o) => o.id === activeId) ?? OPTIONS[1];
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+    <div ref={containerRef} className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
       {open && (
         <div
           role="dialog"
@@ -64,8 +92,9 @@ export function QualityToggleHUD() {
 
           <div className="flex flex-col gap-1">
             {OPTIONS.map((option) => {
-              const selected = activeId === option.id;
-              const disabled = option.id !== "2d" && !webglSupported;
+              const selected =
+                preference === "auto" ? option.id === "auto" : preference === option.id;
+              const disabled = option.id !== "2d" && option.id !== "auto" && !webglSupported;
 
               return (
                 <button
@@ -114,7 +143,7 @@ export function QualityToggleHUD() {
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-label={`Graphics mode ${activeMeta.shortLabel}. ${qualityReason}. Click to adjust.`}
-        className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22]/90 px-3.5 py-2 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] backdrop-blur-md transition-all duration-300 hover:border-[#38BDF8] hover:text-[#38BDF8]"
+        className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22]/90 px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] backdrop-blur-md transition-all duration-300 hover:border-[#38BDF8] hover:text-[#38BDF8]"
       >
         {activeId === "2d" ? (
           <Desktop className="h-3.5 w-3.5 text-[#F59E0B]" weight="regular" aria-hidden="true" />

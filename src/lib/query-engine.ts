@@ -94,7 +94,7 @@ export function matchPortfolioQuery(query: string): PortfolioQueryMatch | null {
       .join("; ");
     return {
       answer: `Systems research and clinical builds: ${labSummary}.`,
-      citations: [{ label: "Experience & Research", href: "/#experience" }],
+      citations: [{ label: "Background & Timeline", href: "/#about" }],
     };
   }
 
@@ -110,7 +110,7 @@ export function matchPortfolioQuery(query: string): PortfolioQueryMatch | null {
 
   if (/\b(who\s+is|who\s+are\s+you|about\s+(mehedi|you|him|this)|mehedi|education|brac|university|location|dhaka|thesis|background|bio)\b/i.test(q)) {
     return {
-      answer: `${profile.name} is an ${profile.role} in ${profile.location} (${profile.utc}), pursuing a B.Sc. in Computer Science & Engineering at BRAC University (2022-2026) and interning at FlyRank. Core thesis: "${profile.thesis}"`,
+      answer: `${profile.name} is an ${profile.role} based in ${profile.location}, holding a B.Sc. in Computer Science & Engineering from BRAC University (2026) and interning at FlyRank. Core thesis: "${profile.thesis}"`,
       citations: [{ label: "Background", href: "/#about" }],
     };
   }

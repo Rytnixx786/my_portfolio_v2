@@ -62,6 +62,32 @@ export default async function CaseStudyPage({
   const docsUrl = "docs" in project ? project.docs : undefined;
   const hue = getCategoryHue(project.category);
 
+  const wordCount = [
+    project.description,
+    project.impact,
+    project.methodology,
+    project.challenge,
+    project.approach,
+    ...project.constraints,
+    ...project.tradeoffs,
+    ...project.failures,
+    ...project.lessons,
+    project.nextSteps,
+  ]
+    .join(" ")
+    .trim()
+    .split(/\s+/).length;
+  const readMinutes = Math.max(2, Math.ceil(wordCount / 180));
+
+  const tocItems = [
+    { href: "#benchmarks", label: "Benchmarks" },
+    { href: "#architecture", label: "Architecture" },
+    { href: "#topology", label: "Topology" },
+    { href: "#failures", label: "Failures" },
+    { href: "#implementation", label: "Code" },
+    { href: "#next-steps", label: "Next Steps" },
+  ] as const;
+
   const softwareJsonLd = {
     "@context": "https://schema.org",
     "@type": "SoftwareSourceCode",
@@ -69,7 +95,13 @@ export default async function CaseStudyPage({
     description: project.description,
     codeRepository: project.href,
     programmingLanguage: project.tech,
-    author: { "@type": "Person", name: profile.name, url: profile.url },
+    dateCreated: `${project.year}-01-01`,
+    author: {
+      "@type": "Person",
+      "@id": `${profile.url}/#person`,
+      name: profile.name,
+      url: profile.url,
+    },
     url: `${profile.url}/work/${project.slug}`,
   };
 
@@ -101,7 +133,7 @@ export default async function CaseStudyPage({
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[rgba(240,246,252,0.08)] pb-6 font-mono text-xs uppercase tracking-[0.14em]">
           <Link
             href="/#work"
-            className="inline-flex items-center gap-2 text-[#9DA7B3] transition-colors hover:text-[#38BDF8]"
+            className="inline-flex min-h-[44px] items-center gap-2 text-[#9DA7B3] transition-colors hover:text-[#38BDF8]"
           >
             <ArrowLeft className="h-4 w-4" weight="regular" aria-hidden="true" />
             <span>All systems</span>
@@ -138,7 +170,25 @@ export default async function CaseStudyPage({
             <span className="text-[#8B949E]">
               {project.year} ({project.timeline})
             </span>
+            <span className="text-[#8B949E]" aria-hidden="true">
+              ·
+            </span>
+            <span className="text-[#8B949E] tabular-nums">
+              {readMinutes} min read
+            </span>
           </div>
+
+          <nav aria-label="Case study sections" className="mt-5 flex flex-wrap gap-2">
+            {tocItems.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="inline-flex min-h-[44px] items-center rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22] px-3.5 py-2 font-mono text-xs text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
+              >
+                {item.label}
+              </a>
+            ))}
+          </nav>
 
           <h1 className="mt-5 font-display text-[clamp(2.85rem,8vw,6.2rem)] font-bold uppercase leading-[0.98] tracking-[-0.02em] text-[#E6EDF3]">
             {project.name}
@@ -212,7 +262,7 @@ export default async function CaseStudyPage({
         </header>
 
         {/* Baseline vs Engineered Visual Chart + Reproducibility */}
-        <section className="space-y-6 border-b border-[rgba(240,246,252,0.08)] py-14">
+        <section id="benchmarks" className="scroll-mt-24 space-y-6 border-b border-[rgba(240,246,252,0.08)] py-14">
           <EvalComparisonChart series={project.evalSeries} accentHex={hue.hex} />
 
           <div className="rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22] p-5 sm:p-6">
@@ -234,7 +284,7 @@ export default async function CaseStudyPage({
         </section>
 
         {/* Problem & Architecture */}
-        <section className="grid grid-cols-1 gap-6 border-b border-[rgba(240,246,252,0.08)] py-14 md:grid-cols-2 md:gap-8">
+        <section id="architecture" className="scroll-mt-24 grid grid-cols-1 gap-6 border-b border-[rgba(240,246,252,0.08)] py-14 md:grid-cols-2 md:gap-8">
           <div className="double-bezel-outer">
             <div className="double-bezel-core h-full p-6 sm:p-8">
               <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#38BDF8]">
@@ -294,7 +344,7 @@ export default async function CaseStudyPage({
         </section>
 
         {/* Interactive Topology */}
-        <section className="border-b border-[rgba(240,246,252,0.08)] py-14">
+        <section id="topology" className="scroll-mt-24 border-b border-[rgba(240,246,252,0.08)] py-14">
           <div className="mb-8 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
             <div>
               <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#38BDF8]">
@@ -315,7 +365,7 @@ export default async function CaseStudyPage({
         </section>
 
         {/* What I Got Wrong + Engineering Lessons */}
-        <section className="border-b border-[rgba(240,246,252,0.08)] py-14">
+        <section id="failures" className="scroll-mt-24 border-b border-[rgba(240,246,252,0.08)] py-14">
           <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#F59E0B]">
             Failure Analysis &amp; Lessons
           </p>
@@ -351,10 +401,22 @@ export default async function CaseStudyPage({
               </li>
             ))}
           </ol>
+
+          <div
+            id="next-steps"
+            className="scroll-mt-24 mt-8 rounded-2xl border border-[#38BDF8]/25 bg-[#38BDF8]/[0.06] p-6"
+          >
+            <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#7DD3FC]">
+              If I Did It Again &middot; Next Steps
+            </p>
+            <p className="mt-2.5 max-w-[68ch] font-sans text-sm leading-relaxed text-[#E6EDF3] sm:text-base">
+              {project.nextSteps}
+            </p>
+          </div>
         </section>
 
         {/* Server-Side Shiki Highlighted Snippet */}
-        <section className="border-b border-[rgba(240,246,252,0.08)] py-14">
+        <section id="implementation" className="scroll-mt-24 border-b border-[rgba(240,246,252,0.08)] py-14">
           <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#38BDF8]">
             Core Implementation
           </p>

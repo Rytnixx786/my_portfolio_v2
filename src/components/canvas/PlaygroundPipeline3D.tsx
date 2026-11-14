@@ -573,7 +573,7 @@ export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {
       </ViewportCanvas>
 
       {canRender3D && (
-        <span className="pointer-events-none absolute bottom-2.5 right-3 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/85 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[#8B949E] backdrop-blur-md">
+        <span className="pointer-events-none absolute bottom-2.5 right-3 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/85 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.1em] text-[#8B949E] backdrop-blur-md">
           Drag to orbit · +/- or click &amp; scroll to zoom · Click station
         </span>
       )}

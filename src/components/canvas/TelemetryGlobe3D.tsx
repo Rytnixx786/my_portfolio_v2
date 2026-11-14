@@ -395,15 +395,14 @@ function Globe2DFallback({
 
   return (
     <div className="relative flex h-full w-full items-center justify-center bg-[#0D1117] px-3 pb-12 pt-9">
-      <span className="pointer-events-none absolute right-2.5 top-2.5 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B949E]">
+      <span className="pointer-events-none absolute right-2.5 top-2.5 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E]">
         2D Safe · Graticule
       </span>
 
       <svg
         viewBox="0 0 320 200"
         className="h-full max-h-[205px] w-full select-none"
-        role="img"
-        aria-label="Dhaka global latency telemetry map"
+        aria-hidden="true"
       >
         <defs>
           <clipPath id="globe2d-clip">
@@ -532,7 +531,7 @@ function Globe2DFallback({
                 y={region.svgPos.y - 10}
                 textAnchor="middle"
                 fill={isSelected ? "#E6EDF3" : "#9DA7B3"}
-                fontSize="9"
+                fontSize="11"
                 fontWeight={isSelected ? "700" : "500"}
                 fontFamily="var(--font-mono), monospace"
               >

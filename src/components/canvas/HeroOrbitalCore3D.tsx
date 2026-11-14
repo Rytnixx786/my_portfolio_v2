@@ -444,6 +444,8 @@ function HeroOrbital2DFallback({
     const stage = stageRef.current;
     if (!stage) return;
 
+    const prefersReducedMotion =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const finePointer =
       window.matchMedia?.("(hover: hover) and (pointer: fine)").matches ?? false;
 
@@ -490,6 +492,14 @@ function HeroOrbital2DFallback({
     };
 
     positionBeacons(theta);
+
+    if (prefersReducedMotion) {
+      const onResize = () => positionBeacons(theta);
+      window.addEventListener("resize", onResize, { passive: true });
+      return () => {
+        window.removeEventListener("resize", onResize);
+      };
+    }
 
     const tick = (now: number) => {
       const dt = Math.min((now - lastTs) / 1000, 0.05);
@@ -560,7 +570,7 @@ function HeroOrbital2DFallback({
         style={{ backgroundColor: active.hue }}
       />
 
-      {/* Back-Half Orbital Arcs (z-[4] — passes cleanly BEHIND portrait) */}
+      {/* Back-Half Orbital Arcs (z-[4] - passes cleanly BEHIND portrait) */}
       <svg
         viewBox="0 0 440 360"
         className="pointer-events-none absolute inset-0 z-[4] h-full w-full"
@@ -607,7 +617,7 @@ function HeroOrbital2DFallback({
         </div>
       </div>
 
-      {/* Front-Half Orbital Arcs (z-[20] — wraps cleanly IN FRONT of lower portrait) */}
+      {/* Front-Half Orbital Arcs (z-[20] - wraps cleanly IN FRONT of lower portrait) */}
       <svg
         viewBox="0 0 440 360"
         className="pointer-events-none absolute inset-0 z-[20] h-full w-full"
@@ -666,12 +676,12 @@ function HeroOrbital2DFallback({
               left: "50%",
               top: "50%",
             }}
-            className="group absolute flex h-9 w-9 items-center justify-center rounded-full focus-visible:outline-none"
+            className="group absolute flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none"
           >
             {/* Tilted Outer Gimbal Ring */}
             <span
               aria-hidden="true"
-              className="absolute inset-0 rounded-full border transition-all duration-200"
+              className="absolute inset-1 rounded-full border transition-all duration-200"
               style={{
                 borderColor: sys.hue,
                 opacity: isActive ? 0.92 : isHovered ? 0.78 : 0.52,
@@ -691,7 +701,7 @@ function HeroOrbital2DFallback({
             {/* Compact Micro-Tag on Active / Hover */}
             {(isActive || isHovered) && (
               <span
-                className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border bg-[#0D1117]/95 px-2 py-0.5 font-mono text-[10px] font-semibold text-[#E6EDF3] shadow-lg backdrop-blur-md"
+                className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border bg-[#0D1117]/95 px-2.5 py-0.5 font-mono text-xs font-semibold text-[#E6EDF3] shadow-lg backdrop-blur-md"
                 style={{ borderColor: `${sys.hue}66` }}
               >
                 {sys.label}
@@ -702,7 +712,7 @@ function HeroOrbital2DFallback({
       })}
 
       {/* 2D Safe Indicator positioned top-right away from bottom-right HUD pill */}
-      <span className="pointer-events-none absolute right-3 top-3 z-30 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117]/88 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B949E] backdrop-blur-md">
+      <span className="pointer-events-none absolute right-3 top-3 z-30 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117]/88 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E] backdrop-blur-md">
         2D Safe
       </span>
     </div>

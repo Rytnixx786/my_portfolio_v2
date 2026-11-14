@@ -29,20 +29,20 @@ export const projects = [
     services: ["LLM Serving", "Async Gateway", "FinOps Control"],
     eyebrow: "Self-hosted LLM serving gateway",
     description:
-      "A 14-stage asynchronous FastAPI gateway & AWQ Marlin INT4 serving layer for Qwen2.5-7B on 8 GB VRAM GPUs with sub-5ms semantic caching, Kubernetes HPA, and per-tenant token cutoffs.",
+      "An 8-stage asynchronous FastAPI gateway & AWQ Marlin INT4 serving layer for Qwen2.5-7B on an 8 GB VRAM card with sub-5ms CPU semantic caching, k3d gateway HPA, and per-tenant token cutoffs.",
     impact:
-      "10.86x throughput speedup (30.48 -> 331.0 tok/s), 4.12ms ONNX semantic cache hits (0W GPU), 45.56ms circuit breaker fast-fail, and 195 deterministic CI tests.",
+      "10.86x throughput speedup (30.48 -> 331.0 tok/s vs CPU-offloaded FP16 on 8 GB VRAM), 4.12ms ONNX semantic cache hits (zero GPU compute), 45.56ms breaker fast-fail, and 195 CI tests.",
     methodology:
-      "Benchmarked Qwen2.5-7B-Instruct on an 8 GB VRAM workstation GPU comparing FP16 baseline (30.48 tok/s) against AWQ Marlin W4A16 INT4 with prefix caching, plus k3d 2-to-6 replica HPA scaling and pytest fault injection.",
+      "Benchmarked Qwen2.5-7B-Instruct on an 8 GB VRAM GPU comparing CPU-offloaded FP16 baseline (30.48 tok/s) against AWQ Marlin W4A16 INT4 with prefix caching, k3d gateway HPA scaling (2 to 6 gateway pods), and pytest fault injection.",
     reproduceCmd: "pytest tests/ -v --cov=gateway && python scripts/bench_throughput.py --quant awq_marlin",
     constraints: [
-      "8 GB consumer VRAM ceiling forcing strict 4.2 GiB weights budget plus KV cache headroom",
+      "8 GB consumer VRAM card (~4.2 GiB INT4 weights plus activations/KV cache headroom)",
       "Sub-50ms failure isolation requirement so worker OOM crashes never hang downstream callers for 30s",
       "Strict EBNF JSON grammar repair required on 7B parameters for deterministic tool calling",
     ],
     tradeoffs: [
-      "Selected in-process CPU ONNX embeddings + TF-IDF cache over external Redis vector search, trading cluster-wide cache sharing on single-node replicas for a 4.12ms hit path with zero GPU wattage.",
-      "Used AWQ Marlin W4A16 quantization instead of FP16 tensor parallelism, accepting slight perplexity drift in exchange for 10.86x throughput on 8 GB VRAM.",
+      "Selected in-process CPU ONNX embeddings + TF-IDF cache over external Redis vector search, trading cluster-wide cache sharing on single-node replicas for a 4.12ms hit path with zero GPU compute.",
+      "Used AWQ Marlin W4A16 quantization instead of FP16 tensor parallelism, accepting slight perplexity drift in exchange for 10.86x batched throughput vs CPU-offloaded FP16 on 8 GB VRAM.",
     ],
     failures: [
       "Early semantic cache threshold of cosine >= 0.85 triggered false hits on negated follow-up prompts; raised threshold to >= 0.92 and gated cache bypass on system-prompt hashes.",
@@ -66,15 +66,15 @@ export const projects = [
     challenge:
       "Serving self-hosted LLMs across multi-tenant callers exposes raw vLLM processes to cascading failure: GPU OOM panics stall sockets for 30 seconds, paraphrased prompts burn redundant KV cache cycles, and unguarded JSON generation breaks downstream tool parsers.",
     approach:
-      "Engineered Cinch as a 14-stage async FastAPI control plane around AWQ Marlin INT4 workers. Built an in-process ONNX semantic vector cache (cosine >= 0.92) returning exact/paraphrased hits in 4.12ms at 0W GPU, a 3-state circuit breaker FSM isolating panics in 45.56ms (HTTP 503) with canary recovery probes, micro-dollar FinOps cutoffs (HTTP 402), EBNF grammar repair, and k3d HPA autoscaling.",
+      "Engineered Cinch as an 8-stage async FastAPI control plane around AWQ Marlin INT4 workers. Built an in-process ONNX semantic vector cache (cosine >= 0.92) returning exact/paraphrased hits in 4.12ms without GPU compute, a 3-state circuit breaker FSM isolating panics in 45.56ms (HTTP 503) with canary recovery probes, micro-dollar FinOps cutoffs (HTTP 402), EBNF grammar repair, and k3d gateway HPA autoscaling.",
     architecture: {
       nodes: [
         { id: "circuit_breaker", label: "Circuit Breaker FSM", desc: "45.56ms fast-fail with single-flight canary probe recovery" },
         { id: "finops_gate", label: "FinOps Budget Gate", desc: "Pre-flight micro-dollar token cutoff returning HTTP 402" },
         { id: "guardrails", label: "PII & Input Filter", desc: "Regex & heuristic scanner redacting keys before GPU dispatch" },
-        { id: "semantic_cache", label: "ONNX Semantic Cache", desc: "CPU cosine >= 0.92 vector lookup in 4.12ms (0W GPU)" },
-        { id: "rate_limiter", label: "PID Admission Queue", desc: "60 RPM / 50k TPM sliding window with priority scheduling" },
-        { id: "vllm_engine", label: "vLLM Marlin Engine", desc: "INT4 W4A16 GEMM inference for Qwen2.5-7B in 4.2 GiB VRAM" },
+        { id: "semantic_cache", label: "ONNX Semantic Cache", desc: "CPU cosine >= 0.92 vector lookup in 4.12ms (zero GPU compute)" },
+        { id: "rate_limiter", label: "Admission Queue", desc: "60 RPM / 50k TPM sliding-window priority scheduler" },
+        { id: "vllm_engine", label: "vLLM Marlin Engine", desc: "INT4 W4A16 inference for Qwen2.5-7B on 8 GB VRAM (~4.2 GiB weights)" },
         { id: "tool_engine", label: "Sandboxed Executor", desc: "Isolated EBNF-repaired Python & SQL tool execution loop" },
         { id: "shadow_replayer", label: "Shadow Replayer", desc: "5% async candidate traffic capture with divergence scoring" },
       ],
@@ -95,7 +95,7 @@ export const projects = [
       "Combining prefix caching with AWQ Marlin W4A16 cut Time-To-First-Token by 4.87x alongside a 10.86x raw generation speedup.",
     ],
     codeLanguage: "python",
-    codeSnippet: `# Cinch: Async Circuit Breaker FSM & Canary Recovery (gateway/circuit_breaker.py)
+    codeSnippet: `# Cinch: Circuit Breaker FSM & Canary Recovery (actual excerpt, gateway/circuit_breaker.py)
 import time
 from enum import Enum
 from typing import Optional, Tuple
@@ -148,6 +148,8 @@ class CircuitBreaker:
         self.canary_in_flight = False
         if self.consecutive_failures >= self.failure_threshold:
             self.state = BreakerState.OPEN`,
+    nextSteps:
+      "Add GPU-node sidecar Redis vector cache syncing for multi-node cluster scaling and benchmark AWQ Marlin against FP8 on RTX 4090.",
   },
   {
     slug: "nexus-researcher",
@@ -161,7 +163,7 @@ class CircuitBreaker:
     services: ["LangGraph Orchestration", "SSE Replay", "Postgres Checkpointing"],
     eyebrow: "Stateful multi-agent research engine",
     description:
-      "An 8-node LangGraph workflow combining four-stage hybrid retrieval (Tavily -> BM25 -> RRF -> cross-encoder rerank), human-in-the-loop query approval, and resumable Last-Event-ID SSE streams.",
+      "A 7-node LangGraph workflow combining four-stage hybrid retrieval (Tavily -> BM25 -> RRF -> cross-encoder rerank), human-in-the-loop query approval, and resumable Last-Event-ID SSE streams.",
     impact:
       "8.05 req/s sustained API throughput, 91% adversarial refusal accuracy, 122 passing backend tests, and 5 documented architectural decision records.",
     methodology:
@@ -189,7 +191,7 @@ class CircuitBreaker:
       { value: "8.05 req/s", label: "Sustained Throughput" },
       { value: "91%", label: "Refusal Accuracy" },
       { value: "122", label: "Passing Tests (5 ADRs)" },
-      { value: "8 Nodes", label: "LangGraph StateGraph" },
+      { value: "7 Nodes", label: "LangGraph StateGraph" },
     ],
     tech: ["LangGraph", "FastAPI", "PostgreSQL", "Redis", "SSE", "React"],
     href: "https://github.com/Rytnixx786/Nexus",
@@ -198,7 +200,7 @@ class CircuitBreaker:
     challenge:
       "Single-pass research agents break silently on bad search formulations, waste tokens scraping boilerplate pages, and synthesize fabricated claims whenever retrieved sources contradict or lack proof.",
     approach:
-      "Designed an 8-node LangGraph StateGraph separating Planning, Query Formulation, Human Approval interrupt, rate-limited Parallel Scraping (Tavily -> BM25 -> RRF -> cross-encoder rerank), Refusal Calibration, and Citation Synthesis. State persists in PostgreSQL via AsyncPostgresSaver so disconnected SSE streams resume via Last-Event-ID.",
+      "Designed a 7-node LangGraph StateGraph separating Planning, Query Formulation, Human Approval interrupt, rate-limited Parallel Scraping, Hybrid Reranking (BM25 -> RRF -> cross-encoder), Refusal Calibration, and Citation Synthesis. State persists in PostgreSQL via AsyncPostgresSaver so disconnected SSE streams resume via Last-Event-ID.",
     architecture: {
       nodes: [
         { id: "planner", label: "Research Planner", desc: "Deconstructs user prompt into verifiable sub-topics" },
@@ -224,7 +226,7 @@ class CircuitBreaker:
       "A Redis token-bucket limiter synced across worker tasks eliminated external host 429 throttling under concurrent load.",
     ],
     codeLanguage: "python",
-    codeSnippet: `# Nexus Researcher: LangGraph Stateful Multi-Agent Workflow (backend/graph/workflow.py)
+    codeSnippet: `# Nexus Researcher: Simplified 7-Node StateGraph Topology (backend/graph/workflow.py)
 from typing import TypedDict, List, Dict, Any
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -242,6 +244,7 @@ workflow.add_node("planner", plan_research_subtopics)
 workflow.add_node("query_generator", generate_focused_queries)
 workflow.add_node("human_approval", hitl_checkpoint_node)
 workflow.add_node("parallel_scraper", scrape_with_rate_limits)
+workflow.add_node("extractor", hybrid_rerank_documents)
 workflow.add_node("refusal_check", evaluate_groundedness_score)
 workflow.add_node("synthesizer", compile_citation_dossier)
 
@@ -252,15 +255,19 @@ workflow.add_conditional_edges(
     "human_approval",
     lambda state: "parallel_scraper" if state["is_approved"] else "planner",
 )
-workflow.add_edge("parallel_scraper", "refusal_check")
+workflow.add_edge("parallel_scraper", "extractor")
+workflow.add_edge("extractor", "refusal_check")
 workflow.add_conditional_edges(
     "refusal_check",
     lambda state: "synthesizer" if state["groundedness_score"] >= 0.85 else "planner",
 )
 workflow.add_edge("synthesizer", END)
 
-# Compile with PostgreSQL checkpointer for Last-Event-ID resumable SSE replay
-app = workflow.compile(checkpointer=AsyncPostgresSaver(connection_pool))`,
+async def compile_graph(db_uri: str):
+    async with AsyncPostgresSaver.from_conn_string(db_uri) as checkpointer:
+        return workflow.compile(checkpointer=checkpointer)`,
+    nextSteps:
+      "Add multi-provider search fallback beyond Tavily and automate end-to-end replay stress benchmarks across dropped WebSocket/SSE clients.",
   },
   {
     slug: "ares",
@@ -369,6 +376,8 @@ class RulesEngine:
             failures=failures,
             narrative=self._build_narrative(candidate, champion, failures),
         )`,
+    nextSteps:
+      "Add OpenTelemetry span attributes for every rejected slice floor and automate golden dataset drift snapshots in GitHub Releases.",
   },
   {
     slug: "mindstack",
@@ -384,9 +393,9 @@ class RulesEngine:
     description:
       "An evidence-only document Q&A engine fusing ChromaDB vectors with BM25 lexical search via Reciprocal Rank Fusion (k = 60), cross-encoder reranking, and an NLI refusal classifier.",
     impact:
-      "Measured 95% factual QA groundedness and raised adversarial unanswerable refusal accuracy from 26.67% to 66.67% under CI evaluation suites.",
+      "Measured 95% factual QA groundedness and raised adversarial unanswerable refusal accuracy from 4/15 (26.67%) to 10/15 (66.67%, n = 15) under CI evaluation suites.",
     methodology:
-      "Measured using CI-backed adversarial QA suites comparing baseline un-gated vector retrieval against RRF (k = 60) plus NLI entailment gating and cross-encoder reranking.",
+      "Measured using CI-backed adversarial QA suites comparing baseline un-gated vector retrieval against RRF (k = 60) plus NLI entailment gating (>= 0.70) and cross-encoder reranking.",
     reproduceCmd: "docker compose up --build -d && pytest evals/adversarial_suite.py",
     constraints: [
       "Exact code identifiers and error strings frequently miss pure embedding nearest-neighbor search",
@@ -452,11 +461,13 @@ def reciprocal_rank_fusion(dense_results, sparse_results, doc_map, k: int = 60):
     ranked = sorted(fused_scores.items(), key=lambda item: item[1], reverse=True)
     return [doc_map[doc_id] for doc_id, _ in ranked[:5]]
 
-def check_groundedness(query: str, retrieved_chunks: list[str], nli_model) -> bool:
-    entailment_score = nli_model.predict(query, retrieved_chunks)
+def check_groundedness(answer_draft: str, retrieved_chunks: list[str], nli_model) -> bool:
+    entailment_score = nli_model.predict(answer_draft, retrieved_chunks)
     if entailment_score < 0.70:
         raise RefusalException("Insufficient supporting evidence in indexed sources.")
     return True`,
+    nextSteps:
+      "Expand the adversarial QA eval corpus from n = 15 to 200+ paired edge cases and add parent-chunk citation span highlighting.",
   },
   {
     slug: "offboarder",
@@ -526,6 +537,12 @@ def check_groundedness(query: str, retrieved_chunks: list[str], nli_model) -> bo
     ],
     codeLanguage: "typescript",
     codeSnippet: `// OFFBoarder: Segregation of Duties Guard (src/lib/middleware/sod.ts)
+export class SodViolationError extends Error {
+  constructor(message: string, public readonly status: 401 | 403 | 404) {
+    super(message);
+  }
+}
+
 export async function enforceSegregationOfDuties(
   prisma: PrismaClient,
   taskId: string,
@@ -535,21 +552,24 @@ export async function enforceSegregationOfDuties(
     where: { id: taskId, tenantId: actor.tenantId },
   });
 
-  if (!task) throw new NotFoundError("Offboarding task not found.");
+  if (!task) throw new SodViolationError("Offboarding task not found.", 404);
 
   // Creator of the offboarding request cannot approve their own action
   if (task.creatorId === actor.id) {
-    throw new ForbiddenError(
-      "Segregation of Duties violated: creators cannot self-approve tasks."
+    throw new SodViolationError(
+      "Segregation of Duties violated: creators cannot self-approve tasks.",
+      403
     );
   }
 
   if (!actor.roles.includes("SEC_OFFICER")) {
-    throw new UnauthorizedError("Security officer approval required.");
+    throw new SodViolationError("Security officer approval required.", 401);
   }
 
   return task;
 }`,
+    nextSteps:
+      "Add SCIM 2.0 webhook adapters for Okta/Google Workspace deprovisioning and automate PostgreSQL RLS tenant-boundary fuzzing in CI.",
   },
   {
     slug: "masheba-ai",
@@ -575,7 +595,7 @@ export async function enforceSegregationOfDuties(
     ],
     tradeoffs: [
       "Exported XGBoost triage directly to ONNX on-device instead of cloud scoring so high-risk vital signs flag instantaneously without connectivity.",
-      "Used client-generated UUID v4 identifiers plus microsecond logical clocks to merge offline writes without server round-trips.",
+      "Used client-generated UUID v4 identifiers plus per-device microsecond wall timestamps (created_us) to avoid primary-key collisions without server round-trips.",
     ],
     failures: [
       "Sequential integer IDs caused primary-key collisions across disconnected devices; migrated cleanly to UUID v4 keys.",
@@ -641,6 +661,8 @@ export async function flushSyncQueue(db: SQLiteDatabase, endpoint: string) {
   const placeholders = ids.map(() => "?").join(", ");
   await db.runAsync(\`DELETE FROM sync_queue WHERE id IN (\${placeholders})\`, ids);
 }`,
+    nextSteps:
+      "Add end-to-end conflict replay tests for overlapping rural household edits and expose ONNX model quantization diffs per Android ABI.",
   },
 ] as const;
 

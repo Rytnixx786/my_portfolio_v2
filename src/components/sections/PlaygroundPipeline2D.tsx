@@ -58,7 +58,7 @@ export function PlaygroundPipeline2D({
   const animDur = `${Math.max(0.8, 2.1 / Math.max(0.5, rpsMultiplier)).toFixed(2)}s`;
 
   const scenarioAnnotation = isCacheBypass
-    ? "ONNX Cache Hit · Bypassing 05–06 (0W GPU)"
+    ? "ONNX Cache Hit · Bypassing 05-06 (0 GPU Compute)"
     : isFaultTrip
       ? scenarioId === "breaker-open"
         ? "Breaker Tripped OPEN at 01 · Fast-Fail 503"
@@ -86,7 +86,7 @@ export function PlaygroundPipeline2D({
 
       {/* Top HUD Metadata Row */}
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-3 py-1 font-mono text-[11px] text-[#E6EDF3]">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-3 py-1 font-mono text-xs text-[#E6EDF3]">
           <span
             className="h-2 w-2 rounded-full"
             style={{ backgroundColor: statusColor }}
@@ -95,7 +95,7 @@ export function PlaygroundPipeline2D({
           <span>{scenarioAnnotation}</span>
         </div>
 
-        <span className="rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B949E]">
+        <span className="rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-1 font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E]">
           2D Safe · Vector Trace · {rpsMultiplier.toFixed(1)}x
         </span>
       </div>
@@ -105,8 +105,7 @@ export function PlaygroundPipeline2D({
         <svg
           viewBox="0 0 900 210"
           className="h-full max-h-[205px] w-full select-none"
-          role="img"
-          aria-label={`${tab === "cinch" ? "Cinch Gateway" : "RAG Refusal Gate"} 2D pipeline execution trace`}
+          aria-hidden="true"
         >
           <defs>
             <filter id="pg-glow" x="-20%" y="-20%" width="140%" height="140%">
@@ -322,8 +321,8 @@ export function PlaygroundPipeline2D({
                 <text
                   x="-38"
                   y="-5"
-                  fill={isActive ? statusColor : "#6E7681"}
-                  fontSize="10"
+                  fill={isActive ? statusColor : "#8B949E"}
+                  fontSize="11"
                   fontWeight="700"
                   fontFamily="var(--font-mono), monospace"
                 >
@@ -342,7 +341,7 @@ export function PlaygroundPipeline2D({
                   y="13"
                   textAnchor="middle"
                   fill={isActive ? "#E6EDF3" : "#8B949E"}
-                  fontSize="10.5"
+                  fontSize="11"
                   fontWeight="600"
                   fontFamily="var(--font-sans), sans-serif"
                 >
@@ -355,7 +354,7 @@ export function PlaygroundPipeline2D({
       </div>
 
       {/* Bottom Interactive Hint */}
-      <div className="relative z-10 flex items-center justify-between font-mono text-[11px] text-[#8B949E]">
+      <div className="relative z-10 flex items-center justify-between font-mono text-xs text-[#8B949E]">
         <span>Click any stage node to inspect contract</span>
         <span className="tabular-nums text-[#9DA7B3]">
           {activeStages.length}/{stages.length} stations active

@@ -128,6 +128,24 @@ function jsonReply(
   });
 }
 
+function buildGeminiPayload(message: string) {
+  return JSON.stringify({
+    contents: [{ parts: [{ text: `<user_query>\n${message}\n</user_query>` }] }],
+    systemInstruction: { parts: [{ text: buildSystemInstruction() }] },
+    safetySettings: [
+      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
+    ],
+    generationConfig: {
+      temperature: 0.2,
+      maxOutputTokens: 280,
+      thinkingConfig: { thinkingBudget: 0 },
+    },
+  });
+}
+
 export async function POST(request: Request) {
   const ip = getClientIp(request);
   const rate = isRateLimited(ip);
@@ -189,29 +207,25 @@ export async function POST(request: Request) {
     });
   }
 
+  const citations: QueryCitation[] = [{ label: "Selected Work", href: "/#work" }];
+
   try {
-    const res = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        signal: AbortSignal.timeout(8000),
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `<user_query>\n${message}\n</user_query>` }] }],
-          systemInstruction: { parts: [{ text: buildSystemInstruction() }] },
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 280,
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
-      }
-    );
+    const endpoint = wantsStream
+      ? "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+      : "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      signal: AbortSignal.timeout(8500),
+      body: buildGeminiPayload(message),
+    });
 
     if (!res.ok) {
+      console.error("[/api/query] Gemini HTTP error:", res.status, res.statusText);
       const fallback = fallbackPortfolioMatch(message);
       if (wantsStream) {
         return sseResponse(fallback.answer, "fallback", fallback.citations);
@@ -223,9 +237,109 @@ export async function POST(request: Request) {
       });
     }
 
+    if (wantsStream && res.body) {
+      const upstreamBody = res.body;
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+      const fallback = fallbackPortfolioMatch(message);
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          const reader = upstreamBody.getReader();
+          let buffer = "";
+          let fullText = "";
+
+          controller.enqueue(
+            encoder.encode(
+              `event: meta\ndata: ${JSON.stringify({ source: "gemini", citations })}\n\n`
+            )
+          );
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n");
+              buffer = lines.pop() ?? "";
+
+              for (const rawLine of lines) {
+                const line = rawLine.trim();
+                if (!line.startsWith("data:")) continue;
+                const jsonStr = line.slice(5).trim();
+                if (!jsonStr || jsonStr === "[DONE]") continue;
+                try {
+                  const parsed = JSON.parse(jsonStr) as GeminiResponse;
+                  const cand = parsed.candidates?.[0];
+                  if (cand?.finishReason && cand.finishReason !== "STOP") {
+                    console.warn("[/api/query] Gemini finishReason:", cand.finishReason);
+                  }
+                  const chunkText =
+                    cand?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+                  if (chunkText) {
+                    fullText += chunkText;
+                    controller.enqueue(
+                      encoder.encode(
+                        `event: chunk\ndata: ${JSON.stringify({ chunk: chunkText })}\n\n`
+                      )
+                    );
+                  }
+                } catch {
+                  // Ignore partial JSON frames across chunk boundaries
+                }
+              }
+            }
+          } catch (streamErr) {
+            console.error("[/api/query] Gemini stream read error:", streamErr);
+          } finally {
+            if (!fullText.trim()) {
+              controller.enqueue(
+                encoder.encode(
+                  `event: chunk\ndata: ${JSON.stringify({ chunk: fallback.answer })}\n\n`
+                )
+              );
+              controller.enqueue(
+                encoder.encode(
+                  `event: done\ndata: ${JSON.stringify({
+                    text: fallback.answer,
+                    source: "fallback",
+                    citations: fallback.citations,
+                  })}\n\n`
+                )
+              );
+            } else {
+              controller.enqueue(
+                encoder.encode(
+                  `event: done\ndata: ${JSON.stringify({
+                    text: fullText.trim(),
+                    source: "gemini",
+                    citations,
+                  })}\n\n`
+                )
+              );
+            }
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(stream, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-store, max-age=0",
+          Connection: "keep-alive",
+        },
+      });
+    }
+
     const data = (await res.json()) as GeminiResponse;
+    const candidate = data.candidates?.[0];
+    if (candidate?.finishReason && candidate.finishReason !== "STOP") {
+      console.warn("[/api/query] Gemini finishReason:", candidate.finishReason);
+    }
     const text =
-      data.candidates?.[0]?.content?.parts
+      candidate?.content?.parts
         ?.map((part) => part.text ?? "")
         .join("")
         .trim() ?? "";
@@ -242,12 +356,12 @@ export async function POST(request: Request) {
       });
     }
 
-    const citations: QueryCitation[] = [{ label: "Selected Work", href: "/#work" }];
     if (wantsStream) {
       return sseResponse(text, "gemini", citations);
     }
     return jsonReply({ text, source: "gemini", citations });
-  } catch {
+  } catch (err) {
+    console.error("[/api/query] Gemini request failed:", err);
     const fallback = fallbackPortfolioMatch(message);
     if (wantsStream) {
       return sseResponse(fallback.answer, "fallback", fallback.citations);

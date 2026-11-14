@@ -5,6 +5,14 @@ import { useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Cpu, GitBranch, Lightning, Sliders } from "@phosphor-icons/react";
 import type { PlaygroundCameraPreset } from "@/components/canvas/PlaygroundPipeline3D";
+import {
+  CINCH_SCENARIOS,
+  CINCH_STAGES,
+  RAG_SCENARIOS,
+  RAG_STAGES,
+  type SimulatorTab,
+} from "@/data/playground";
+import { KineticHeading, ScrambleMetric } from "@/components/motion/KineticText";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { PlaygroundPipeline2D } from "./PlaygroundPipeline2D";
 import { SectionReveal } from "./SectionReveal";
@@ -23,185 +31,6 @@ const LazyPlaygroundPipeline3D = dynamic(
     ),
   }
 );
-
-type SimulatorTab = "cinch" | "rag";
-
-interface ScenarioSpec {
-  id: string;
-  label: string;
-  trigger: string;
-  statusColor: "#10B981" | "#38BDF8" | "#F59E0B" | "#EF4444";
-  statusCode: string;
-  baseLatencyMs: number;
-  latencyLabel: string;
-  vramOrCost: string;
-  activeStages: string[];
-  summary: string;
-  payload: Record<string, string | number | boolean>;
-}
-
-const CINCH_STAGES = [
-  { id: "breaker", label: "01 Breaker FSM" },
-  { id: "finops", label: "02 FinOps Gate" },
-  { id: "pii", label: "03 PII Guard" },
-  { id: "cache", label: "04 ONNX Cache" },
-  { id: "limiter", label: "05 PID Limiter" },
-  { id: "vllm", label: "06 vLLM Marlin" },
-] as const;
-
-const CINCH_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
-  {
-    id: "cache-hit",
-    label: "Duplicate Query",
-    trigger: "cosine >= 0.92",
-    statusColor: "#10B981",
-    statusCode: "200 CACHE_HIT",
-    baseLatencyMs: 4.12,
-    latencyLabel: "4.12 ms",
-    vramOrCost: "0 W GPU",
-    activeStages: ["breaker", "finops", "pii", "cache"],
-    summary:
-      "CPU ONNX vector cache hits at cosine >= 0.92, returning in 4.12 ms with zero GPU load.",
-    payload: {
-      route: "POST /v1/chat/completions",
-      cache_hit: true,
-      cosine_similarity: 0.946,
-      ttft_ms: 4.12,
-      gpu_power_watts: 0,
-      status: 200,
-    },
-  },
-  {
-    id: "cold-vllm",
-    label: "Cold Generation",
-    trigger: "AWQ Marlin INT4",
-    statusColor: "#38BDF8",
-    statusCode: "200 STREAM",
-    baseLatencyMs: 142,
-    latencyLabel: "331.0 tok/s",
-    vramOrCost: "4.2 GiB VRAM",
-    activeStages: ["breaker", "finops", "pii", "cache", "limiter", "vllm"],
-    summary:
-      "PID limiter schedules Qwen2.5-7B AWQ Marlin INT4 at 331.0 tok/s with grammar-repaired JSON.",
-    payload: {
-      model: "Qwen2.5-7B-Instruct-AWQ",
-      quantization: "Marlin W4A16 INT4",
-      throughput_tok_s: 331.0,
-      speedup_vs_fp16: "10.86x",
-      status: 200,
-    },
-  },
-  {
-    id: "breaker-open",
-    label: "Worker OOM",
-    trigger: "3 panics in window",
-    statusColor: "#EF4444",
-    statusCode: "503 BREAKER_OPEN",
-    baseLatencyMs: 45.56,
-    latencyLabel: "45.56 ms",
-    vramOrCost: "Canary Probe 10s",
-    activeStages: ["breaker"],
-    summary:
-      "Breaker trips OPEN after 3 worker panics, failing fast in 45.56 ms instead of 30s hangs.",
-    payload: {
-      breaker_state: "OPEN -> HALF_OPEN",
-      fast_fail_ms: 45.56,
-      recovery_window_s: 10,
-      canary_in_flight: false,
-      status: 503,
-    },
-  },
-  {
-    id: "budget-cutoff",
-    label: "Quota Exhausted",
-    trigger: "tenant_spend >= cap",
-    statusColor: "#F59E0B",
-    statusCode: "402 BUDGET_CAP",
-    baseLatencyMs: 1.8,
-    latencyLabel: "1.80 ms",
-    vramOrCost: "0 Tokens Burned",
-    activeStages: ["breaker", "finops"],
-    summary:
-      "Pre-flight FinOps gate rejects capped tenants with HTTP 402 before GPU allocation.",
-    payload: {
-      tenant_id: "org_enterprise_04",
-      budget_usd: 25.0,
-      spent_usd: 25.004,
-      action: "HTTP_402_HARD_CUTOFF",
-      status: 402,
-    },
-  },
-];
-
-const RAG_STAGES = [
-  { id: "bm25", label: "01 BM25 Sparse" },
-  { id: "dense", label: "02 ChromaDB Dense" },
-  { id: "rrf", label: "03 RRF k=60" },
-  { id: "rerank", label: "04 Cross-Encoder" },
-  { id: "nli", label: "05 NLI Gate" },
-  { id: "synth", label: "06 Cited SSE" },
-] as const;
-
-const RAG_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
-  {
-    id: "grounded-pass",
-    label: "Verified Evidence",
-    trigger: "entailment >= 0.85",
-    statusColor: "#10B981",
-    statusCode: "200 CITED_PASS",
-    baseLatencyMs: 620,
-    latencyLabel: "95% Grounded",
-    vramOrCost: "RRF k=60 + NLI",
-    activeStages: ["bm25", "dense", "rrf", "rerank", "nli", "synth"],
-    summary:
-      "BM25 + dense vectors fuse via RRF (k=60), pass rerank + NLI check, and stream cited SSE tokens.",
-    payload: {
-      rrf_constant_k: 60,
-      groundedness_score: 0.95,
-      nli_entailment: 0.91,
-      citations_attached: 4,
-      decision: "SYNTHESIZE_WITH_CITATIONS",
-    },
-  },
-  {
-    id: "nli-refusal",
-    label: "Conflicting Sources",
-    trigger: "entailment < 0.70",
-    statusColor: "#EF4444",
-    statusCode: "200 REFUSAL_GATE",
-    baseLatencyMs: 410,
-    latencyLabel: "91% Refusal Acc",
-    vramOrCost: "Aborted Safely",
-    activeStages: ["bm25", "dense", "rrf", "rerank", "nli"],
-    summary:
-      "Pre-generation NLI classifier catches low entailment and aborts generation cleanly.",
-    payload: {
-      top_chunk_cosine: 0.81,
-      nli_entailment: 0.41,
-      threshold_required: 0.7,
-      decision: "CALIBRATED_REFUSAL",
-    },
-  },
-  {
-    id: "hitl-replan",
-    label: "Sparse Ambiguity",
-    trigger: "Checkpoint Re-plan",
-    statusColor: "#38BDF8",
-    statusCode: "PAUSE HITL_CHECK",
-    baseLatencyMs: 310,
-    latencyLabel: "8.05 req/s Load",
-    vramOrCost: "Postgres Saved",
-    activeStages: ["bm25", "dense", "rrf"],
-    summary:
-      "LangGraph persists AsyncPostgresSaver checkpoints and pauses via Last-Event-ID for HITL review.",
-    payload: {
-      checkpointer: "AsyncPostgresSaver",
-      interrupt_node: "human_approval",
-      sse_replay_supported: true,
-      decision: "REPLAN_SUBQUERIES",
-    },
-  },
-];
 
 export function SystemsPlayground() {
   const { canRender3D } = useCanRender3D();
@@ -246,12 +75,15 @@ export function SystemsPlayground() {
               <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#7DD3FC]">
                 <span>Interactive Pipeline Simulator</span>
               </div>
-              <h2 className="mt-4 font-display text-[clamp(2.4rem,5vw,4.2rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]">
+              <KineticHeading
+                as="h2"
+                className="mt-4 font-display text-[clamp(2.4rem,5vw,4.2rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
+              >
                 TRACE EXECUTION,{" "}
                 <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
                   not claims.
                 </span>
-              </h2>
+              </KineticHeading>
             </div>
 
             <div
@@ -267,7 +99,7 @@ export function SystemsPlayground() {
                 aria-selected={tab === "cinch"}
                 aria-controls="panel-simulator"
                 onClick={() => setTab("cinch")}
-                className={`inline-flex min-h-[40px] items-center gap-2 rounded-full px-4 py-1.5 font-mono text-xs uppercase tracking-[0.12em] transition-colors ${
+                className={`inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] transition-colors ${
                   tab === "cinch"
                     ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                     : "text-[#9DA7B3] hover:text-[#E6EDF3]"
@@ -283,7 +115,7 @@ export function SystemsPlayground() {
                 aria-selected={tab === "rag"}
                 aria-controls="panel-simulator"
                 onClick={() => setTab("rag")}
-                className={`inline-flex min-h-[40px] items-center gap-2 rounded-full px-4 py-1.5 font-mono text-xs uppercase tracking-[0.12em] transition-colors ${
+                className={`inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] transition-colors ${
                   tab === "rag"
                     ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                     : "text-[#9DA7B3] hover:text-[#E6EDF3]"
@@ -319,7 +151,7 @@ export function SystemsPlayground() {
                       onClick={() =>
                         tab === "cinch" ? setCinchId(scenario.id) : setRagId(scenario.id)
                       }
-                      className={`inline-flex min-h-[36px] items-center gap-2 rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
+                      className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border px-3.5 py-2 font-mono text-xs transition-colors ${
                         selected
                           ? "border-[#38BDF8] bg-[#38BDF8]/15 font-semibold text-[#E6EDF3]"
                           : "border-[rgba(240,246,252,0.1)] bg-[#161B22] text-[#9DA7B3] hover:text-[#E6EDF3]"
@@ -373,7 +205,7 @@ export function SystemsPlayground() {
                       type="button"
                       aria-pressed={piiGuardEnabled}
                       onClick={() => setPiiGuardEnabled((v) => !v)}
-                      className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
+                      className={`min-h-[44px] rounded-full border px-3.5 py-2 font-mono text-xs transition-colors ${
                         piiGuardEnabled
                           ? "border-[#10B981]/50 bg-[#10B981]/12 text-[#10B981]"
                           : "border-[rgba(240,246,252,0.12)] text-[#8B949E]"
@@ -385,7 +217,7 @@ export function SystemsPlayground() {
                       type="button"
                       aria-pressed={semanticCacheEnabled}
                       onClick={() => setSemanticCacheEnabled((v) => !v)}
-                      className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
+                      className={`min-h-[44px] rounded-full border px-3.5 py-2 font-mono text-xs transition-colors ${
                         semanticCacheEnabled
                           ? "border-[#38BDF8]/50 bg-[#38BDF8]/12 text-[#7DD3FC]"
                           : "border-[rgba(240,246,252,0.12)] text-[#8B949E]"
@@ -408,7 +240,7 @@ export function SystemsPlayground() {
                         setCameraPreset(preset);
                         setPresetTrigger((n) => n + 1);
                       }}
-                      className={`rounded-md px-2.5 py-1 uppercase transition-colors ${
+                      className={`min-h-[44px] rounded-md px-3 py-2 uppercase transition-colors ${
                         cameraPreset === preset
                           ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                           : "bg-[#161B22] text-[#9DA7B3] hover:text-[#E6EDF3]"
@@ -465,7 +297,7 @@ export function SystemsPlayground() {
                           setFocusedStageId((prev) => (prev === stage.id ? null : stage.id))
                         }
                         aria-pressed={isFocused}
-                        className={`flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left font-mono text-xs transition-colors ${
+                        className={`flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left font-mono text-xs transition-colors ${
                           isFocused
                             ? "border-[#38BDF8] bg-[#38BDF8]/18 text-[#F0F6FC] ring-1 ring-[#38BDF8]/40"
                             : isActive
@@ -486,13 +318,62 @@ export function SystemsPlayground() {
                 })}
               </ol>
 
+              {/* Focused Stage Inspector (live feedback on stage selection) */}
+              {(() => {
+                const inspectedStage = stages.find((s) => s.id === focusedStageId);
+                if (!inspectedStage) return null;
+                const inspectedActive = effectiveStages.includes(inspectedStage.id);
+                return (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="rounded-2xl border border-[#38BDF8]/35 bg-[#38BDF8]/[0.07] p-4 sm:p-5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                        <span className="font-semibold text-[#7DD3FC]">
+                          STAGE INSPECTOR · {inspectedStage.label}
+                        </span>
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-xs ${
+                            inspectedActive
+                              ? "bg-[#10B981]/15 text-[#10B981]"
+                              : "bg-[#161B22] text-[#8B949E]"
+                          }`}
+                        >
+                          {inspectedActive ? "Active in Scenario" : "Bypassed / Skipped"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFocusedStageId(null)}
+                        className="min-h-[44px] rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117] px-3.5 py-1.5 font-mono text-xs text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
+                      >
+                        Clear focus
+                      </button>
+                    </div>
+                    <p className="mt-2 font-mono text-xs text-[#9DA7B3]">
+                      Role: <span className="text-[#E6EDF3]">{inspectedStage.role}</span>
+                    </p>
+                    <p className="mt-1.5 font-sans text-sm leading-relaxed text-[#E6EDF3]">
+                      {inspectedStage.contract}
+                    </p>
+                    <p className="mt-1.5 font-sans text-sm leading-relaxed text-[#9DA7B3]">
+                      Fault behavior: {inspectedStage.faultBehavior}
+                    </p>
+                  </div>
+                );
+              })()}
+
               {/* Telemetry Summary + JSON Trace */}
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                <div className="space-y-3 lg:col-span-6">
+                <div aria-live="polite" className="space-y-3 lg:col-span-6">
                   <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-[#9DA7B3]">
                     <span>Trigger: {activeScenario.trigger}</span>
                     <span>·</span>
-                    <span className="text-[#38BDF8]">{activeScenario.latencyLabel}</span>
+                    <span className="text-[#38BDF8] tabular-nums">
+                      <ScrambleMetric value={activeScenario.latencyLabel} />
+                    </span>
                     <span>·</span>
                     <span>{activeScenario.vramOrCost}</span>
                   </div>
@@ -502,7 +383,7 @@ export function SystemsPlayground() {
                   <div className="pt-1">
                     <Link
                       href={tab === "cinch" ? "/work/cinch" : "/work/nexus-researcher"}
-                      className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.12em] text-[#38BDF8] hover:text-[#7DD3FC]"
+                      className="inline-flex min-h-[44px] items-center gap-1.5 font-mono text-xs uppercase tracking-[0.12em] text-[#38BDF8] hover:text-[#7DD3FC]"
                     >
                       <span>Open full architecture notes</span>
                       <ArrowUpRight className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />

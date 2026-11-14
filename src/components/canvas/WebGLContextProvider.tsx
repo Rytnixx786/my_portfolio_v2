@@ -58,7 +58,7 @@ const WebGLContext = createContext<WebGLContextValue>({
 
 /**
  * Global WebGL quality, reduced-motion, and LRU WebGL context slot-pool provider.
- * Caps active container-scoped <Canvas> instances (max 4 on high, 3 on mid) so
+ * Caps active container-scoped <Canvas> instances (max 3 on high, 2 on mid) so
  * WebGL scenes stay 100% locked to their DOM containers on scroll without hitting browser context limits.
  */
 export function WebGLContextProvider({ children }: { children: ReactNode }) {

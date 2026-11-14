@@ -21,7 +21,7 @@ export const profile = {
   thesis: "I build the deterministic systems around stochastic models.",
   headline: "I build AI systems that stay verifiable after the demo ends.",
   summary:
-    "CS candidate at BRAC University (2022 to 2026) and Back End AI Intern at FlyRank. Building quantized LLM gateways, stateful LangGraph orchestration, grounded RAG, and CI-gated ML pipelines.",
+    "B.Sc. Computer Science & Engineering graduate (BRAC University, Class of 2026) and Back End AI Intern at FlyRank. Building quantized LLM gateways, stateful LangGraph orchestration, grounded RAG, and CI-gated ML pipelines.",
   status: "Open to AI & Backend Engineering Roles",
   availabilityShort: "Dhaka, Bangladesh (UTC+6) · Open to Work",
 } as const;
@@ -60,7 +60,7 @@ export const measurementProtocol = [
     title: "Fixed Baselines",
     metric: "FP16 & single-pass controls",
     detail:
-      "Compared directly against 30.48 tok/s FP16 vLLM and 26.67% un-gated single-pass RAG refusal.",
+      "Compared directly against 30.48 tok/s CPU-offloaded FP16 vLLM on 8 GB VRAM and 4/15 un-gated single-pass RAG refusal.",
   },
   {
     step: "02",
@@ -85,7 +85,7 @@ export const focusAreas = [
     category: "Inference & Serving" as const,
     title: "LLM Serving & Gateway Control Planes",
     description:
-      "Quantized AWQ Marlin serving with PID admission control, 4.12ms ONNX semantic cache, 3-state circuit breaker, and FinOps cutoffs.",
+      "Quantized AWQ Marlin serving with 60 RPM / 50k TPM admission control, 4.12ms ONNX semantic cache, 3-state circuit breaker, and FinOps cutoffs.",
     capabilities: [
       "vLLM + AWQ Marlin INT4",
       "In-process ONNX Semantic Cache",
@@ -161,7 +161,7 @@ export const evidence = [
     value: "10.86",
     unit: "×",
     label: "Generation throughput",
-    from: "30.48 tok/s FP16 baseline",
+    from: "30.48 tok/s FP16 offload (8 GB VRAM)",
     to: "331 tok/s",
     context: "Qwen2.5-7B-Instruct, AWQ Marlin INT4 on 8 GB VRAM GPU",
     project: "Cinch",
@@ -172,7 +172,7 @@ export const evidence = [
     unit: "ms",
     label: "Semantic cache hit",
     from: ">1,200 ms cold GPU round-trip",
-    to: "4.12 ms, 0 W GPU",
+    to: "4.12 ms, zero GPU compute",
     context: "In-process ONNX vector cache, cosine >= 0.92",
     project: "Cinch",
     href: "/work/cinch",
@@ -192,7 +192,7 @@ export const evidence = [
     unit: "%",
     label: "Adversarial refusal accuracy",
     from: "Single-shot search synthesis",
-    to: "8-node gated LangGraph",
+    to: "7-node gated LangGraph",
     context: "8.05 req/s sustained load, 122 backend tests, 5 ADRs",
     project: "Nexus Researcher",
     href: "/work/nexus-researcher",
@@ -201,9 +201,9 @@ export const evidence = [
     value: "95",
     unit: "%",
     label: "QA groundedness",
-    from: "26.67% refusal on unanswerable queries",
-    to: "66.67% refusal, 95% grounded",
-    context: "BM25 + ChromaDB, RRF k = 60, NLI entailment gate",
+    from: "4/15 (26.67%) un-gated refusal",
+    to: "10/15 (66.67%) refusal, 95% grounded",
+    context: "BM25 + ChromaDB, RRF k = 60, NLI entailment >= 0.70 (n = 15)",
     project: "MindStack",
     href: "/work/mindstack",
   },
@@ -222,16 +222,16 @@ export const evidence = [
 export const experience = [
   {
     period: "June 2026",
-    role: "AI & Back End Engineering Intern",
+    role: "AI & Back End Engineering Intern (Capstone Track)",
     org: "FlyRank",
-    focus: "Production metering & billing",
+    focus: "Usage metering & Stripe billing",
     description:
       "Engineered multi-tenant usage metering in FastAPI and SQLAlchemy 2: idempotent usage-event ingestion, a tiered pricing calculation engine, and asynchronous Stripe webhook state reconciliation.",
     stack: ["FastAPI", "SQLAlchemy 2", "Stripe SDK", "Pydantic v2"],
     href: "https://github.com/Rytnixx786/flyrank-capstone-metering-billing",
   },
   {
-    period: "2022 to 2026",
+    period: "B.Sc. CSE, 2026",
     role: "B.Sc. Computer Science & Engineering",
     org: "BRAC University",
     focus: "Systems, databases & AI",
@@ -245,7 +245,7 @@ export const lab = [
   {
     name: "3D CCTA Stenosis Engine",
     domain: "Volumetric medical AI",
-    note: "RASNet + SegResNet achieving 95.2% adjacent CAD-RADS agreement",
+    note: "RASNet + SegResNet achieving 95.2% adjacent (+/-1 CAD-RADS) agreement",
     stack: "PyTorch 3D",
   },
   {
@@ -281,7 +281,7 @@ export const stack = [
     code: "01",
     layer: "Serving & inference",
     summary: "Quantized GPU serving, sub-5ms CPU caching, and fast-fail fault isolation.",
-    items: ["vLLM", "AWQ Marlin INT4", "ONNX Runtime", "Semantic caching", "PID admission control"],
+    items: ["vLLM", "AWQ Marlin INT4", "ONNX Runtime", "Semantic caching", "Sliding-window queue"],
   },
   {
     code: "02",

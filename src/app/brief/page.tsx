@@ -7,7 +7,7 @@ import { projects } from "@/data/projects";
 export const metadata: Metadata = {
   title: "Recruiter Brief & Technical Summary",
   description:
-    "Printable one-page recruiter and hiring manager summary covering Mehedi Hasan's FlyRank internship, systems benchmarks, and production code repositories.",
+    "Printable one-page recruiter and hiring manager summary covering Mehedi Hasan's FlyRank internship, systems benchmarks, and open-source code repositories.",
   alternates: { canonical: "/brief" },
 };
 

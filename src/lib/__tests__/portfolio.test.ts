@@ -1,9 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { answerPortfolioQuery, matchPortfolioQuery } from "@/lib/query-engine";
 import { CATEGORY_HUES } from "@/lib/palette";
 import { resolveEffectiveTier, resolveQualityReason } from "@/lib/device-tier";
 import { classifyNodeKind } from "@/lib/architecture";
 import { projects } from "@/data/projects";
+import {
+  CINCH_SCENARIOS,
+  CINCH_STAGES,
+  RAG_SCENARIOS,
+  RAG_STAGES,
+} from "@/data/playground";
 import { POST } from "@/app/api/query/route";
 
 describe("query-engine grounded retrieval", () => {
@@ -42,15 +48,38 @@ describe("palette, device tier, and project data integrity", () => {
     expect(hexes).not.toContain("#a855f7");
   });
 
-  it("provides Section 15 methodology, evals, and dash-free UI copy on all 6 projects", () => {
+  it("provides Section 15 methodology, evals, nextSteps, and dash-free UI copy on all 6 projects", () => {
     expect(projects).toHaveLength(6);
     for (const project of projects) {
       expect(project.methodology.length).toBeGreaterThan(20);
       expect(project.evalSeries.length).toBeGreaterThanOrEqual(2);
       expect(project.failures.length).toBeGreaterThanOrEqual(1);
       expect(project.reproduceCmd.length).toBeGreaterThan(3);
+      expect(project.nextSteps.length).toBeGreaterThan(20);
       expect(/[\u2013\u2014]/.test(project.description)).toBe(false);
     }
+  });
+
+  it("validates playground stage contracts, thresholds, and scenario stage IDs", () => {
+    const cinchIds = new Set(CINCH_STAGES.map((s) => s.id));
+    const ragIds = new Set(RAG_STAGES.map((s) => s.id));
+    for (const stage of [...CINCH_STAGES, ...RAG_STAGES]) {
+      expect(stage.role.trim().length).toBeGreaterThan(4);
+      expect(stage.contract.trim().length).toBeGreaterThan(10);
+      expect(stage.faultBehavior.trim().length).toBeGreaterThan(10);
+      expect(/[\u2013\u2014]/.test(stage.contract + stage.faultBehavior)).toBe(false);
+    }
+    for (const sc of CINCH_SCENARIOS) {
+      expect(sc.activeStages.length).toBeGreaterThanOrEqual(1);
+      expect(sc.activeStages.every((id) => cinchIds.has(id))).toBe(true);
+      expect(sc.summary).not.toContain("0 W GPU");
+    }
+    for (const sc of RAG_SCENARIOS) {
+      expect(sc.activeStages.length).toBeGreaterThanOrEqual(1);
+      expect(sc.activeStages.every((id) => ragIds.has(id))).toBe(true);
+    }
+    const refusal = RAG_SCENARIOS.find((s) => s.id === "nli-refusal");
+    expect(refusal?.payload.threshold_required).toBe(0.7);
   });
 
   it("resolves WebGL tiers and diagnostics accurately", () => {
@@ -101,6 +130,39 @@ describe("/api/query handler", () => {
     const bodyText = await res.text();
     expect(bodyText).toContain("MaSheba AI");
     expect(bodyText).toContain("0.90 AUC");
+  });
+
+  it("streams SSE fallback gracefully when Gemini API returns HTTP 500", async () => {
+    const prevKey = process.env.GEMINI_API_KEY;
+    process.env.GEMINI_API_KEY = "test-mock-key";
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("upstream error", { status: 500 }));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const req = new Request("http://localhost:3100/api/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+          "x-forwarded-for": "198.51.100.99",
+        },
+        body: JSON.stringify({ message: "xyzzy unmatched custom prompt" }),
+      });
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/event-stream");
+      const text = await res.text();
+      expect(text).toContain("event: meta");
+      expect(text).toContain('"source":"fallback"');
+      expect(errSpy).toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+      errSpy.mockRestore();
+      if (prevKey === undefined) delete process.env.GEMINI_API_KEY;
+      else process.env.GEMINI_API_KEY = prevKey;
+    }
   });
 });
 

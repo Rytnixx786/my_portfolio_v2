@@ -98,7 +98,7 @@ export function ProjectPreviewPlate({
                 type="button"
                 onClick={() => setViewMode("3d")}
                 aria-pressed={viewMode === "3d"}
-                className={`rounded-full px-2.5 py-0.5 font-mono text-xs uppercase transition-colors ${
+                className={`min-h-[44px] rounded-full px-3 py-1 font-mono text-xs uppercase transition-colors ${
                   viewMode === "3d"
                     ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                     : "text-[#8B949E] hover:text-[#E6EDF3]"
@@ -110,7 +110,7 @@ export function ProjectPreviewPlate({
                 type="button"
                 onClick={() => setViewMode("2d")}
                 aria-pressed={viewMode === "2d"}
-                className={`rounded-full px-2.5 py-0.5 font-mono text-xs uppercase transition-colors ${
+                className={`min-h-[44px] rounded-full px-3 py-1 font-mono text-xs uppercase transition-colors ${
                   viewMode === "2d"
                     ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                     : "text-[#8B949E] hover:text-[#E6EDF3]"
@@ -192,7 +192,7 @@ export function ProjectPreviewPlate({
                     y={4}
                     textAnchor="middle"
                     fill={isActive ? "#E6EDF3" : "#9DA7B3"}
-                    fontSize="10"
+                    fontSize="12"
                     fontFamily="var(--font-mono), monospace"
                     fontWeight="600"
                   >
@@ -216,7 +216,7 @@ export function ProjectPreviewPlate({
                     type="button"
                     onClick={() => setActiveIdx(node.index)}
                     aria-pressed={isActive}
-                    className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-xs transition-colors ${
+                    className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border px-3 py-1 font-mono text-xs transition-colors ${
                       isActive
                         ? "border-[#38BDF8] bg-[#38BDF8]/12 font-semibold text-[#E6EDF3]"
                         : "border-[rgba(240,246,252,0.08)] bg-[#161B22] text-[#9DA7B3] hover:border-[rgba(240,246,252,0.22)] hover:text-[#E6EDF3]"

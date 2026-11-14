@@ -5,7 +5,6 @@
   --font-sans: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-serif-detail: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
-  --font-serif: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
 
   --color-canvas: #0d1117;
   --color-surface: #161b22;
@@ -113,18 +112,6 @@ p {
   background-color: var(--bg-surface-muted);
   border: 1px solid rgba(240, 246, 252, 0.075);
   box-shadow: inset 0 1px 0 rgba(240, 246, 252, 0.05);
-}
-
-.tabular-nums {
-  font-variant-numeric: tabular-nums;
-}
-
-.editorial-rule {
-  border-color: var(--border-hairline);
-}
-
-.editorial-rule-accent {
-  border-color: rgba(56, 189, 248, 0.35);
 }
 
 /* Custom subtle scrollbars for code blocks and console */

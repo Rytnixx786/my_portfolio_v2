@@ -263,13 +263,13 @@ export function ArchitectureDiagram({
                 setActiveIndex((i) => (i + 1) % nodes.length);
               }}
               aria-label="Next pipeline stage"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
             >
               <CaretRight className="h-4 w-4" weight="regular" aria-hidden="true" />
             </button>
 
             {playing && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#10B981]/35 bg-[#10B981]/10 px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.1em] text-[#10B981] tabular-nums">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#10B981]/35 bg-[#10B981]/10 px-2.5 py-1 font-mono text-xs uppercase tracking-[0.1em] text-[#10B981] tabular-nums">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]" aria-hidden="true" />
                 Stage {String(activeIndex + 1).padStart(2, "0")}/
                 {String(nodes.length).padStart(2, "0")}
@@ -328,7 +328,7 @@ export function ArchitectureDiagram({
               }}
             >
               {/* Semantic Legend */}
-              <div className="mb-1 flex flex-wrap items-center justify-between gap-2 px-2 pt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[#8B949E]">
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2 px-2 pt-1 font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E]">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-[#10B981]" /> Entry
@@ -349,7 +349,7 @@ export function ArchitectureDiagram({
               <svg
                 viewBox={`0 0 ${layout.svgW} ${layout.svgH}`}
                 className="block h-auto w-full select-none"
-                role="img"
+                role="group"
                 aria-label={`${projectName} 2D architecture stage graph`}
               >
                 {/* Edges */}

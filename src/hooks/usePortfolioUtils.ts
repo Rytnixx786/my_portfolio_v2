@@ -68,13 +68,21 @@ export function useQueryConsole(initialHistory: QueryExchange[]) {
       setLoading(true);
       setQuery("");
 
-      const pendingIdx = Date.now();
       setHistory((prev) => [
         ...prev.slice(-4),
         { q: trimmed, a: "Querying verified project index...", citations: [] },
       ]);
 
       try {
+        const timeoutSignal =
+          typeof AbortSignal.timeout === "function"
+            ? AbortSignal.timeout(10_000)
+            : undefined;
+        const signal =
+          timeoutSignal && typeof AbortSignal.any === "function"
+            ? AbortSignal.any([controller.signal, timeoutSignal])
+            : controller.signal;
+
         const res = await fetch("/api/query", {
           method: "POST",
           headers: {
@@ -82,10 +90,31 @@ export function useQueryConsole(initialHistory: QueryExchange[]) {
             Accept: "text/event-stream, application/json",
           },
           body: JSON.stringify({ message: trimmed }),
-          signal: controller.signal,
+          signal,
         });
 
         const contentType = res.headers.get("content-type") ?? "";
+        if (!res.ok) {
+          let errMsg = `Query service returned HTTP ${res.status}. Browse /work/[slug] for system specs.`;
+          if (contentType.includes("application/json")) {
+            try {
+              const errData = (await res.json()) as { error?: string; text?: string };
+              errMsg = errData.error ?? errData.text ?? errMsg;
+            } catch {
+              // Keep HTTP status fallback
+            }
+          }
+          setHistory((prev) => {
+            const next = [...prev];
+            const last = next.length - 1;
+            if (last >= 0) {
+              next[last] = { q: trimmed, a: errMsg, citations: [] };
+            }
+            return next;
+          });
+          return;
+        }
+
         if (contentType.includes("text/event-stream") && res.body) {
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
@@ -152,7 +181,6 @@ export function useQueryConsole(initialHistory: QueryExchange[]) {
               }
             }
           }
-          void pendingIdx;
         } else {
           const data = (await res.json()) as {
             text?: string;

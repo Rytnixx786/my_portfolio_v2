@@ -40,7 +40,7 @@ export function CanvasZoomHUD({
         onClick={onZoomIn}
         aria-label="Zoom in"
         title="Zoom in"
-        className="flex h-7 w-7 items-center justify-center rounded-full text-[#9DA7B3] transition-colors hover:bg-[#1C222B] hover:text-[#38BDF8] active:scale-95 sm:h-8 sm:w-8"
+        className="flex h-11 w-11 items-center justify-center rounded-full text-[#9DA7B3] transition-colors hover:bg-[#1C222B] hover:text-[#38BDF8] active:scale-95"
       >
         <Plus className="h-3.5 w-3.5" weight="bold" aria-hidden="true" />
       </button>
@@ -49,7 +49,7 @@ export function CanvasZoomHUD({
         onClick={onZoomOut}
         aria-label="Zoom out"
         title="Zoom out"
-        className="flex h-7 w-7 items-center justify-center rounded-full text-[#9DA7B3] transition-colors hover:bg-[#1C222B] hover:text-[#38BDF8] active:scale-95 sm:h-8 sm:w-8"
+        className="flex h-11 w-11 items-center justify-center rounded-full text-[#9DA7B3] transition-colors hover:bg-[#1C222B] hover:text-[#38BDF8] active:scale-95"
       >
         <Minus className="h-3.5 w-3.5" weight="bold" aria-hidden="true" />
       </button>
@@ -62,7 +62,7 @@ export function CanvasZoomHUD({
         onClick={onReset}
         aria-label="Reset camera view"
         title="Reset camera view"
-        className="flex h-7 w-7 items-center justify-center rounded-full text-[#9DA7B3] transition-colors hover:bg-[#1C222B] hover:text-[#38BDF8] active:scale-95 sm:h-8 sm:w-8"
+        className="flex h-11 w-11 items-center justify-center rounded-full text-[#9DA7B3] transition-colors hover:bg-[#1C222B] hover:text-[#38BDF8] active:scale-95"
       >
         <ArrowCounterClockwise className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
       </button>

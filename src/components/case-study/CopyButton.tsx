@@ -11,7 +11,7 @@ export function CopyButton({ text, label = "Copy" }: { text: string; label?: str
       type="button"
       onClick={() => void copy(text)}
       aria-label={copied ? "Copied to clipboard" : `Copy ${label.toLowerCase()} to clipboard`}
-      className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-3.5 py-1 font-mono text-xs uppercase tracking-[0.1em] transition-colors ${
+      className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-4 py-2 font-mono text-xs uppercase tracking-[0.1em] transition-colors ${
         copied
           ? "border-[#10B981]/50 bg-[#10B981]/15 text-[#10B981]"
           : "border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#9DA7B3] hover:border-[#38BDF8] hover:text-[#38BDF8]"

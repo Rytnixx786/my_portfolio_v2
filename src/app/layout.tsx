@@ -98,18 +98,35 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+const personId = `${profile.url}/#person`;
+const websiteId = `${profile.url}/#website`;
+
 const personJsonLd = {
   "@context": "https://schema.org",
   "@type": "Person",
+  "@id": personId,
   name: profile.name,
+  givenName: profile.first,
+  familyName: profile.last,
   jobTitle: profile.role,
   url: profile.url,
+  image: `${profile.url}${profile.portrait}`,
   email: `mailto:${profile.email}`,
   sameAs: [profile.github, profile.linkedin],
+  knowsAbout: [
+    "vLLM",
+    "AWQ Marlin Quantization",
+    "LangGraph",
+    "FastAPI",
+    "Hybrid RAG",
+    "PostgreSQL Row-Level Security",
+    "MLOps CI Gates",
+    "ONNX Runtime",
+  ],
   alumniOf: {
     "@type": "CollegeOrUniversity",
     name: "BRAC University",
-    url: "https://www.bracu.ac.bd",
+    sameAs: "https://www.bracu.ac.bd",
   },
   address: {
     "@type": "PostalAddress",
@@ -121,12 +138,11 @@ const personJsonLd = {
 const websiteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
+  "@id": websiteId,
   name: siteTitle,
   url: profile.url,
-  author: {
-    "@type": "Person",
-    name: profile.name,
-  },
+  publisher: { "@id": personId },
+  author: { "@id": personId },
 };
 
 export default function RootLayout({

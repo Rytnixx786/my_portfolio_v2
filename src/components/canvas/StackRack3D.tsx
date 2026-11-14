@@ -89,6 +89,8 @@ function KeycapNode({
   accentHue,
   isSelected,
   rippleDelay,
+  selectKey,
+  reducedMotion,
   onSelect,
 }: {
   label: string;
@@ -96,25 +98,39 @@ function KeycapNode({
   accentHue: string;
   isSelected: boolean;
   rippleDelay: number;
+  selectKey: string;
+  reducedMotion: boolean;
   onSelect: () => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
   const elapsedRef = useRef(0);
+  const waveStartRef = useRef(-10);
+
+  useEffect(() => {
+    waveStartRef.current = elapsedRef.current;
+  }, [selectKey]);
 
   useFrame((_, delta) => {
+    if (!groupRef.current) return;
+    const baseY = isSelected ? -0.14 : hovered ? -0.06 : 0;
+
+    if (reducedMotion) {
+      groupRef.current.position.y = baseY;
+      return;
+    }
+
     const dt = Math.min(delta, 0.05);
     elapsedRef.current += dt;
-    if (!groupRef.current) return;
-    const wave =
-      rippleDelay > 0
-        ? Math.sin(Math.max(0, elapsedRef.current - rippleDelay) * 4.5) * 0.018
-        : 0;
-    const targetY = (isSelected ? -0.14 : hovered ? -0.06 : 0) + wave;
+    const age = elapsedRef.current - waveStartRef.current - rippleDelay;
+    const envelope = age > 0 && age < 0.65 ? 1 - age / 0.65 : 0;
+    const wave = envelope > 0 ? Math.sin(age * 14) * 0.045 * envelope : 0;
+    const targetY = baseY + wave;
+
     groupRef.current.position.y = THREE.MathUtils.damp(
       groupRef.current.position.y,
       targetY,
-      10,
+      12,
       dt
     );
   });
@@ -171,12 +187,12 @@ function KeycapNode({
 
         <SpriteLabel3D
           text={label}
-          position={[0, 0.42, 0]}
+          position={[0, 0.44, 0]}
           active={isSelected || hovered}
           accentColor={accentHue}
-          worldHeight={0.25}
-          maxWorldWidth={1.58}
-          minHeightScale={0.82}
+          worldHeight={0.28}
+          maxWorldWidth={1.68}
+          minHeightScale={0.86}
         />
       </group>
     </group>
@@ -207,11 +223,23 @@ function StackRack2DFallback({
         }}
       />
 
-      <span className="pointer-events-none absolute right-3 top-2.5 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B949E]">
+      <span className="pointer-events-none absolute right-3 top-2.5 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E]">
         2D Safe · Keycaps
       </span>
 
-      <div className="relative z-10 my-auto grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5">
+      <div
+        onKeyDown={(e) => {
+          const curIdx = Math.max(0, tools.indexOf(selectedTool ?? ""));
+          if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+            e.preventDefault();
+            onSelectTool(tools[(curIdx + 1) % tools.length]);
+          } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+            e.preventDefault();
+            onSelectTool(tools[(curIdx - 1 + tools.length) % tools.length]);
+          }
+        }}
+        className="relative z-10 my-auto grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5"
+      >
         {tools.map((tool, idx) => {
           const isPicked = selectedTool === tool;
           return (
@@ -234,8 +262,8 @@ function StackRack2DFallback({
             >
               <div className="flex items-center justify-between gap-2">
                 <span
-                  className="font-mono text-[10px] tabular-nums"
-                  style={{ color: isPicked ? accentHue : "#6E7681" }}
+                  className="font-mono text-xs tabular-nums"
+                  style={{ color: isPicked ? accentHue : "#8B949E" }}
                 >
                   K{String(idx + 1).padStart(2, "0")}
                 </span>
@@ -255,8 +283,8 @@ function StackRack2DFallback({
         })}
       </div>
 
-      <p className="relative z-10 font-mono text-[10px] uppercase tracking-[0.12em] text-[#6E7681]">
-        {layerName} · Click any keycap to inspect
+      <p className="relative z-10 font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E]">
+        {layerName} · Click or arrow-key keycaps to inspect
       </p>
     </div>
   );
@@ -273,8 +301,9 @@ export function StackRack3D({
   selectedTool,
   onSelectTool,
 }: StackRack3DProps) {
-  const { canRender3D } = useCanRender3D();
-  const pulseTime = layerCode ? 0.1 : 0;
+  const { canRender3D, reducedMotion } = useCanRender3D();
+  const selectedIndex = Math.max(0, tools.indexOf(selectedTool ?? ""));
+  const selectKey = `${layerCode}-${selectedTool ?? ""}`;
   const cols = tools.length <= 4 ? 2 : 3;
   const totalRows = Math.ceil(tools.length / cols);
   const xSpacing = 1.72;
@@ -386,7 +415,9 @@ export function StackRack3D({
             position={positions[idx]}
             accentHue={accentHue}
             isSelected={selectedTool === tool}
-            rippleDelay={pulseTime > 0 ? idx * 0.05 : 0}
+            rippleDelay={Math.abs(idx - selectedIndex) * 0.05}
+            selectKey={selectKey}
+            reducedMotion={reducedMotion}
             onSelect={() => onSelectTool(tool)}
           />
         ))}

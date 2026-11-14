@@ -327,7 +327,7 @@ function TopologySlotFallback({ slug }: { slug: string }) {
           </g>
         ))}
       </svg>
-      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8B949E]">
+      <span className="font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E]">
         2D Topology · Scroll into view for live 3D
       </span>
     </div>
@@ -437,7 +437,7 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
                   key={m}
                   type="button"
                   onClick={() => setCinchMode(m)}
-                  className={`rounded-md px-2 py-0.5 font-mono text-xs uppercase transition-colors ${
+                  className={`min-h-[44px] rounded-md px-2.5 py-2 font-mono text-xs uppercase transition-colors ${
                     cinchMode === m
                       ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                       : "bg-[#0D1117] text-[#9DA7B3] hover:text-[#E6EDF3]"
@@ -458,7 +458,7 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
             <button
               type="button"
               onClick={() => setHitlApproved((v) => !v)}
-              className={`rounded-md px-2.5 py-0.5 font-mono text-xs uppercase transition-colors ${
+              className={`min-h-[44px] rounded-md px-3 py-2 font-mono text-xs uppercase transition-colors ${
                 hitlApproved
                   ? "bg-[#10B981]/20 text-[#10B981]"
                   : "bg-[#F59E0B]/20 text-[#F59E0B]"

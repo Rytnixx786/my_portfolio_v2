@@ -1,13 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
-import { useRef, useState, type PointerEvent } from "react";
+import { useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
-import { ArrowDownRight, ArrowUpRight, FilePdf } from "@phosphor-icons/react";
+import { ArrowDownRight, FilePdf } from "@phosphor-icons/react";
 import { profile } from "@/data/site";
 import { MagneticButton } from "@/components/motion/MagneticButton";
+import { KineticHeading } from "@/components/motion/KineticText";
 import { FloatingProjectStack3D } from "./FloatingProjectStack3D";
 import { HeroCursorField } from "./HeroCursorField";
 
@@ -30,16 +30,10 @@ const LazyHeroOrbitalCore3D = dynamic(
   }
 );
 
-const HERO_PROOF = [
-  { value: "331 tok/s", label: "Qwen2.5-7B INT4", systemIdx: 0 },
-  { value: "95%", label: "Grounded RAG", systemIdx: 3 },
-  { value: "92%+", label: "CI Test Gate", systemIdx: 2 },
-] as const;
-
 /**
  * Clean, spacious above-the-fold Hero section optimized for 1366x768+ laptops:
- * focused identity + interactive cursor precision lattice + 3 high-signal metrics
- * paired with an interactive 3D/2D Orbital Core.
+ * focused identity + interactive cursor precision lattice paired with
+ * an interactive 3D/2D Orbital Core and compact system switcher.
  */
 export function HeroEditorial() {
   const [activeSystemIndex, setActiveSystemIndex] = useState(0);
@@ -60,13 +54,6 @@ export function HeroEditorial() {
     },
     { scope: heroRef }
   );
-
-  const handleMetricMove = (event: PointerEvent<HTMLButtonElement>) => {
-    if (event.pointerType === "touch") return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    event.currentTarget.style.setProperty("--mouse-x", `${event.clientX - rect.left}px`);
-    event.currentTarget.style.setProperty("--mouse-y", `${event.clientY - rect.top}px`);
-  };
 
   return (
     <section
@@ -89,23 +76,22 @@ export function HeroEditorial() {
           <div className="min-w-0 lg:col-span-7">
             <p
               data-hero-stagger
-              className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22]/75 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[#9DA7B3] backdrop-blur-sm sm:text-[11px] sm:tracking-[0.15em]"
+              className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-2xl border border-[rgba(240,246,252,0.12)] bg-[#161B22]/75 px-3.5 py-1.5 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3] backdrop-blur-sm sm:rounded-full"
             >
               <span className="h-2 w-2 shrink-0 rounded-full bg-[#10B981]" aria-hidden="true" />
-              <span>
-                {profile.role} · FlyRank Intern · {profile.utc}
-              </span>
+              <span>{profile.role} · FlyRank Intern</span>
             </p>
 
-            <h1
-              data-hero-stagger
+            <KineticHeading
+              as="h1"
+              immediate
               className="mt-5 max-w-5xl font-display text-[clamp(2.45rem,6.4vw,5.5rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
             >
               RELIABLE{" "}
               <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
                 ai systems.
               </span>
-            </h1>
+            </KineticHeading>
 
             <p
               data-hero-stagger
@@ -136,47 +122,6 @@ export function HeroEditorial() {
                 <FilePdf className="h-4 w-4 text-[#38BDF8]" weight="regular" aria-hidden="true" />
                 <span>Resume</span>
               </a>
-
-              <Link
-                href="/brief"
-                className="inline-flex min-h-[44px] items-center gap-1.5 px-2 font-mono text-xs uppercase tracking-[0.14em] text-[#9DA7B3] transition-colors hover:text-[#38BDF8]"
-              >
-                <span>Recruiter Brief</span>
-                <ArrowUpRight className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
-              </Link>
-            </div>
-
-            <div className="mt-9 grid max-w-xl grid-cols-3 gap-2 border-t border-[rgba(240,246,252,0.08)] pt-6 sm:gap-3">
-              {HERO_PROOF.map((stat) => {
-                const isSelected = activeSystemIndex === stat.systemIdx;
-                return (
-                  <button
-                    key={stat.label}
-                    type="button"
-                    onClick={() => setActiveSystemIndex(stat.systemIdx)}
-                    onPointerMove={handleMetricMove}
-                    aria-pressed={isSelected}
-                    className={`spotlight-card relative min-w-0 overflow-hidden rounded-xl border px-2.5 py-2.5 text-left transition-all duration-200 sm:px-3.5 sm:py-3 ${
-                      isSelected
-                        ? "border-[#38BDF8]/45 bg-[#38BDF8]/10"
-                        : "border-[rgba(240,246,252,0.08)] bg-[#161B22]/45 hover:border-[rgba(240,246,252,0.18)] hover:bg-[#161B22]/80"
-                    }`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`absolute inset-x-0 top-0 h-[2px] bg-[#38BDF8] transition-opacity duration-200 ${
-                        isSelected ? "opacity-100" : "opacity-0"
-                      }`}
-                    />
-                    <span className="block font-display text-xl font-bold leading-none text-[#E6EDF3] tabular-nums sm:text-3xl">
-                      {stat.value}
-                    </span>
-                    <span className="mt-1.5 block truncate font-mono text-[10px] text-[#8B949E] sm:text-[11px]">
-                      {stat.label}
-                    </span>
-                  </button>
-                );
-              })}
             </div>
           </div>
 

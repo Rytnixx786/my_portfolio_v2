@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { getProjectBySlug, projects } from "@/data/projects";
 import { profile } from "@/data/site";
+import { getCategoryHue } from "@/lib/palette";
 
 export const size = {
   width: 1200,
@@ -21,6 +22,7 @@ export default async function CaseStudyOGImage({
   const { slug } = await params;
   const project = getProjectBySlug(slug) ?? projects[0];
   const idx = projects.findIndex((p) => p.slug === project.slug) + 1;
+  const accentHex = getCategoryHue(project.category).hex;
 
   return new ImageResponse(
     (
@@ -46,7 +48,7 @@ export default async function CaseStudyOGImage({
             fontSize: 18,
             letterSpacing: "0.18em",
             textTransform: "uppercase",
-            color: "#38BDF8",
+            color: accentHex,
             fontFamily: "monospace",
           }}
         >
@@ -59,7 +61,7 @@ export default async function CaseStudyOGImage({
             style={{
               display: "flex",
               fontSize: 22,
-              color: "#38BDF8",
+              color: accentHex,
               fontWeight: 500,
             }}
           >

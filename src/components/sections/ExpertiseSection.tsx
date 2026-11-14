@@ -1,10 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 import { Cpu, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
 import { stack } from "@/data/site";
 import { STACK_LAYER_HUES } from "@/lib/palette";
+import { KineticHeading } from "@/components/motion/KineticText";
 import { SectionReveal } from "./SectionReveal";
 
 const LazyStackRack3D = dynamic(
@@ -49,6 +50,7 @@ export function ExpertiseSection() {
   const [activeLayerIdx, setActiveLayerIdx] = useState(0);
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const activeLayer = stack[activeLayerIdx];
   const layerHue = STACK_LAYER_HUES[activeLayerIdx] ?? "#38BDF8";
@@ -61,12 +63,27 @@ export function ExpertiseSection() {
   const handleTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "ArrowDown" || e.key === "ArrowRight") {
       e.preventDefault();
-      setActiveLayerIdx((i) => (i + 1) % stack.length);
+      const next = (activeLayerIdx + 1) % stack.length;
+      setActiveLayerIdx(next);
       setSelectedTool(null);
+      tabRefs.current[next]?.focus();
     } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
       e.preventDefault();
-      setActiveLayerIdx((i) => (i - 1 + stack.length) % stack.length);
+      const prev = (activeLayerIdx - 1 + stack.length) % stack.length;
+      setActiveLayerIdx(prev);
       setSelectedTool(null);
+      tabRefs.current[prev]?.focus();
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setActiveLayerIdx(0);
+      setSelectedTool(null);
+      tabRefs.current[0]?.focus();
+    } else if (e.key === "End") {
+      e.preventDefault();
+      const last = stack.length - 1;
+      setActiveLayerIdx(last);
+      setSelectedTool(null);
+      tabRefs.current[last]?.focus();
     }
   };
 
@@ -82,12 +99,15 @@ export function ExpertiseSection() {
               <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#7DD3FC]">
                 <span>Capabilities</span>
               </div>
-              <h2 className="mt-4 font-display text-[clamp(2.4rem,5vw,4.3rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]">
+              <KineticHeading
+                as="h2"
+                className="mt-4 font-display text-[clamp(2.4rem,5vw,4.3rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
+              >
                 STACK BY{" "}
                 <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
                   layer.
                 </span>
-              </h2>
+              </KineticHeading>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-[#9DA7B3]">
@@ -95,7 +115,7 @@ export function ExpertiseSection() {
                 type="button"
                 aria-pressed={soundEnabled}
                 onClick={() => setSoundEnabled((v) => !v)}
-                className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-3.5 py-1.5 text-xs uppercase tracking-[0.1em] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-4 py-2 text-xs uppercase tracking-[0.1em] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
               >
                 {soundEnabled ? (
                   <SpeakerHigh className="h-3.5 w-3.5 text-[#10B981]" weight="regular" aria-hidden="true" />
@@ -120,9 +140,13 @@ export function ExpertiseSection() {
                 return (
                   <button
                     key={row.layer}
+                    ref={(el) => {
+                      tabRefs.current[idx] = el;
+                    }}
                     type="button"
                     role="tab"
                     id={`stack-tab-${row.code}`}
+                    tabIndex={isSelected ? 0 : -1}
                     aria-selected={isSelected}
                     aria-controls={`stack-panel-${row.code}`}
                     onClick={() => {
@@ -200,7 +224,7 @@ export function ExpertiseSection() {
                         type="button"
                         onClick={() => handleSelectTool(tool)}
                         aria-pressed={isPicked}
-                        className={`inline-flex min-h-[36px] items-center rounded-full border px-3.5 py-1 font-mono text-xs transition-colors ${
+                        className={`inline-flex min-h-[44px] items-center rounded-full border px-4 py-2 font-mono text-xs transition-colors ${
                           isPicked
                             ? "border-[#38BDF8] bg-[#38BDF8]/15 font-semibold text-[#E6EDF3]"
                             : "border-[rgba(240,246,252,0.1)] bg-[#0D1117] text-[#9DA7B3] hover:text-[#E6EDF3]"

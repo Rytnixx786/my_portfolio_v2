@@ -1,35 +1,31 @@
 # Design System: Mehedi Hasan — Deep Compute Studio
 
 ## 1. Visual Theme & Atmosphere
-- **Mood:** A high-craft dark systems studio inspired by modern AI telemetry workspaces, IDE architecture graphs, and editorial monograph layouts.
-- **Density:** 4/10 (Gallery-Structured) on editorial sections; 6/10 (Instrument Precision) inside interactive topology plates and telemetry simulators.
-- **Variance:** 8/10 (Offset asymmetric splits, left-pinned experience choreography, interleaved 3D stack & live WebGL particle lattice).
-- **Motion:** 7/10 (Smooth Lenis scroll synced with GSAP `ScrollTrigger` pinning/scrubbing, `SplitText` reveals, `ScrambleTextPlugin` telemetry counters, spring tactile physics — with instant `prefers-reduced-motion` fallbacks).
+- **Mood:** High-craft dark systems engineering workspace combining IDE telemetry precision with clean editorial typography.
+- **Density:** 4/10 (Gallery-Structured) across editorial bands; 6/10 (Instrument Precision) inside interactive topology views and pipeline controls.
+- **Variance:** 8/10 (AIDA chapter progression: asymmetric 2-line Hero + orbital core -> gapless 12-col Selected Work Bento -> interactive Systems Simulator -> desktop-pinned editorial bio & timeline -> tactile 3D Stack rack -> grounded Contact & Ask console).
+- **Motion:** 7/10 (Single-ticker Lenis smooth scroll synced with GSAP 3.15 `ScrollTrigger`, `SplitText` masked line reveals guarded by `document.fonts.ready`, single-pass `ScrambleTextPlugin` telemetry decoding, and scrubbed SVG `stroke-dashoffset` traces — honoring live `prefers-reduced-motion` static states).
 
-## 2. Color Palette & Roles (Deep Compute)
-- **Obsidian Base (60%):** `#0D1117` (`--bg-canvas`) — Primary background surface. Never pure `#000000`.
-- **Slate Card (30%):** `#161B22` (`--bg-surface`) — Elevated panels, navigation shells, cards (+5% brightness separation over base canvas).
-- **Recessed Compute Well:** `#1C222B` (`--bg-surface-muted`) — Double-Bezel core wells, code blocks, terminal stream logs, SVG canvases.
-- **Soft Bone Ink:** `#E6EDF3` (`--ink-primary`) — Primary headlines, labels, strong body highlights (soft desaturated off-white to prevent halation).
-- **Muted Slate:** `#8B949E` (`--ink-secondary`) — Body descriptions, technical context (`max-w-[65ch]`).
-- **Dim Graphite:** `#6E7681` (`--ink-muted`) — Line counts, indices, dividers, metadata labels.
-- **Electric Cyan (10% Single Accent):** `#38BDF8` (`--accent-primary`) — Active pipeline nodes, focus rings, primary CTAs, WebGL energy pulses. Hover tint: `#7DD3FC`. Soft wash: `rgba(56, 189, 248, 0.12)`.
-- **Structural Hairline:** `rgba(240, 246, 252, 0.10)` (`--border-hairline`) — Crisp 1px architectural dividers and outer Double-Bezel frames.
-- **Functional Telemetry Signals Only (Not Decorative):**
-  - Healthy / Cache Hit / CI Pass: `#10B981`
-  - Latency / Warning / Half-Open Canary: `#F59E0B`
-  - Circuit Open / HTTP 402 / Fault: `#EF4444`
+## 2. Color Palette & Roles
+- **Obsidian Base (60%):** `#0D1117` (`--bg-canvas`) — Primary background surface. Never `#000000`.
+- **Slate Surface (30%):** `#161B22` (`--bg-surface`) — Elevated panels, navigation shells, Double-Bezel frames.
+- **Recessed Compute Well:** `#1C222B` (`--bg-surface-muted`) — Inner bezel wells, code blocks, terminal logs, diagram canvases.
+- **Soft Bone Ink:** `#E6EDF3` (`--ink-primary`) — Primary headlines, labels, strong body contrast.
+- **Secondary Body Ink:** `#9DA7B3` (`--ink-secondary`) — Prose body copy (`max-w-[65ch]`).
+- **Accessible Muted Ink:** `#8B949E` (`--color-muted` / `--ink-muted`) — Metadata, axis labels, indices (`>= 4.5:1` AA contrast; legacy `#6E7681` eliminated).
+- **Single Global UI Accent (`<80%` Saturation):** `#38BDF8` (`--accent-primary`) — Primary CTAs, active nav highlight, focus rings, UI links. Hover tint: `#7DD3FC`. Soft wash: `rgba(56, 189, 248, 0.12)`.
+- **Semantic Category Palette (`src/lib/palette.ts` via `culori` OKLCH, zero purple):** Scoped strictly to project cards, architecture diagrams, Stack layers, and 3D node encoding (`Inference & Serving` sky `#6EC3EE`, `Agents & RAG` rose `#F29BBB`, `MLOps & Security` lime `#B4D67A`, `Mobile & Systems` apricot `#F2B47F`).
+- **Telemetry States (Simulator & Diagrams Only):** Healthy `#10B981`, Warning/Latency `#F59E0B`, Fault/Blocked `#EF4444` (always paired with text/status badge).
 
-## 3. Typography Rules
-- **Display Condensed:** `Antonio` — Uppercase compressed authority (`-0.025em` tracking, tight `0.90` leading).
-- **Editorial Contrast Detail:** `Instrument Serif` (`weight: 400`, normal/italic) — Contrasting lowercase editorial accents inside headings.
-- **UI / Body Sans:** `Plus Jakarta Sans` — Crisp body prose, `max-w-[65ch]`, relaxed `1.65`–`1.75` line-height.
-- **Telemetry / Code Mono:** `JetBrains Mono` — `tabular-nums`, latency readouts, node indices, command palette, simulator JSON.
-- **Banned:** `Inter`, generic system defaults, `#000000`, light/white full washes, green brand themes, `#A855F7` decorative purple/indigo neon glows.
+## 3. Typography & Ergonomic Floors
+- **Display Condensed:** `Antonio` — Uppercase compressed authority (`-0.02em` tracking, `0.90–0.96` leading).
+- **Editorial Accent Detail:** `Instrument Serif` (italic, `400`) — Restrained lowercase accent inside selected display headlines.
+- **UI & Body Sans:** `Plus Jakarta Sans` — Crisp prose (`max-w-[65ch]`, relaxed `1.65` line-height).
+- **Telemetry & Code Mono:** `JetBrains Mono` — `tabular-nums`, latency metrics, stage telemetry, command palette, JSON payloads.
+- **12px Minimum Floor:** All visible HTML, SVG, and canvas-overlay UI copy enforces `>= 12px` (`text-xs`) legibility.
+- **44px Interactive Floor:** All clickable UI buttons, keycaps, HUD triggers, and beacons enforce `>= 44px` minimum hit targets.
 
-## 4. Component & Layout Contracts
-- **Double-Bezel Enclosures:** Outer shell (`#161B22` / `rgba(240,246,252,0.08)` ring) stepping inward to recessed core (`#1C222B` / `#161B22`) with top highlight edge (`inset 0 1px 0 rgba(240,246,252,0.06)`).
-- **Buttons:** Tactile Button-in-Button trailing icon badges with magnetic spring pull on pointer hover and `active:scale-[0.98]`.
-- **Hero Stage:** `min-h-[100dvh]`, WebGL `HeroInferenceCanvas`, `/img/newdp.jpg` portrait in obsidian double-bezel with `#38BDF8` orbital ring, synced `FloatingProjectStack3D`.
-- **Interactive Modules:** `TelemetryMarquee`, interactive `ProjectPreviewPlate` stage inspector, `SystemsPlayground` (Cinch Gateway & MindStack/Nexus NLI live routing simulator), scroll-pinned `ExperienceSection`, and global `Cmd/Ctrl + K` `CommandPalette` wired to `/api/query`.
-
+## 4. Component, WebGL & Scroll Contracts
+- **Compositor-Locked 3D Slot Pool (`ViewportCanvas.tsx` + `WebGLContextProvider.tsx`):** Container-scoped `<Canvas>` instances governed by an LRU active pool (`maxSlots: 3` high / `2` mid) with intersection hysteresis, single session-cached GPU capability probe (`WEBGL_lose_context` cleanup), live `prefers-reduced-motion` subscription, and full 2D SVG/DOM parity (`2D SAFE` / `webglcontextlost`).
+- **Active Scene Set:** `HeroOrbitalCore3D`, `ProjectTopology3D`, `PlaygroundPipeline3D`, `StackRack3D` (tactile layer switchboard with neighbor wave ripple & keyboard sync), `TelemetryGlobe3D`, and case-study `ArchitectureDiagram3D`.
+- **Interactive Modules:** `HeroCursorField`, gapless `SelectedWorkSection` Bento, `SystemsPlayground` (with live Stage Inspector & telemetry payload), merged `AboutSection` narrative + timeline, `CommandPalette` (`<dialog>` + `/api/query`), collapsed `AskTerminal`, and standalone `/brief` & `/uses` routes.

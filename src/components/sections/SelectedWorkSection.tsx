@@ -12,6 +12,7 @@ import { getCategoryHue } from "@/lib/palette";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { ProjectPreviewPlate } from "./ProjectPreviewPlate";
 import { SectionReveal } from "./SectionReveal";
+import { KineticHeading, ScrambleMetric } from "@/components/motion/KineticText";
 
 type FilterValue = "All" | ProjectCategory;
 
@@ -64,12 +65,15 @@ export function SelectedWorkSection() {
               <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#7DD3FC]">
                 <span>Selected Work</span>
               </div>
-              <h2 className="mt-4 font-display text-[clamp(2.4rem,5vw,4.3rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]">
+              <KineticHeading
+                as="h2"
+                className="mt-4 font-display text-[clamp(2.4rem,5vw,4.3rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
+              >
                 SYSTEM ARCHITECTURES,{" "}
                 <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
                   benchmarked.
                 </span>
-              </h2>
+              </KineticHeading>
             </div>
 
             <p className="max-w-[42ch] font-sans text-base leading-relaxed text-[#9DA7B3]">
@@ -111,7 +115,7 @@ export function SelectedWorkSection() {
                         }
                       : undefined
                   }
-                  className={`inline-flex min-h-[40px] items-center gap-2 rounded-full border px-4 py-1.5 font-mono text-xs transition-all duration-300 ${
+                  className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border px-4 py-2 font-mono text-xs transition-all duration-300 ${
                     isActive && !hue
                       ? "border-[#38BDF8] bg-[#38BDF8]/15 font-semibold text-[#E6EDF3]"
                       : isActive
@@ -131,6 +135,13 @@ export function SelectedWorkSection() {
                 </button>
               );
             })}
+
+            <span
+              aria-live="polite"
+              className="ml-auto font-mono text-xs text-[#8B949E] tabular-nums"
+            >
+              Showing {visibleProjects.length} of {projects.length}
+            </span>
           </div>
         </SectionReveal>
 
@@ -155,7 +166,7 @@ export function SelectedWorkSection() {
 
             return (
               <div key={project.slug} className={spanClass}>
-                <SectionReveal delayMs={Math.min(position * 60, 180)}>
+                <SectionReveal delayMs={Math.min(position * 60, 180)} variant="bento-cascade" className="h-full">
                   <article className="double-bezel-outer group h-full transition-colors duration-300 hover:border-[rgba(240,246,252,0.22)]">
                     <div
                       onPointerMove={handleSpotlightMove}
@@ -199,7 +210,7 @@ export function SelectedWorkSection() {
                                 className="rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] px-3 py-2.5"
                               >
                                 <dd className="font-display text-xl font-bold leading-none text-[#E6EDF3] tabular-nums sm:text-2xl">
-                                  {m.value}
+                                  <ScrambleMetric value={m.value} />
                                 </dd>
                                 <dt className="mt-1 font-mono text-xs text-[#8B949E]">
                                   {m.label}

@@ -1,181 +1,347 @@
 "use client";
 
 import Image from "next/image";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
-import { Briefcase, GraduationCap, MapPin } from "@phosphor-icons/react";
-import { principles, profile } from "@/data/site";
+import {
+  ArrowUpRight,
+  Briefcase,
+  GraduationCap,
+  MapPin,
+  Terminal,
+} from "@phosphor-icons/react";
+import { experience, lab, principles, profile } from "@/data/site";
+import { KineticHeading } from "@/components/motion/KineticText";
 import { SectionReveal } from "./SectionReveal";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
-const MANIFESTO_WORDS = [
-  "Models",
-  "are",
-  "stochastic.",
-  "Systems",
-  "engineering",
-  "cannot",
-  "be.",
-] as const;
-
+/**
+ * Unified Background & Experience section combining identity, sticky engineering dial,
+ * ScrollTrigger SVG spine trace, FlyRank + BRAC University timeline, principles, and systems lab.
+ */
 export function AboutSection() {
   const sectionRef = useRef<HTMLElement>(null);
-  const manifestoRef = useRef<HTMLHeadingElement>(null);
-  const portraitWrapRef = useRef<HTMLDivElement>(null);
+  const tracePathRef = useRef<SVGPathElement>(null);
+  const [selectedLabIdx, setSelectedLabIdx] = useState(0);
 
   useGSAP(
     () => {
-      const el = manifestoRef.current;
-      const portrait = portraitWrapRef.current;
-      if (!el) return;
+      const el = sectionRef.current;
+      const path = tracePathRef.current;
+      if (!el || !path) return;
 
-      const words = el.querySelectorAll<HTMLElement>("[data-scrub-word]");
-
+      const totalLength = path.getTotalLength();
       const mm = gsap.matchMedia();
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        if (words.length > 0) {
-          gsap.fromTo(
-            words,
-            { opacity: 0.2 },
-            {
-              opacity: 1,
-              stagger: 0.1,
-              ease: "none",
-              scrollTrigger: {
-                trigger: el,
-                start: "top 92%",
-                end: "top 55%",
-                scrub: 0.4,
-              },
-            }
-          );
-        }
 
-        if (portrait) {
-          gsap.fromTo(
-            portrait,
-            { scale: 0.94 },
-            {
-              scale: 1,
-              ease: "none",
-              clearProps: "transform",
-              scrollTrigger: {
-                trigger: portrait,
-                start: "top 95%",
-                end: "top 55%",
-                scrub: 0.4,
-              },
-            }
-          );
-        }
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.set(path, {
+          strokeDasharray: totalLength,
+          strokeDashoffset: totalLength,
+        });
+
+        gsap.to(path, {
+          strokeDashoffset: 0,
+          ease: "none",
+          scrollTrigger: {
+            trigger: el,
+            start: "top 70%",
+            end: "bottom 75%",
+            scrub: 0.65,
+          },
+        });
+      });
+
+      mm.add("(prefers-reduced-motion: reduce)", () => {
+        gsap.set(path, {
+          strokeDasharray: "none",
+          strokeDashoffset: 0,
+        });
       });
     },
     { scope: sectionRef }
   );
 
+  const activeLab = lab[selectedLabIdx] ?? lab[0];
+
   return (
     <section
       ref={sectionRef}
       id="about"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-24 sm:py-32"
+      className="relative z-[2] border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-20 sm:py-28 lg:py-32"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(240,246,252,0.08)] pb-4 font-mono text-xs uppercase tracking-[0.14em] text-[#8B949E]">
-          <span>Background</span>
-          <span className="text-[#38BDF8]">
-            {profile.location} · {profile.utc}
-          </span>
-        </div>
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-14">
+          {/* Left Sticky Engineering Dial (5 cols) */}
+          <div className="lg:col-span-5">
+            <div className="lg:sticky lg:top-24">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#7DD3FC]">
+                <span>Background &amp; Track</span>
+              </div>
 
-        <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-12 lg:items-start lg:gap-12">
-          {/* Left 5 Cols: Monochrome Portrait */}
-          <div ref={portraitWrapRef} className="min-w-0 lg:col-span-5">
-            <SectionReveal>
-              <div className="double-bezel-outer">
-                <div className="double-bezel-core overflow-hidden p-2.5 sm:p-3">
-                  <div className="group relative aspect-[4/4.6] overflow-hidden rounded-[calc(1.75rem-0.85rem)] bg-[#0D1117]">
+              <KineticHeading
+                as="h2"
+                className="mt-4 font-display text-[clamp(2.35rem,4.6vw,3.9rem)] font-bold uppercase leading-[0.94] tracking-[-0.02em] text-[#E6EDF3]"
+              >
+                SYSTEMS BUILT ON{" "}
+                <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
+                  evidence.
+                </span>
+              </KineticHeading>
+
+              <p className="mt-4 max-w-[44ch] font-sans text-base leading-relaxed text-[#9DA7B3]">
+                {profile.summary}
+              </p>
+
+              {/* Editorial Portrait + Live Track Dial */}
+              <div className="mt-8 overflow-hidden rounded-3xl border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 p-5">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                  <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.14)] bg-[#0D1117]">
                     <Image
-                      src={profile.portrait}
+                      src={profile.heroPortrait}
                       alt={`${profile.name} portrait`}
                       fill
-                      sizes="(max-width: 1024px) 100vw, 42vw"
-                      className="object-cover object-top grayscale contrast-125 transition-all duration-700 group-hover:scale-[1.02] group-hover:grayscale-0"
-                    />
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0D1117] via-transparent to-[#38BDF8]/10 opacity-75"
+                      sizes="96px"
+                      className="object-cover object-top"
                     />
                   </div>
-                  <div className="mt-2.5 flex items-center justify-between rounded-xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] px-3.5 py-2.5 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3]">
-                    <span className="font-semibold text-[#E6EDF3]">{profile.name}</span>
-                    <span className="text-[#38BDF8]">{profile.role}</span>
+
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <p className="font-display text-xl font-bold uppercase tracking-tight text-[#E6EDF3]">
+                      {profile.name}
+                    </p>
+                    <p className="inline-flex items-center gap-1.5 font-mono text-xs text-[#8B949E]">
+                      <MapPin className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
+                      <span>{profile.location}</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#0D1117] px-3 py-1 font-mono text-xs text-[#9DA7B3]">
+                        <Briefcase className="h-3.5 w-3.5 text-[#10B981]" weight="regular" aria-hidden="true" />
+                        <span>FlyRank Intern</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#0D1117] px-3 py-1 font-mono text-xs text-[#9DA7B3]">
+                        <GraduationCap className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
+                        <span>BRACU 2026</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
+
+                {/* ScrollTrigger SVG Telemetry Trace */}
+                <div className="mt-5 border-t border-[rgba(240,246,252,0.08)] pt-4">
+                  <div className="mb-2 flex items-center justify-between font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E]">
+                    <span>Verification Spine</span>
+                    <span className="text-[#38BDF8]">Baseline to Gate</span>
+                  </div>
+                  <svg
+                    viewBox="0 0 360 44"
+                    className="h-11 w-full overflow-visible"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M 8 22 L 88 22 L 116 10 L 180 10 L 208 34 L 272 34 L 300 22 L 352 22"
+                      fill="none"
+                      stroke="rgba(240,246,252,0.12)"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      ref={tracePathRef}
+                      d="M 8 22 L 88 22 L 116 10 L 180 10 L 208 34 L 272 34 L 300 22 L 352 22"
+                      fill="none"
+                      stroke="#38BDF8"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    {[8, 116, 208, 352].map((cx, i) => (
+                      <circle
+                        key={cx}
+                        cx={cx}
+                        cy={i === 1 ? 10 : i === 2 ? 34 : 22}
+                        r="4"
+                        fill="#0D1117"
+                        stroke="#38BDF8"
+                        strokeWidth="2"
+                      />
+                    ))}
+                  </svg>
+                </div>
               </div>
-            </SectionReveal>
+            </div>
           </div>
 
-          {/* Right 7 Cols: Manifesto + Principles */}
-          <div className="min-w-0 space-y-8 lg:col-span-7">
-            <h2
-              ref={manifestoRef}
-              aria-label="Models are stochastic. Systems engineering cannot be."
-              className="font-display text-[clamp(2.35rem,4.6vw,4rem)] font-bold uppercase leading-[0.96] tracking-[-0.02em] text-[#E6EDF3]"
-            >
-              {MANIFESTO_WORDS.map((word, idx) => (
-                <span
-                  key={`${word}-${idx}`}
-                  data-scrub-word
-                  aria-hidden="true"
-                  className={`mr-[0.22em] inline-block ${
-                    idx >= 3 && idx <= 4 ? "text-[#38BDF8]" : ""
-                  }`}
-                >
-                  {word}
+          {/* Right Scrolling Narrative Column (7 cols) */}
+          <div className="space-y-12 lg:col-span-7">
+            {/* 1. Experience & Education Timeline */}
+            <SectionReveal variant="reveal">
+              <div className="mb-6 flex items-center justify-between border-b border-[rgba(240,246,252,0.08)] pb-3">
+                <h3 className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-[#8B949E]">
+                  Experience &amp; Education
+                </h3>
+                <span className="font-mono text-xs text-[#38BDF8]">02 Milestones</span>
+              </div>
+
+              <div className="relative space-y-6 border-l border-[rgba(240,246,252,0.12)] pl-6 sm:pl-8">
+                {experience.map((item) => (
+                  <article
+                    key={item.org}
+                    className="relative rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/75 p-5 transition-colors hover:border-[rgba(240,246,252,0.18)] sm:p-6"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="absolute -left-[31px] top-7 h-3 w-3 rounded-full border-2 border-[#38BDF8] bg-[#0D1117] sm:-left-[39px]"
+                    />
+
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#38BDF8]">
+                        {item.org}
+                      </span>
+                      <span className="rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117] px-3 py-1 font-mono text-xs text-[#8B949E]">
+                        {item.period}
+                      </span>
+                    </div>
+
+                    <h4 className="mt-2 font-display text-2xl font-bold uppercase tracking-tight text-[#E6EDF3]">
+                      {item.role}
+                    </h4>
+                    <p className="mt-1 font-mono text-xs text-[#8B949E]">
+                      Focus: {item.focus}
+                    </p>
+                    <p className="mt-3 font-sans text-sm leading-relaxed text-[#9DA7B3] sm:text-base">
+                      {item.description}
+                    </p>
+
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        {item.stack.map((tech) => (
+                          <span
+                            key={tech}
+                            className="rounded-lg border border-[rgba(240,246,252,0.08)] bg-[#0D1117] px-2.5 py-1 font-mono text-xs text-[#9DA7B3]"
+                          >
+                            {tech}
+                          </span>
+                        ))}
+                      </div>
+
+                      {"href" in item && item.href && (
+                        <a
+                          href={item.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117] px-4 py-2 font-mono text-xs text-[#38BDF8] transition-colors hover:border-[#38BDF8] hover:text-[#7DD3FC]"
+                        >
+                          <span>Repository</span>
+                          <ArrowUpRight className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
+                        </a>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </SectionReveal>
+
+            {/* 2. Operating Principles (hairline typographic index) */}
+            <SectionReveal variant="bento-cascade">
+              <div className="mb-4 flex items-center justify-between border-b border-[rgba(240,246,252,0.08)] pb-3">
+                <h3 className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-[#8B949E]">
+                  Operating Rules
+                </h3>
+                <span className="font-mono text-xs text-[#8B949E]">3 Constraints</span>
+              </div>
+
+              <ol className="divide-y divide-[rgba(240,246,252,0.08)] border-b border-[rgba(240,246,252,0.08)]">
+                {principles.map((p) => (
+                  <li
+                    key={p.k}
+                    data-bento-item
+                    className="grid grid-cols-1 gap-2 py-4 sm:grid-cols-12 sm:items-baseline"
+                  >
+                    <div className="flex items-baseline gap-3 sm:col-span-5">
+                      <span className="font-mono text-xs font-semibold text-[#38BDF8] tabular-nums">
+                        {p.k}
+                      </span>
+                      <span className="font-display text-lg font-bold uppercase tracking-tight text-[#E6EDF3]">
+                        {p.t}
+                      </span>
+                    </div>
+                    <p className="font-sans text-sm leading-relaxed text-[#9DA7B3] sm:col-span-7">
+                      {p.d}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </SectionReveal>
+
+            {/* 3. Research & Low-Level Systems Lab */}
+            <SectionReveal variant="reveal">
+              <div className="mb-4 flex items-center justify-between border-b border-[rgba(240,246,252,0.08)] pb-3">
+                <h3 className="inline-flex items-center gap-2 font-mono text-xs font-semibold uppercase tracking-[0.16em] text-[#8B949E]">
+                  <Terminal className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
+                  <span>Research &amp; Low-Level Lab</span>
+                </h3>
+                <span className="font-mono text-xs text-[#8B949E]">
+                  {lab.length} builds
                 </span>
-              ))}
-            </h2>
+              </div>
 
-            <p className="max-w-[60ch] font-sans text-base leading-relaxed text-[#9DA7B3] sm:text-lg">
-              {profile.summary}
-            </p>
+              <div className="rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/75 p-4 sm:p-5">
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Research and systems builds">
+                  {lab.map((entry, idx) => {
+                    const isSelected = idx === selectedLabIdx;
+                    return (
+                      <button
+                        key={entry.name}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => setSelectedLabIdx(idx)}
+                        className={`min-h-[44px] rounded-xl border px-3.5 py-2 font-mono text-xs transition-colors ${
+                          isSelected
+                            ? "border-[#38BDF8] bg-[#38BDF8]/12 font-semibold text-[#E6EDF3]"
+                            : "border-[rgba(240,246,252,0.08)] bg-[#0D1117] text-[#9DA7B3] hover:border-[rgba(240,246,252,0.2)] hover:text-[#E6EDF3]"
+                        }`}
+                      >
+                        {entry.name}
+                      </button>
+                    );
+                  })}
+                </div>
 
-            <div className="flex flex-wrap gap-3 font-mono text-xs text-[#9DA7B3]">
-              <span className="inline-flex items-center gap-2 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22] px-3.5 py-1.5">
-                <Briefcase className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
-                <span>FlyRank Intern</span>
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22] px-3.5 py-1.5">
-                <GraduationCap className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
-                <span>BRAC University CSE</span>
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22] px-3.5 py-1.5">
-                <MapPin className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
-                <span>{profile.location}</span>
-              </span>
-            </div>
+                {activeLab && (
+                  <div className="mt-4 flex flex-col justify-between gap-4 rounded-xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] p-4 sm:flex-row sm:items-center">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs uppercase tracking-[0.12em] text-[#38BDF8]">
+                          {activeLab.domain}
+                        </span>
+                        <span aria-hidden="true" className="text-[#8B949E]">·</span>
+                        <span className="font-mono text-xs text-[#8B949E]">
+                          {activeLab.stack}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 font-sans text-sm leading-relaxed text-[#E6EDF3]">
+                        {activeLab.note}
+                      </p>
+                    </div>
 
-            <ol className="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-3">
-              {principles.map((item) => (
-                <li
-                  key={item.k}
-                  className="rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22] p-5"
-                >
-                  <p className="font-mono text-xs font-semibold text-[#38BDF8] tabular-nums">
-                    {item.k}
-                  </p>
-                  <h3 className="mt-2 font-display text-xl font-bold uppercase tracking-tight text-[#E6EDF3]">
-                    {item.t}
-                  </h3>
-                  <p className="mt-2 font-sans text-sm leading-relaxed text-[#9DA7B3]">
-                    {item.d}
-                  </p>
-                </li>
-              ))}
-            </ol>
+                    {"href" in activeLab && activeLab.href && (
+                      <a
+                        href={activeLab.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22] px-4 py-2 font-mono text-xs text-[#38BDF8] transition-colors hover:border-[#38BDF8]"
+                      >
+                        <span>Source</span>
+                        <ArrowUpRight className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            </SectionReveal>
           </div>
         </div>
       </div>

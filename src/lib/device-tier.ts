@@ -13,27 +13,39 @@ interface NavigatorWithHints extends Navigator {
   };
 }
 
+let cachedWebGLSupport: boolean | null = null;
+
 /**
  * Checks whether hardware-accelerated WebGL is available in this browser session.
+ * Memoizes the result and releases the temporary probe context immediately.
  */
 export function hasWebGLSupport(): boolean {
   if (typeof window === "undefined") return false;
+  if (cachedWebGLSupport !== null) return cachedWebGLSupport;
   try {
     const canvas = document.createElement("canvas");
     const gl =
       canvas.getContext("webgl2", { failIfMajorPerformanceCaveat: true }) ??
       canvas.getContext("webgl", { failIfMajorPerformanceCaveat: true });
-    if (!gl) return false;
+    if (!gl) {
+      cachedWebGLSupport = false;
+      return false;
+    }
 
+    let supported = true;
     const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
     if (debugInfo) {
       const renderer = String(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) ?? "");
       if (/SwiftShader|llvmpipe|Software|Microsoft Basic Render/i.test(renderer)) {
-        return false;
+        supported = false;
       }
     }
-    return true;
+
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    cachedWebGLSupport = supported;
+    return supported;
   } catch {
+    cachedWebGLSupport = false;
     return false;
   }
 }
