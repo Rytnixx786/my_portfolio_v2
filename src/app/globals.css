@@ -282,11 +282,25 @@ html.lenis body {
   .spotlight-card:hover::after {
     opacity: 1;
   }
+  .bento-tilt-card {
+    transition:
+      transform 240ms var(--ease-editorial),
+      border-color 300ms var(--ease-editorial);
+    transform: perspective(1200px) rotateX(var(--card-rx, 0deg)) rotateY(var(--card-ry, 0deg));
+  }
+  .plate-parallax-inner {
+    transition: transform 260ms var(--ease-editorial);
+    transform: translate3d(var(--plate-px, 0px), var(--plate-py, 0px), 0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto !important;
+  }
+  .bento-tilt-card,
+  .plate-parallax-inner {
+    transform: none !important;
   }
   *,
   *::before,

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import gsap from "gsap";
+import { Flip } from "gsap/Flip";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { ArrowUpRight, FunnelSimple } from "@phosphor-icons/react";
@@ -14,11 +15,12 @@ import { getCategoryHue } from "@/lib/palette";
 import { MOTION } from "@/lib/motion";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
 import { MagneticButton } from "@/components/motion/MagneticButton";
+import { useSlidingIndicator } from "@/components/motion/useSlidingIndicator";
 import { ProjectPreviewPlate } from "./ProjectPreviewPlate";
 import { SectionReveal } from "./SectionReveal";
 import { KineticHeading, ScrambleMetric } from "@/components/motion/KineticText";
 
-gsap.registerPlugin(ScrollTrigger, useGSAP);
+gsap.registerPlugin(ScrollTrigger, Flip, useGSAP);
 
 type FilterValue = "All" | ProjectCategory;
 
@@ -34,7 +36,40 @@ export function SelectedWorkSection() {
   const [activeFilter, setActiveFilter] = useState<FilterValue>("All");
   const [showAllSystems, setShowAllSystems] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
+  const flipStateRef = useRef<ReturnType<typeof Flip.getState> | null>(null);
   const hasInteractedRef = useRef(false);
+
+  const {
+    containerRef: filterRailRef,
+    registerItem: registerFilterItem,
+    rect: filterPillRect,
+    ready: filterPillReady,
+  } = useSlidingIndicator<FilterValue>(activeFilter);
+
+  const activeFilterHue =
+    activeFilter === "All" ? null : getCategoryHue(activeFilter);
+
+  const captureGridFlip = () => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+      flipStateRef.current = null;
+      return;
+    }
+    const items = grid.querySelectorAll("[data-bento-item]");
+    flipStateRef.current = items.length > 0 ? Flip.getState(items) : null;
+  };
+
+  const handleSelectFilter = (next: FilterValue) => {
+    if (next === activeFilter) return;
+    captureGridFlip();
+    setActiveFilter(next);
+  };
+
+  const handleToggleShowAll = () => {
+    captureGridFlip();
+    setShowAllSystems((v) => !v);
+  };
 
   useGSAP(
     () => {
@@ -45,10 +80,39 @@ export function SelectedWorkSection() {
       const grid = gridRef.current;
       if (!grid) return;
 
+      const capturedFlip = flipStateRef.current;
+      flipStateRef.current = null;
+
       const mm = gsap.matchMedia();
       mm.add("(prefers-reduced-motion: no-preference)", () => {
         const items = grid.querySelectorAll("[data-bento-item]");
         if (items.length === 0) return;
+
+        if (capturedFlip) {
+          Flip.from(capturedFlip, {
+            targets: items,
+            duration: 0.44,
+            ease: MOTION.gsapEase,
+            stagger: 0.035,
+            scale: false,
+            simple: true,
+            clearProps: "transform",
+            onEnter: (elements) =>
+              gsap.fromTo(
+                elements,
+                { y: 16, opacity: 0 },
+                {
+                  y: 0,
+                  opacity: 1,
+                  duration: 0.34,
+                  stagger: 0.04,
+                  ease: MOTION.gsapEase,
+                  clearProps: "transform,opacity",
+                }
+              ),
+          });
+          return;
+        }
 
         const staggerStep =
           items.length > 1
@@ -75,7 +139,7 @@ export function SelectedWorkSection() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       ScrollTrigger.refresh();
-    }, 250);
+    }, 480);
     return () => window.clearTimeout(timer);
   }, [activeFilter, showAllSystems]);
 
@@ -127,65 +191,89 @@ export function SelectedWorkSection() {
               </KineticHeading>
             </div>
 
-            <p className="max-w-[42ch] font-sans text-base leading-relaxed text-[#9DA7B3]">
-              Flagship architectures first, with category filters and live 3D system topologies.
-            </p>
+            <SectionReveal parallaxY={8}>
+              <p className="max-w-[42ch] font-sans text-base leading-relaxed text-[#9DA7B3]">
+                Flagship architectures first, with category filters and live 3D system topologies.
+              </p>
+            </SectionReveal>
           </div>
 
-          {/* Interactive Category Filter Pills */}
-          <div
-            role="group"
-            aria-label="Filter projects by engineering category"
-            className="mt-7 flex flex-wrap items-center gap-2.5"
-          >
+          {/* Interactive Category Filter Pills with GPU Sliding Active Rail */}
+          <div className="mt-7 flex flex-wrap items-center gap-2.5">
             <span className="mr-1 inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-[0.14em] text-[#8B949E]">
               <FunnelSimple className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
               <span>Filter</span>
             </span>
 
-            {FILTER_OPTIONS.map((option) => {
-              const isActive = activeFilter === option.value;
-              const hue = option.value === "All" ? null : getCategoryHue(option.value);
-              const count =
-                option.value === "All"
-                  ? projects.length
-                  : projects.filter((p) => p.category === option.value).length;
+            <div
+              ref={filterRailRef}
+              role="group"
+              aria-label="Filter projects by engineering category"
+              className="relative flex flex-wrap items-center gap-2.5"
+            >
+              {filterPillReady && filterPillRect && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-0 top-0 rounded-full border transition-[transform,width,height,background-color,border-color] duration-300 ease-[var(--ease-editorial)]"
+                  style={{
+                    width: filterPillRect.width,
+                    height: filterPillRect.height,
+                    transform: `translate3d(${filterPillRect.left}px, ${filterPillRect.top}px, 0)`,
+                    borderColor: activeFilterHue ? activeFilterHue.hex : "#38BDF8",
+                    backgroundColor: activeFilterHue
+                      ? activeFilterHue.softBg
+                      : "rgba(56, 189, 248, 0.15)",
+                  }}
+                />
+              )}
 
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  aria-pressed={isActive}
-                  onClick={() => setActiveFilter(option.value)}
-                  style={
-                    isActive && hue
-                      ? {
-                          borderColor: hue.hex,
-                          backgroundColor: hue.softBg,
-                          color: "#E6EDF3",
-                        }
-                      : undefined
-                  }
-                  className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border px-4 py-2 font-mono text-xs transition-all duration-300 ${
-                    isActive && !hue
-                      ? "border-[#38BDF8] bg-[#38BDF8]/15 font-semibold text-[#E6EDF3]"
-                      : isActive
-                        ? "font-semibold"
+              {FILTER_OPTIONS.map((option) => {
+                const isActive = activeFilter === option.value;
+                const hue = option.value === "All" ? null : getCategoryHue(option.value);
+                const count =
+                  option.value === "All"
+                    ? projects.length
+                    : projects.filter((p) => p.category === option.value).length;
+
+                return (
+                  <button
+                    key={option.value}
+                    ref={registerFilterItem(option.value)}
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() => handleSelectFilter(option.value)}
+                    style={
+                      isActive && hue && !filterPillReady
+                        ? {
+                            borderColor: hue.hex,
+                            backgroundColor: hue.softBg,
+                            color: "#E6EDF3",
+                          }
+                        : undefined
+                    }
+                    className={`relative z-10 inline-flex min-h-[44px] items-center gap-2 rounded-full border px-4 py-2 font-mono text-xs transition-colors duration-300 ${
+                      isActive
+                        ? filterPillReady
+                          ? "border-transparent bg-transparent font-semibold text-[#E6EDF3]"
+                          : !hue
+                            ? "border-[#38BDF8] bg-[#38BDF8]/15 font-semibold text-[#E6EDF3]"
+                            : "font-semibold"
                         : "border-[rgba(240,246,252,0.1)] bg-[#161B22] text-[#9DA7B3] hover:border-[rgba(240,246,252,0.25)] hover:text-[#E6EDF3]"
-                  }`}
-                >
-                  {hue && (
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: hue.hex }}
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span>{option.label}</span>
-                  <span className="text-[#8B949E] tabular-nums">({count})</span>
-                </button>
-              );
-            })}
+                    }`}
+                  >
+                    {hue && (
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: hue.hex }}
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span>{option.label}</span>
+                    <span className="text-[#8B949E] tabular-nums">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
 
             <span
               aria-live="polite"
@@ -206,24 +294,44 @@ export function SelectedWorkSection() {
               const isWideCard = spanClass === "lg:col-span-12";
               const hue = getCategoryHue(project.category);
 
-              const handleSpotlightMove = (event: PointerEvent<HTMLDivElement>) => {
+              const handleCardPointerMove = (event: PointerEvent<HTMLElement>) => {
                 if (event.pointerType === "touch") return;
-                const rect = event.currentTarget.getBoundingClientRect();
-                event.currentTarget.style.setProperty(
-                  "--mouse-x",
-                  `${event.clientX - rect.left}px`
-                );
-                event.currentTarget.style.setProperty(
-                  "--mouse-y",
-                  `${event.clientY - rect.top}px`
-                );
+                const el = event.currentTarget;
+                const rect = el.getBoundingClientRect();
+                const relX = event.clientX - rect.left;
+                const relY = event.clientY - rect.top;
+                el.style.setProperty("--mouse-x", `${relX}px`);
+                el.style.setProperty("--mouse-y", `${relY}px`);
+
+                const canTilt =
+                  window.matchMedia?.("(hover: hover) and (pointer: fine)")?.matches &&
+                  !window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+                if (!canTilt || rect.width <= 0 || rect.height <= 0) return;
+
+                const nx = relX / rect.width - 0.5;
+                const ny = relY / rect.height - 0.5;
+                el.style.setProperty("--card-rx", `${(-ny * 3.2).toFixed(2)}deg`);
+                el.style.setProperty("--card-ry", `${(nx * 3.2).toFixed(2)}deg`);
+                el.style.setProperty("--plate-px", `${(nx * 8).toFixed(2)}px`);
+                el.style.setProperty("--plate-py", `${(ny * 8).toFixed(2)}px`);
+              };
+
+              const handleCardPointerLeave = (event: PointerEvent<HTMLElement>) => {
+                const el = event.currentTarget;
+                el.style.setProperty("--card-rx", "0deg");
+                el.style.setProperty("--card-ry", "0deg");
+                el.style.setProperty("--plate-px", "0px");
+                el.style.setProperty("--plate-py", "0px");
               };
 
               return (
                 <div key={project.slug} data-bento-item className={spanClass}>
-                  <article className="double-bezel-outer group h-full transition-colors duration-300 hover:border-[rgba(240,246,252,0.22)]">
+                  <article
+                    onPointerMove={handleCardPointerMove}
+                    onPointerLeave={handleCardPointerLeave}
+                    className="bento-tilt-card double-bezel-outer group h-full hover:border-[rgba(240,246,252,0.22)]"
+                  >
                     <div
-                      onPointerMove={handleSpotlightMove}
                       style={{ "--spotlight-color": hue.softBg } as CSSProperties}
                       className="double-bezel-core spotlight-card flex h-full flex-col justify-between overflow-hidden p-5 sm:p-7"
                     >
@@ -317,7 +425,7 @@ export function SelectedWorkSection() {
           <div className="mt-8 flex justify-center">
             <button
               type="button"
-              onClick={() => setShowAllSystems((v) => !v)}
+              onClick={handleToggleShowAll}
               aria-expanded={showAllSystems}
               className="inline-flex min-h-[44px] items-center gap-2.5 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22] px-6 py-2.5 font-mono text-xs uppercase tracking-[0.14em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8]"
             >

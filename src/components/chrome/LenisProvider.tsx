@@ -95,14 +95,18 @@ export function LenisProvider({ children }: { children: ReactNode }) {
     reducedRef.current = reduced;
 
     const updateProgress = () => {
-      const bar = progressBarRef.current;
-      if (!bar) return;
       const maxScroll = Math.max(
         1,
         document.documentElement.scrollHeight - window.innerHeight
       );
       const ratio = Math.min(1, Math.max(0, window.scrollY / maxScroll));
-      bar.style.transform = `scaleX(${ratio.toFixed(4)})`;
+      const bar = progressBarRef.current;
+      if (bar) {
+        bar.style.transform = `scaleX(${ratio.toFixed(4)})`;
+      }
+      window.dispatchEvent(
+        new CustomEvent("portfolio:scroll-progress", { detail: { ratio } })
+      );
     };
 
     let lenis: Lenis | null = null;

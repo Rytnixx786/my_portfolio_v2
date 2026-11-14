@@ -13,6 +13,7 @@ interface SectionRevealProps {
   className?: string;
   delayMs?: number;
   variant?: "reveal" | "bento-cascade" | "scrub-depth";
+  parallaxY?: number;
 }
 
 /**
@@ -26,6 +27,7 @@ export function SectionReveal({
   className = "",
   delayMs = 0,
   variant = "reveal",
+  parallaxY = 0,
 }: SectionRevealProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -36,6 +38,24 @@ export function SectionReveal({
 
       const mm = gsap.matchMedia();
       mm.add("(prefers-reduced-motion: no-preference)", () => {
+        if (parallaxY !== 0) {
+          gsap.fromTo(
+            el,
+            { y: parallaxY },
+            {
+              y: -parallaxY,
+              ease: "none",
+              scrollTrigger: {
+                trigger: el,
+                start: "top bottom",
+                end: "bottom top",
+                scrub: MOTION.scrollTrigger.scrub,
+              },
+            }
+          );
+          if (variant === "reveal") return;
+        }
+
         const rect = el.getBoundingClientRect();
         if (variant !== "scrub-depth" && rect.top < window.innerHeight * 0.94) {
           return;
@@ -111,7 +131,7 @@ export function SectionReveal({
         );
       });
     },
-    { scope: ref, dependencies: [delayMs, variant] }
+    { scope: ref, dependencies: [delayMs, variant, parallaxY] }
   );
 
   return (

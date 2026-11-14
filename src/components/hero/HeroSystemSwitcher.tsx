@@ -1,9 +1,17 @@
 "use client";
 
+import { useRef } from "react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
 import { ArrowUpRight, CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { projects } from "@/data/projects";
+import { MOTION } from "@/lib/motion";
 import { getCategoryHue } from "@/lib/palette";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
+import { ScrambleMetric } from "@/components/motion/KineticText";
+import { useSlidingIndicator } from "@/components/motion/useSlidingIndicator";
+
+gsap.registerPlugin(useGSAP);
 
 const FLAGSHIP_SLUGS = ["cinch", "nexus-researcher", "ares", "mindstack"] as const;
 
@@ -28,8 +36,53 @@ export function HeroSystemSwitcher({
   const topMetric = current.highlightMetrics[0];
   const secondaryMetric = current.highlightMetrics[1];
 
+  const cardRef = useRef<HTMLDivElement>(null);
+  const prevIndexRef = useRef(safeIndex);
+  const {
+    containerRef: railRef,
+    registerItem,
+    rect: pillRect,
+    ready: pillReady,
+  } = useSlidingIndicator<number>(safeIndex);
+
+  useGSAP(
+    () => {
+      const prev = prevIndexRef.current;
+      prevIndexRef.current = safeIndex;
+      if (prev === safeIndex) return;
+
+      const delta = safeIndex - prev;
+      const dir =
+        Math.abs(delta) === deck.length - 1
+          ? delta > 0
+            ? -1
+            : 1
+          : delta > 0
+            ? 1
+            : -1;
+
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.fromTo(
+          "[data-switcher-slide]",
+          { x: dir * 12, opacity: 0.25 },
+          {
+            x: 0,
+            opacity: 1,
+            duration: MOTION.durations.ui,
+            stagger: 0.03,
+            ease: MOTION.gsapEase,
+            clearProps: "transform,opacity",
+          }
+        );
+      });
+    },
+    { scope: cardRef, dependencies: [safeIndex] }
+  );
+
   return (
     <div
+      ref={cardRef}
       onKeyDown={(event) => {
         if (event.key === "ArrowLeft") {
           event.preventDefault();
@@ -55,14 +108,33 @@ export function HeroSystemSwitcher({
         }}
       />
 
-      {/* Top Segmented System Rail */}
-      <div className="flex flex-nowrap items-center gap-1 rounded-xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117]/85 p-1">
+      {/* Top Segmented System Rail with GPU Sliding Indicator */}
+      <div
+        ref={railRef}
+        className="relative flex flex-nowrap items-center gap-1 rounded-xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117]/85 p-1"
+      >
+        {pillReady && pillRect && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute left-0 top-0 rounded-lg border transition-[transform,width,height,background-color,border-color] duration-300 ease-[var(--ease-editorial)]"
+            style={{
+              width: pillRect.width,
+              height: pillRect.height,
+              transform: `translate3d(${pillRect.left}px, ${pillRect.top}px, 0)`,
+              backgroundColor: hue.softBg,
+              borderColor: hue.border,
+              boxShadow: "inset 0 1px 0 rgba(240,246,252,0.08)",
+            }}
+          />
+        )}
+
         {deck.map((item, idx) => {
           const isCurrent = idx === safeIndex;
           const itemHue = getCategoryHue(item.category);
           return (
             <button
               key={item.slug}
+              ref={registerItem(idx)}
               type="button"
               onClick={() => onActiveChange?.(idx)}
               aria-label={`Select ${item.name}`}
@@ -70,17 +142,21 @@ export function HeroSystemSwitcher({
               style={
                 isCurrent
                   ? {
-                      backgroundColor: itemHue.softBg,
-                      borderColor: itemHue.border,
                       color: itemHue.labelText,
-                      boxShadow: `inset 0 1px 0 rgba(240,246,252,0.08)`,
+                      ...(!pillReady
+                        ? {
+                            backgroundColor: itemHue.softBg,
+                            borderColor: itemHue.border,
+                            boxShadow: "inset 0 1px 0 rgba(240,246,252,0.08)",
+                          }
+                        : undefined),
                     }
                   : undefined
               }
-              className={`inline-flex min-h-[44px] flex-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-1.5 py-1 text-center font-mono text-xs transition-all sm:px-2.5 ${
+              className={`relative z-10 inline-flex min-h-[44px] flex-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-transparent px-1.5 py-1 text-center font-mono text-xs transition-colors sm:px-2.5 ${
                 isCurrent
                   ? "font-semibold"
-                  : "border-transparent text-[#8B949E] hover:bg-[#161B22]/80 hover:text-[#E6EDF3]"
+                  : "text-[#8B949E] hover:text-[#E6EDF3]"
               }`}
             >
               <span
@@ -99,7 +175,10 @@ export function HeroSystemSwitcher({
 
       {/* Telemetry Spec Panel (locked 2-tier height, 0.0px shift across systems) */}
       <div className="hidden rounded-xl border border-[rgba(240,246,252,0.07)] bg-[#0D1117]/70 px-3 py-2 sm:block">
-        <div className="flex items-center justify-between gap-3 font-mono text-xs leading-none">
+        <div
+          data-switcher-slide
+          className="flex items-center justify-between gap-3 font-mono text-xs leading-none"
+        >
           <div className="flex shrink-0 items-center gap-1.5">
             <span
               className="whitespace-nowrap font-semibold uppercase tracking-[0.1em]"
@@ -127,7 +206,7 @@ export function HeroSystemSwitcher({
                 className="shrink-0 whitespace-nowrap font-mono text-xs font-semibold tabular-nums"
                 style={{ color: hue.labelText }}
               >
-                {topMetric.value}
+                <ScrambleMetric value={topMetric.value} />
               </span>
             </div>
           )}
@@ -137,7 +216,7 @@ export function HeroSystemSwitcher({
                 {secondaryMetric.label}
               </span>
               <span className="shrink-0 whitespace-nowrap font-mono text-xs font-semibold text-[#E6EDF3] tabular-nums">
-                {secondaryMetric.value}
+                <ScrambleMetric value={secondaryMetric.value} />
               </span>
             </div>
           )}
@@ -146,7 +225,10 @@ export function HeroSystemSwitcher({
 
       {/* Mobile-only full-width topMetric row so long labels never truncate on 375px */}
       {topMetric && (
-        <div className="flex items-baseline justify-between gap-2 rounded-lg border border-[rgba(240,246,252,0.06)] bg-[#0D1117]/70 px-2.5 py-1.5 sm:hidden">
+        <div
+          data-switcher-slide
+          className="flex items-baseline justify-between gap-2 rounded-lg border border-[rgba(240,246,252,0.06)] bg-[#0D1117]/70 px-2.5 py-1.5 sm:hidden"
+        >
           <span className="font-mono text-xs text-[#9DA7B3]">
             {topMetric.label}
           </span>
@@ -154,14 +236,14 @@ export function HeroSystemSwitcher({
             className="shrink-0 font-mono text-xs font-semibold tabular-nums"
             style={{ color: hue.labelText }}
           >
-            {topMetric.value}
+            <ScrambleMetric value={topMetric.value} />
           </span>
         </div>
       )}
 
       {/* Bottom Action & Controls Row */}
       <div className="flex items-center justify-between gap-2 px-0.5">
-        <div className="flex min-w-0 items-center gap-2">
+        <div data-switcher-slide className="flex min-w-0 items-center gap-2">
           <span className="whitespace-nowrap font-mono text-xs text-[#8B949E] sm:hidden">
             {String(safeIndex + 1).padStart(2, "0")}/04 · {current.name.split(" ")[0]}
           </span>

@@ -14,6 +14,7 @@ import {
   type ZoomAction,
   type ZoomSignal,
 } from "./CanvasZoomHUD";
+import { HeroOrbitalBootSilhouette } from "@/components/hero/HeroOrbitalBootSilhouette";
 import { ViewportCanvas } from "./ViewportCanvas";
 
 const ORBITAL_SYSTEMS = [
@@ -914,13 +915,7 @@ export function HeroOrbitalCore3D({
         onCanvasReadyChange={setStageReady}
         cameraPosition={HERO_CAM_POS}
         fov={40}
-        loadingFallback={
-          <div className="flex h-full w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/40">
-            <span className="font-mono text-xs uppercase tracking-[0.16em] text-[#8B949E]">
-              Initializing Orbital Stage...
-            </span>
-          </div>
-        }
+        loadingFallback={<HeroOrbitalBootSilhouette className="h-full w-full" />}
         fallback={
           <HeroOrbital2DFallback
             activeSystemIndex={activeSystemIndex}

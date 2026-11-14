@@ -10,6 +10,16 @@ import { TransitionLink } from "@/components/chrome/TransitionLink";
 
 const emptySubscribe = () => () => {};
 
+const SECTION_TELEMETRY_CODES: Record<string, string> = {
+  top: "00 HERO",
+  work: "01 WORK",
+  simulator: "02 SIM",
+  about: "03 TRACK",
+  expertise: "04 STACK",
+  contact: "05 CONTACT",
+  brief: "06 BRIEF",
+};
+
 function isApplePlatform(): boolean {
   if (typeof navigator === "undefined") return false;
   const navWithUaData = navigator as Navigator & {
@@ -33,6 +43,8 @@ export function Navbar() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const scrollPctRef = useRef<HTMLSpanElement>(null);
+  const headerBarRef = useRef<HTMLDivElement>(null);
   const wasMobileOpenRef = useRef(false);
 
   const mobileOpen = openedPath === pathname;
@@ -43,6 +55,10 @@ export function Navbar() {
       : pathname !== "/"
         ? ""
         : scrolledSection;
+
+  const telemetryCode =
+    SECTION_TELEMETRY_CODES[activeSection] ??
+    (pathname === "/uses" ? "07 USES" : "00 INDEX");
 
   useBodyScrollLock(mobileOpen);
 
@@ -86,6 +102,41 @@ export function Navbar() {
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    const syncScrollTelemetry = (ratioValue?: number) => {
+      const ratio =
+        typeof ratioValue === "number"
+          ? ratioValue
+          : Math.min(
+              1,
+              Math.max(
+                0,
+                window.scrollY /
+                  Math.max(1, document.documentElement.scrollHeight - window.innerHeight)
+              )
+            );
+      const pct = String(Math.round(ratio * 100)).padStart(2, "0");
+      if (scrollPctRef.current) {
+        scrollPctRef.current.textContent = `${pct}%`;
+      }
+      if (headerBarRef.current) {
+        headerBarRef.current.style.transform = `scaleX(${ratio.toFixed(4)})`;
+      }
+    };
+
+    syncScrollTelemetry();
+
+    const onScrollProgress = (event: Event) => {
+      const ratio = (event as CustomEvent<{ ratio?: number }>).detail?.ratio;
+      syncScrollTelemetry(ratio);
+    };
+
+    window.addEventListener("portfolio:scroll-progress", onScrollProgress);
+    return () => {
+      window.removeEventListener("portfolio:scroll-progress", onScrollProgress);
+    };
+  }, [pathname]);
 
   useEffect(() => {
     if (pathname !== "/") return;
@@ -152,13 +203,27 @@ export function Navbar() {
           aria-label="Primary navigation"
           className="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-2 px-4 sm:gap-3 sm:px-6 xl:gap-6 xl:px-8"
         >
-          {/* Left: Clean Editorial Wordmark */}
-          <TransitionLink
-            href="/"
-            className="inline-flex min-h-[44px] min-w-0 shrink-0 items-center whitespace-nowrap font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#E6EDF3] transition-colors hover:text-[#38BDF8] xl:tracking-[0.18em]"
-          >
-            {profile.name}
-          </TransitionLink>
+          {/* Left: Clean Editorial Wordmark + Live Scroll Telemetry Pill */}
+          <div className="flex min-w-0 shrink-0 items-center gap-2.5">
+            <TransitionLink
+              href="/"
+              className="inline-flex min-h-[44px] min-w-0 shrink-0 items-center whitespace-nowrap font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#E6EDF3] transition-colors hover:text-[#38BDF8] xl:tracking-[0.18em]"
+            >
+              {profile.name}
+            </TransitionLink>
+
+            <span
+              aria-hidden="true"
+              className="hidden items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-xs tabular-nums text-[#8B949E] sm:inline-flex"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-[#38BDF8]" />
+              <span className="text-[#E6EDF3]">{telemetryCode}</span>
+              <span className="text-[#8B949E]">·</span>
+              <span ref={scrollPctRef} className="min-w-[3ch] text-right text-[#7DD3FC]">
+                00%
+              </span>
+            </span>
+          </div>
 
           {/* Center: Clean Architectural Hairline Links */}
           <ul className="hidden items-center gap-0.5 lg:flex xl:gap-1.5">
@@ -250,6 +315,15 @@ export function Navbar() {
           </button>
         </div>
       </nav>
+
+      {/* Hairline scroll-synced header border gauge */}
+      <div aria-hidden="true" className="pointer-events-none h-px w-full overflow-hidden">
+        <div
+          ref={headerBarRef}
+          className="h-full w-full origin-left bg-gradient-to-r from-[#38BDF8]/75 to-[#7DD3FC]"
+          style={{ transform: "scaleX(0)" }}
+        />
+      </div>
 
       {/* Mobile Drawer with GPU grid-rows transition + native inert state */}
       <div

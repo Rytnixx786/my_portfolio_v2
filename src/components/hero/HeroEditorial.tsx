@@ -3,16 +3,18 @@
 import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
 import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { ArrowDownRight, FilePdf } from "@phosphor-icons/react";
 import { profile } from "@/data/site";
 import { MOTION } from "@/lib/motion";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { KineticHeading } from "@/components/motion/KineticText";
+import { HeroOrbitalBootSilhouette } from "./HeroOrbitalBootSilhouette";
 import { HeroSystemSwitcher } from "./HeroSystemSwitcher";
 import { HeroCursorField } from "./HeroCursorField";
 
-gsap.registerPlugin(useGSAP);
+gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const LazyHeroOrbitalCore3D = dynamic(
   () =>
@@ -22,11 +24,7 @@ const LazyHeroOrbitalCore3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[280px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/40 sm:h-[380px] lg:h-[420px]">
-        <span className="font-mono text-xs uppercase tracking-[0.16em] text-[#8B949E]">
-          Initializing Orbital Stage...
-        </span>
-      </div>
+      <HeroOrbitalBootSilhouette className="h-[280px] w-full sm:h-[380px] lg:h-[420px]" />
     ),
   }
 );
@@ -42,14 +40,59 @@ export function HeroEditorial() {
 
   useGSAP(
     () => {
+      const hero = heroRef.current;
+      if (!hero) return;
+
       const mm = gsap.matchMedia();
       mm.add("(prefers-reduced-motion: no-preference)", () => {
-        gsap.from("[data-hero-stagger]", {
-          y: 14,
-          duration: MOTION.durations.reveal,
-          stagger: MOTION.stagger.hero,
-          ease: MOTION.gsapEase,
+        // 3-beat entrance: Beat 1 eyebrow -> Beat 2 KineticHeading (handled by immediate) -> Beat 3 copy/CTAs + stage settle
+        const tl = gsap.timeline({ defaults: { ease: MOTION.gsapEase } });
+        tl.from("[data-hero-beat='1']", {
+          y: 12,
+          duration: 0.45,
           clearProps: "transform",
+        })
+          .from(
+            "[data-hero-beat='3']",
+            {
+              y: 16,
+              duration: MOTION.durations.reveal,
+              stagger: MOTION.stagger.hero,
+              clearProps: "transform",
+            },
+            0.14
+          )
+          .from(
+            "[data-hero-stage-enter]",
+            {
+              y: 14,
+              duration: MOTION.durations.reveal,
+              clearProps: "transform",
+            },
+            0.18
+          );
+
+        // Scroll-linked foreground/stage depth separation on hero exit
+        gsap.to("[data-hero-copy]", {
+          y: -26,
+          ease: "none",
+          scrollTrigger: {
+            trigger: hero,
+            start: "top top",
+            end: "bottom top",
+            scrub: MOTION.scrollTrigger.scrub,
+          },
+        });
+
+        gsap.to("[data-hero-stage]", {
+          y: -12,
+          ease: "none",
+          scrollTrigger: {
+            trigger: hero,
+            start: "top top",
+            end: "bottom top",
+            scrub: MOTION.scrollTrigger.scrub,
+          },
         });
       });
     },
@@ -74,9 +117,9 @@ export function HeroEditorial() {
       <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 sm:px-8">
         <div className="grid grid-cols-1 items-center gap-6 sm:gap-10 lg:grid-cols-12 lg:gap-12">
           {/* Left 7 Cols: Focused Editorial Identity */}
-          <div className="min-w-0 lg:col-span-7">
+          <div data-hero-copy className="min-w-0 lg:col-span-7">
             <p
-              data-hero-stagger
+              data-hero-beat="1"
               className="inline-flex max-w-full items-center gap-2.5 border-0 bg-transparent px-0 font-mono text-xs uppercase tracking-[0.14em] text-[#9DA7B3]"
             >
               <span className="h-2 w-2 shrink-0 rounded-full bg-[#10B981]" aria-hidden="true" />
@@ -86,6 +129,7 @@ export function HeroEditorial() {
             <KineticHeading
               as="h1"
               immediate
+              delay={0.05}
               className="mt-4 max-w-5xl font-display text-[clamp(2.45rem,6.4vw,5.5rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3] sm:mt-5"
             >
               RELIABLE{" "}
@@ -95,13 +139,13 @@ export function HeroEditorial() {
             </KineticHeading>
 
             <p
-              data-hero-stagger
+              data-hero-beat="3"
               className="mt-3 max-w-[46ch] font-sans text-base leading-relaxed text-[#9DA7B3] sm:mt-4 sm:text-lg"
             >
               Quantized serving, grounded RAG, and fault-isolated backends.
             </p>
 
-            <div data-hero-stagger className="mt-5 flex flex-wrap items-center gap-3.5 sm:mt-7">
+            <div data-hero-beat="3" className="mt-5 flex flex-wrap items-center gap-3.5 sm:mt-7">
               <MagneticButton>
                 <a
                   href="#work"
@@ -131,15 +175,17 @@ export function HeroEditorial() {
           </div>
 
           {/* Right 5 Cols: Interactive 3D/2D Orbital Stage + Compact Switcher Bar */}
-          <div className="flex min-w-0 flex-col gap-3 lg:col-span-5">
-            <LazyHeroOrbitalCore3D
-              activeSystemIndex={activeSystemIndex}
-              onSelectSystem={setActiveSystemIndex}
-            />
-            <HeroSystemSwitcher
-              activeIndex={activeSystemIndex}
-              onActiveChange={setActiveSystemIndex}
-            />
+          <div data-hero-stage className="min-w-0 lg:col-span-5">
+            <div data-hero-stage-enter className="flex min-w-0 flex-col gap-3">
+              <LazyHeroOrbitalCore3D
+                activeSystemIndex={activeSystemIndex}
+                onSelectSystem={setActiveSystemIndex}
+              />
+              <HeroSystemSwitcher
+                activeIndex={activeSystemIndex}
+                onActiveChange={setActiveSystemIndex}
+              />
+            </div>
           </div>
         </div>
       </div>

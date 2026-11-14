@@ -140,7 +140,7 @@ export function ProjectPreviewPlate({
         >
           <svg
             viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            className="h-auto w-full select-none"
+            className="plate-parallax-inner h-auto w-full select-none"
             aria-hidden="true"
           >
             {connections.map((conn) => {

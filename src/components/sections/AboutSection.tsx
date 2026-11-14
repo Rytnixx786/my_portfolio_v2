@@ -18,6 +18,13 @@ import { SectionReveal } from "./SectionReveal";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
+const SPINE_WAYPOINTS = [
+  { cx: 8, cy: 22, threshold: 0.02 },
+  { cx: 116, cy: 10, threshold: 0.3 },
+  { cx: 208, cy: 34, threshold: 0.62 },
+  { cx: 352, cy: 22, threshold: 0.96 },
+] as const;
+
 /**
  * Unified Background & Experience section combining identity, sticky engineering dial,
  * ScrollTrigger SVG spine trace, FlyRank + BRAC University timeline, principles, and systems lab.
@@ -25,6 +32,10 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 export function AboutSection() {
   const sectionRef = useRef<HTMLElement>(null);
   const tracePathRef = useRef<SVGPathElement>(null);
+  const tracerDotRef = useRef<SVGCircleElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const percentReadoutRef = useRef<HTMLSpanElement>(null);
+  const waypointRefs = useRef<Array<SVGCircleElement | null>>([]);
   const [selectedLabIdx, setSelectedLabIdx] = useState(0);
   const [activeMilestone, setActiveMilestone] = useState(0);
 
@@ -35,6 +46,37 @@ export function AboutSection() {
       if (!el || !path) return;
 
       const totalLength = path.getTotalLength();
+      const applySpineProgress = (progress: number) => {
+        const clamped = Math.min(1, Math.max(0, progress));
+        setActiveMilestone(clamped >= 0.5 ? 1 : 0);
+
+        if (progressBarRef.current) {
+          progressBarRef.current.style.transform = `scaleX(${clamped.toFixed(4)})`;
+        }
+        if (percentReadoutRef.current) {
+          const pct = String(Math.round(clamped * 100)).padStart(2, "0");
+          percentReadoutRef.current.textContent = `${pct}% · ${
+            clamped >= 0.5 ? "PHASE 02/02" : "PHASE 01/02"
+          }`;
+        }
+
+        const tracer = tracerDotRef.current;
+        if (tracer) {
+          const pt = path.getPointAtLength(clamped * totalLength);
+          tracer.setAttribute("cx", pt.x.toFixed(2));
+          tracer.setAttribute("cy", pt.y.toFixed(2));
+          tracer.setAttribute("opacity", clamped > 0.01 ? "1" : "0");
+        }
+
+        SPINE_WAYPOINTS.forEach((wp, idx) => {
+          const node = waypointRefs.current[idx];
+          if (!node) return;
+          const active = clamped >= wp.threshold;
+          node.setAttribute("fill", active ? "#38BDF8" : "#0D1117");
+          node.setAttribute("r", active ? "4.6" : "4");
+        });
+      };
+
       const mm = gsap.matchMedia();
 
       mm.add("(prefers-reduced-motion: no-preference)", () => {
@@ -42,6 +84,7 @@ export function AboutSection() {
           strokeDasharray: totalLength,
           strokeDashoffset: totalLength,
         });
+        applySpineProgress(0);
 
         gsap.to(path, {
           strokeDashoffset: 0,
@@ -52,7 +95,7 @@ export function AboutSection() {
             end: "bottom 75%",
             scrub: 0.65,
             onUpdate: (self) => {
-              setActiveMilestone(self.progress >= 0.5 ? 1 : 0);
+              applySpineProgress(self.progress);
             },
           },
         });
@@ -63,6 +106,7 @@ export function AboutSection() {
           strokeDasharray: "none",
           strokeDashoffset: 0,
         });
+        applySpineProgress(1);
       });
     },
     { scope: sectionRef }
@@ -138,7 +182,16 @@ export function AboutSection() {
                 <div className="mt-5 border-t border-[rgba(240,246,252,0.08)] pt-4">
                   <div className="mb-2 flex items-center justify-between font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E]">
                     <span>Verification Spine</span>
-                    <span className="text-[#38BDF8]">Baseline to Gate</span>
+                    <span ref={percentReadoutRef} className="text-[#38BDF8] tabular-nums">
+                      00% · PHASE 01/02
+                    </span>
+                  </div>
+                  <div className="mb-2.5 h-1 w-full overflow-hidden rounded-full bg-[rgba(240,246,252,0.08)]">
+                    <div
+                      ref={progressBarRef}
+                      className="h-full w-full origin-left bg-gradient-to-r from-[#38BDF8] to-[#7DD3FC]"
+                      style={{ transform: "scaleX(0)" }}
+                    />
                   </div>
                   <svg
                     viewBox="0 0 360 44"
@@ -162,17 +215,31 @@ export function AboutSection() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
-                    {[8, 116, 208, 352].map((cx, i) => (
+                    {SPINE_WAYPOINTS.map((wp, i) => (
                       <circle
-                        key={cx}
-                        cx={cx}
-                        cy={i === 1 ? 10 : i === 2 ? 34 : 22}
+                        key={wp.cx}
+                        ref={(node) => {
+                          waypointRefs.current[i] = node;
+                        }}
+                        cx={wp.cx}
+                        cy={wp.cy}
                         r="4"
                         fill="#0D1117"
                         stroke="#38BDF8"
                         strokeWidth="2"
                       />
                     ))}
+                    <circle
+                      ref={tracerDotRef}
+                      cx="8"
+                      cy="22"
+                      r="6.5"
+                      fill="#7DD3FC"
+                      fillOpacity="0.95"
+                      stroke="#0D1117"
+                      strokeWidth="2"
+                      opacity="0"
+                    />
                   </svg>
                 </div>
               </div>

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ArrowUpRight, Cpu, GitBranch, Lightning, Sliders } from "@phosphor-icons/react";
+import { useGSAP } from "@gsap/react";
 import type { PlaygroundCameraPreset } from "@/components/canvas/PlaygroundPipeline3D";
 import {
   CINCH_SCENARIOS,
@@ -13,13 +14,15 @@ import {
   RAG_STAGES,
   type SimulatorTab,
 } from "@/data/playground";
+import { MOTION } from "@/lib/motion";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
 import { KineticHeading, ScrambleMetric } from "@/components/motion/KineticText";
+import { useSlidingIndicator } from "@/components/motion/useSlidingIndicator";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { PlaygroundPipeline2D } from "./PlaygroundPipeline2D";
 import { SectionReveal } from "./SectionReveal";
 
-gsap.registerPlugin(ScrollTrigger);
+gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const LazyPlaygroundPipeline3D = dynamic(
   () =>
@@ -49,6 +52,58 @@ export function SystemsPlayground() {
   const [focusedStageId, setFocusedStageId] = useState<string | null>(null);
   const [lastStageId, setLastStageId] = useState<string | null>(null);
   const didToggleInspectorRef = useRef(false);
+  const telemetryPanelRef = useRef<HTMLDivElement>(null);
+  const hasTelemetryChangedRef = useRef(false);
+
+  const scenarios = tab === "cinch" ? CINCH_SCENARIOS : RAG_SCENARIOS;
+  const stages = tab === "cinch" ? CINCH_STAGES : RAG_STAGES;
+  const rawScenarioId = tab === "cinch" ? cinchId : ragId;
+  const activeScenario =
+    scenarios.find((s) => s.id === rawScenarioId) ?? scenarios[0];
+
+  const {
+    containerRef: tabRailRef,
+    registerItem: registerTabItem,
+    rect: tabPillRect,
+    ready: tabPillReady,
+  } = useSlidingIndicator<SimulatorTab>(tab);
+
+  const {
+    containerRef: scenarioRailRef,
+    registerItem: registerScenarioItem,
+    rect: scenarioPillRect,
+    ready: scenarioPillReady,
+  } = useSlidingIndicator<string>(activeScenario.id);
+
+  useGSAP(
+    () => {
+      if (!hasTelemetryChangedRef.current) {
+        hasTelemetryChangedRef.current = true;
+        return;
+      }
+      const el = telemetryPanelRef.current;
+      if (!el) return;
+
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.fromTo(
+          el,
+          { y: 6, opacity: 0.72 },
+          {
+            y: 0,
+            opacity: 1,
+            duration: MOTION.durations.ui,
+            ease: MOTION.gsapEase,
+            clearProps: "transform,opacity",
+          }
+        );
+      });
+    },
+    {
+      scope: telemetryPanelRef,
+      dependencies: [tab, activeScenario.id, piiGuardEnabled, semanticCacheEnabled],
+    }
+  );
 
   useEffect(() => {
     if (!didToggleInspectorRef.current) {
@@ -68,12 +123,6 @@ export function SystemsPlayground() {
       return next;
     });
   };
-
-  const scenarios = tab === "cinch" ? CINCH_SCENARIOS : RAG_SCENARIOS;
-  const stages = tab === "cinch" ? CINCH_STAGES : RAG_STAGES;
-  const rawScenarioId = tab === "cinch" ? cinchId : ragId;
-  const activeScenario =
-    scenarios.find((s) => s.id === rawScenarioId) ?? scenarios[0];
 
   const effectiveStages = activeScenario.activeStages.filter((id) => {
     if (!piiGuardEnabled && id === "pii") return false;
@@ -112,21 +161,36 @@ export function SystemsPlayground() {
             </div>
 
             <div
+              ref={tabRailRef}
               role="tablist"
               aria-label="Choose pipeline architecture to simulate"
               onKeyDown={handleTabKeyDown}
-              className="inline-flex rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] p-1"
+              className="relative inline-flex rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] p-1"
             >
+              {tabPillReady && tabPillRect && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-0 top-0 rounded-full bg-[#38BDF8] transition-[transform,width,height] duration-300 ease-[var(--ease-editorial)]"
+                  style={{
+                    width: tabPillRect.width,
+                    height: tabPillRect.height,
+                    transform: `translate3d(${tabPillRect.left}px, ${tabPillRect.top}px, 0)`,
+                  }}
+                />
+              )}
               <button
+                ref={registerTabItem("cinch")}
                 type="button"
                 role="tab"
                 id="tab-cinch"
                 aria-selected={tab === "cinch"}
                 aria-controls="panel-simulator"
                 onClick={() => setTab("cinch")}
-                className={`inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] transition-colors ${
+                className={`relative z-10 inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] transition-colors ${
                   tab === "cinch"
-                    ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
+                    ? tabPillReady
+                      ? "font-semibold text-[#0D1117]"
+                      : "bg-[#38BDF8] font-semibold text-[#0D1117]"
                     : "text-[#9DA7B3] hover:text-[#E6EDF3]"
                 }`}
               >
@@ -134,15 +198,18 @@ export function SystemsPlayground() {
                 <span>Cinch Gateway</span>
               </button>
               <button
+                ref={registerTabItem("rag")}
                 type="button"
                 role="tab"
                 id="tab-rag"
                 aria-selected={tab === "rag"}
                 aria-controls="panel-simulator"
                 onClick={() => setTab("rag")}
-                className={`inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] transition-colors ${
+                className={`relative z-10 inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] transition-colors ${
                   tab === "rag"
-                    ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
+                    ? tabPillReady
+                      ? "font-semibold text-[#0D1117]"
+                      : "bg-[#38BDF8] font-semibold text-[#0D1117]"
                     : "text-[#9DA7B3] hover:text-[#E6EDF3]"
                 }`}
               >
@@ -168,35 +235,52 @@ export function SystemsPlayground() {
                 <span className="font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3]">
                   Fault Scenario:
                 </span>
-                {scenarios.map((scenario) => {
-                  const selected = scenario.id === activeScenario.id;
-                  return (
-                    <button
-                      key={scenario.id}
-                      type="button"
-                      onClick={() =>
-                        tab === "cinch" ? setCinchId(scenario.id) : setRagId(scenario.id)
-                      }
-                      className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border px-3.5 py-2 font-mono text-xs transition-colors ${
-                        selected
-                          ? "border-[#38BDF8] bg-[#38BDF8]/15 font-semibold text-[#E6EDF3]"
-                          : "border-[rgba(240,246,252,0.1)] bg-[#161B22] text-[#9DA7B3] hover:text-[#E6EDF3]"
-                      }`}
-                    >
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: scenario.statusColor }}
-                        aria-hidden="true"
-                      />
-                      <span>{scenario.label}</span>
-                    </button>
-                  );
-                })}
+                <div ref={scenarioRailRef} className="relative flex flex-wrap items-center gap-2">
+                  {scenarioPillReady && scenarioPillRect && (
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute left-0 top-0 rounded-full border border-[#38BDF8] bg-[#38BDF8]/15 transition-[transform,width,height] duration-300 ease-[var(--ease-editorial)]"
+                      style={{
+                        width: scenarioPillRect.width,
+                        height: scenarioPillRect.height,
+                        transform: `translate3d(${scenarioPillRect.left}px, ${scenarioPillRect.top}px, 0)`,
+                      }}
+                    />
+                  )}
+                  {scenarios.map((scenario) => {
+                    const selected = scenario.id === activeScenario.id;
+                    return (
+                      <button
+                        key={scenario.id}
+                        ref={registerScenarioItem(scenario.id)}
+                        type="button"
+                        onClick={() =>
+                          tab === "cinch" ? setCinchId(scenario.id) : setRagId(scenario.id)
+                        }
+                        className={`relative z-10 inline-flex min-h-[44px] items-center gap-2 rounded-full border px-3.5 py-2 font-mono text-xs transition-colors ${
+                          selected
+                            ? scenarioPillReady
+                              ? "border-transparent bg-transparent font-semibold text-[#E6EDF3]"
+                              : "border-[#38BDF8] bg-[#38BDF8]/15 font-semibold text-[#E6EDF3]"
+                            : "border-[rgba(240,246,252,0.1)] bg-[#161B22] text-[#9DA7B3] hover:text-[#E6EDF3]"
+                        }`}
+                      >
+                        <span
+                          className="h-2 w-2 rounded-full"
+                          style={{ backgroundColor: scenario.statusColor }}
+                          aria-hidden="true"
+                        />
+                        <span>{scenario.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="flex items-center gap-3 font-mono text-xs">
                 <span
-                  className="rounded-full px-3 py-1 font-semibold tabular-nums"
+                  key={`${tab}-${activeScenario.id}`}
+                  className="panel-enter rounded-full px-3 py-1 font-semibold tabular-nums"
                   style={{
                     color: activeScenario.statusColor,
                     backgroundColor: `${activeScenario.statusColor}1A`,
@@ -403,7 +487,7 @@ export function SystemsPlayground() {
               })()}
 
               {/* Telemetry Summary + JSON Trace */}
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+              <div ref={telemetryPanelRef} className="grid grid-cols-1 gap-6 lg:grid-cols-12">
                 <div aria-live="polite" className="space-y-3 lg:col-span-6">
                   <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-[#9DA7B3]">
                     <span>Trigger: {activeScenario.trigger}</span>

@@ -2,11 +2,17 @@
 
 import dynamic from "next/dynamic";
 import { useRef, useState, type KeyboardEvent } from "react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
 import { Cpu, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
 import { stack } from "@/data/site";
+import { MOTION } from "@/lib/motion";
 import { STACK_LAYER_HUES } from "@/lib/palette";
 import { KineticHeading } from "@/components/motion/KineticText";
+import { useSlidingIndicator } from "@/components/motion/useSlidingIndicator";
 import { SectionReveal } from "./SectionReveal";
+
+gsap.registerPlugin(useGSAP);
 
 const LazyStackRack3D = dynamic(
   () => import("@/components/canvas/StackRack3D").then((mod) => mod.StackRack3D),
@@ -58,9 +64,48 @@ export function ExpertiseSection() {
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const hasSwitchedLayerRef = useRef(false);
 
   const activeLayer = stack[activeLayerIdx];
   const layerHue = STACK_LAYER_HUES[activeLayerIdx] ?? "#38BDF8";
+
+  const {
+    containerRef: layerRailRef,
+    registerItem: registerLayerTab,
+    rect: layerRailRect,
+    ready: layerRailReady,
+  } = useSlidingIndicator<number>(activeLayerIdx);
+
+  useGSAP(
+    () => {
+      if (!hasSwitchedLayerRef.current) {
+        hasSwitchedLayerRef.current = true;
+        return;
+      }
+      const panel = panelRef.current;
+      if (!panel) return;
+
+      const mm = gsap.matchMedia();
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const pills = panel.querySelectorAll("[data-stack-tool]");
+        if (pills.length === 0) return;
+        gsap.fromTo(
+          pills,
+          { y: 8, opacity: 0 },
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.28,
+            stagger: 0.028,
+            ease: MOTION.gsapEase,
+            clearProps: "transform,opacity",
+          }
+        );
+      });
+    },
+    { scope: panelRef, dependencies: [activeLayer.code] }
+  );
 
   const handleSelectTool = (tool: string) => {
     playMechanicalClick(!soundEnabled);
@@ -140,19 +185,35 @@ export function ExpertiseSection() {
 
           <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
             <div
+              ref={layerRailRef}
               role="tablist"
               aria-label="Engineering stack layers"
               onKeyDown={handleTabKeyDown}
-              className="flex flex-col divide-y divide-[rgba(240,246,252,0.08)] border-y border-[rgba(240,246,252,0.08)] lg:col-span-5"
+              className="relative flex flex-col divide-y divide-[rgba(240,246,252,0.08)] border-y border-[rgba(240,246,252,0.08)] lg:col-span-5"
             >
+              {layerRailReady && layerRailRect && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-0 top-0 z-20 w-[3px] rounded-r-full transition-[transform,height,background-color] duration-300 ease-[var(--ease-editorial)]"
+                  style={{
+                    height: layerRailRect.height,
+                    transform: `translate3d(0, ${layerRailRect.top}px, 0)`,
+                    backgroundColor: layerHue,
+                    boxShadow: `0 0 12px ${layerHue}AA`,
+                  }}
+                />
+              )}
+
               {stack.map((row, idx) => {
                 const isSelected = activeLayerIdx === idx;
                 const rowHue = STACK_LAYER_HUES[idx] ?? "#38BDF8";
+                const registerTab = registerLayerTab(idx);
                 return (
                   <button
                     key={row.layer}
                     ref={(el) => {
                       tabRefs.current[idx] = el;
+                      registerTab(el);
                     }}
                     type="button"
                     role="tab"
@@ -165,7 +226,7 @@ export function ExpertiseSection() {
                       setActiveLayerIdx(idx);
                       setSelectedTool(null);
                     }}
-                    className={`flex min-h-[56px] w-full items-center justify-between gap-4 px-3 py-3.5 text-left transition-colors sm:px-4 ${
+                    className={`relative z-10 flex min-h-[56px] w-full items-center justify-between gap-4 px-3 py-3.5 text-left transition-colors sm:px-4 ${
                       isSelected
                         ? "bg-[#161B22] text-[#E6EDF3]"
                         : "bg-transparent text-[#9DA7B3] hover:bg-[#161B22]/60 hover:text-[#E6EDF3]"
@@ -190,67 +251,71 @@ export function ExpertiseSection() {
               })}
             </div>
 
-            <div
-              id={`stack-panel-${activeLayer.code}`}
-              role="tabpanel"
-              aria-labelledby={`stack-tab-${activeLayer.code}`}
-              className="double-bezel-outer lg:col-span-7"
-            >
+            <SectionReveal variant="scrub-depth" className="lg:col-span-7">
               <div
-                key={activeLayer.code}
-                className="panel-enter double-bezel-core space-y-5 p-5 sm:p-6"
+                ref={panelRef}
+                id={`stack-panel-${activeLayer.code}`}
+                role="tabpanel"
+                aria-labelledby={`stack-tab-${activeLayer.code}`}
+                className="double-bezel-outer"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div
-                    className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em]"
-                    style={{ color: layerHue }}
-                  >
-                    <Cpu className="h-4 w-4" weight="regular" aria-hidden="true" />
-                    <span>
-                      Layer {activeLayer.code} · {activeLayer.layer}
-                    </span>
+                <div
+                  key={activeLayer.code}
+                  className="panel-enter double-bezel-core space-y-5 p-5 sm:p-6"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div
+                      className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em]"
+                      style={{ color: layerHue }}
+                    >
+                      <Cpu className="h-4 w-4" weight="regular" aria-hidden="true" />
+                      <span>
+                        Layer {activeLayer.code} · {activeLayer.layer}
+                      </span>
+                    </div>
+                    {selectedTool && (
+                      <span className="rounded-full border border-[#38BDF8]/40 bg-[#38BDF8]/12 px-3 py-0.5 font-mono text-xs text-[#7DD3FC]">
+                        Selected: {selectedTool}
+                      </span>
+                    )}
                   </div>
-                  {selectedTool && (
-                    <span className="rounded-full border border-[#38BDF8]/40 bg-[#38BDF8]/12 px-3 py-0.5 font-mono text-xs text-[#7DD3FC]">
-                      Selected: {selectedTool}
-                    </span>
-                  )}
-                </div>
 
-                <p className="font-sans text-sm leading-relaxed text-[#9DA7B3] sm:text-base">
-                  {activeLayer.summary}
-                </p>
+                  <p className="font-sans text-sm leading-relaxed text-[#9DA7B3] sm:text-base">
+                    {activeLayer.summary}
+                  </p>
 
-                <LazyStackRack3D
-                  layerCode={activeLayer.code}
-                  layerName={activeLayer.layer}
-                  tools={activeLayer.items}
-                  selectedTool={selectedTool}
-                  onSelectTool={handleSelectTool}
-                />
+                  <LazyStackRack3D
+                    layerCode={activeLayer.code}
+                    layerName={activeLayer.layer}
+                    tools={activeLayer.items}
+                    selectedTool={selectedTool}
+                    onSelectTool={handleSelectTool}
+                  />
 
-                <div className="flex flex-wrap gap-2">
-                  {activeLayer.items.map((tool) => {
-                    const isPicked = selectedTool === tool;
-                    return (
-                      <button
-                        key={tool}
-                        type="button"
-                        onClick={() => handleSelectTool(tool)}
-                        aria-pressed={isPicked}
-                        className={`inline-flex min-h-[44px] items-center rounded-full border px-4 py-2 font-mono text-xs transition-colors ${
-                          isPicked
-                            ? "border-[#38BDF8] bg-[#38BDF8]/15 font-semibold text-[#E6EDF3]"
-                            : "border-[rgba(240,246,252,0.1)] bg-[#0D1117] text-[#9DA7B3] hover:text-[#E6EDF3]"
-                        }`}
-                      >
-                        {tool}
-                      </button>
-                    );
-                  })}
+                  <div className="flex flex-wrap gap-2">
+                    {activeLayer.items.map((tool) => {
+                      const isPicked = selectedTool === tool;
+                      return (
+                        <button
+                          key={tool}
+                          data-stack-tool
+                          type="button"
+                          onClick={() => handleSelectTool(tool)}
+                          aria-pressed={isPicked}
+                          className={`inline-flex min-h-[44px] items-center rounded-full border px-4 py-2 font-mono text-xs transition-colors ${
+                            isPicked
+                              ? "border-[#38BDF8] bg-[#38BDF8]/15 font-semibold text-[#E6EDF3]"
+                              : "border-[rgba(240,246,252,0.1)] bg-[#0D1117] text-[#9DA7B3] hover:text-[#E6EDF3]"
+                          }`}
+                        >
+                          {tool}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
+            </SectionReveal>
           </div>
         </SectionReveal>
       </div>

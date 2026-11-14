@@ -109,7 +109,7 @@ export function ContactSection() {
                   >
                     <EnvelopeSimple className="h-4 w-4" weight="regular" aria-hidden="true" />
                     <span>Email · {profile.email}</span>
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15 text-[#0D1117]">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15 text-[#0D1117] transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
                       <ArrowUpRight className="h-4 w-4" weight="regular" aria-hidden="true" />
                     </span>
                   </a>
@@ -118,12 +118,16 @@ export function ContactSection() {
                 <button
                   type="button"
                   onClick={() => void copy(profile.email)}
-                  className="inline-flex min-h-[46px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8]"
+                  className={`inline-flex min-h-[46px] items-center gap-2 rounded-full border px-5 font-mono text-xs uppercase tracking-[0.12em] transition-colors active:scale-[0.98] ${
+                    copied
+                      ? "border-[#10B981]/50 bg-[#10B981]/10 text-[#10B981]"
+                      : "border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#E6EDF3] hover:border-[#38BDF8] hover:text-[#38BDF8]"
+                  }`}
                 >
                   {copied ? (
                     <>
                       <Check className="h-4 w-4 text-[#10B981]" weight="regular" aria-hidden="true" />
-                      <span className="text-[#10B981]">Copied</span>
+                      <span>Copied</span>
                     </>
                   ) : (
                     <>
@@ -135,7 +139,7 @@ export function ContactSection() {
 
                 <TransitionLink
                   href="/brief"
-                  className="group inline-flex min-h-[46px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8]"
+                  className="group inline-flex min-h-[46px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8] active:scale-[0.98]"
                 >
                   <span>Recruiter Brief</span>
                   <ArrowUpRight
@@ -149,7 +153,7 @@ export function ContactSection() {
                   href={profile.resume}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex min-h-[46px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8]"
+                  className="inline-flex min-h-[46px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8] active:scale-[0.98]"
                 >
                   <FilePdf className="h-4 w-4 text-[#38BDF8]" weight="regular" aria-hidden="true" />
                   <span>Resume PDF</span>
