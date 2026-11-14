@@ -219,18 +219,21 @@ dialog.palette-dialog::backdrop {
   animation: editorial-panel-in 180ms var(--ease-editorial) both;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  ::view-transition-old(root) {
-    animation: 220ms var(--ease-editorial) both vt-fade-out;
-  }
-  ::view-transition-new(root) {
-    animation: 320ms var(--ease-editorial) both vt-fade-in;
-  }
-  ::view-transition-old(site-navbar),
-  ::view-transition-new(site-navbar) {
-    animation: none;
-    mix-blend-mode: normal;
-  }
+::view-transition-old(root) {
+  animation: 220ms var(--ease-editorial) both vt-fade-out;
+}
+::view-transition-new(root) {
+  animation: 320ms var(--ease-editorial) both vt-fade-in;
+}
+::view-transition-old(site-navbar),
+::view-transition-new(site-navbar) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html[data-motion="reduced"]::view-transition-old(root),
+html[data-motion="reduced"]::view-transition-new(root) {
+  animation: none !important;
 }
 
 /* Lenis smooth scroll base rules */
@@ -294,21 +297,21 @@ html.lenis body {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto !important;
-  }
-  .bento-tilt-card,
-  .plate-parallax-inner {
-    transform: none !important;
-  }
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-delay: 0ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    transition-delay: 0ms !important;
-  }
+html[data-motion="reduced"] {
+  scroll-behavior: auto !important;
+}
+
+html[data-motion="reduced"] .bento-tilt-card,
+html[data-motion="reduced"] .plate-parallax-inner {
+  transform: none !important;
+}
+
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
 }

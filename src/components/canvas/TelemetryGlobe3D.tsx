@@ -5,6 +5,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
+import { getPortfolioScrollState, shouldReduceAppMotion } from "@/lib/motion";
 import { CATEGORY_HUES, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
 import {
   CameraZoomController,
@@ -183,7 +184,10 @@ function GlobeAssembly({
           }
         }
       } else if (!isStatic) {
-        groupRef.current.rotation.y += dt * 0.095;
+        const scrollVelocity = !shouldReduceAppMotion()
+          ? Math.min(0.65, Math.abs(getPortfolioScrollState().velocity) * 0.012)
+          : 0;
+        groupRef.current.rotation.y += dt * (0.095 + scrollVelocity);
       }
     } else if (draggingRef.current) {
       focusAngleRef.current = null;

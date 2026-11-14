@@ -7,6 +7,7 @@ import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { profile } from "@/data/site";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
+import { getPortfolioScrollState, shouldReduceAppMotion } from "@/lib/motion";
 import { HERO_ORBIT_HUES, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
 import {
   CameraZoomController,
@@ -368,11 +369,16 @@ function HeroOrbitalScene({
   useFrame((_, delta) => {
     const isStatic = frameloop === "demand";
     const dt = Math.min(delta, 0.05);
+    const scrollState = getPortfolioScrollState();
+    const reduceApp = shouldReduceAppMotion();
+    const scrollVelocityBoost =
+      !isStatic && !reduceApp ? Math.min(2.2, Math.abs(scrollState.velocity) * 0.045) : 0;
 
     if (!isStatic) {
       elapsedRef.current += dt;
-      // Smoothly damp angular velocity when hovering a node (no abrupt speed step)
-      const targetSpeed = hoveredIdxRef.current !== null ? 0.1 : 0.38;
+      // Smoothly damp angular velocity when hovering a node or surging on scroll
+      const baseSpeed = hoveredIdxRef.current !== null ? 0.1 : 0.38;
+      const targetSpeed = baseSpeed + scrollVelocityBoost;
       orbitSpeedRef.current = THREE.MathUtils.damp(orbitSpeedRef.current, targetSpeed, 6, dt);
       orbitAngleRef.current += dt * orbitSpeedRef.current;
       currentRingColorRef.current.lerp(targetRingColorRef.current, Math.min(1, dt * 6));
@@ -386,9 +392,19 @@ function HeroOrbitalScene({
       ringMatRef.current.color.copy(currentRingColorRef.current);
     }
 
-    // Gentle vertical float without fighting OrbitControls rotation
+    // Gentle vertical float + subtle scroll-coupled pitch tilt without fighting OrbitControls
     if (tiltGroupRef.current) {
       tiltGroupRef.current.position.y = isStatic ? 0 : Math.sin(t * 1.05) * 0.032;
+      const heroScrollRatio =
+        !isStatic && !reduceApp && typeof window !== "undefined"
+          ? Math.min(1, Math.max(0, scrollState.scrollY / Math.max(520, window.innerHeight || 768)))
+          : 0;
+      tiltGroupRef.current.rotation.x = THREE.MathUtils.damp(
+        tiltGroupRef.current.rotation.x,
+        -heroScrollRatio * 0.24,
+        6,
+        dt
+      );
     }
 
     if (innerRingRef.current) {

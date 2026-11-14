@@ -5,7 +5,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import type { EvalSeriesPoint } from "@/data/projects";
-import { MOTION } from "@/lib/motion";
+import { MOTION, shouldReduceAppMotion } from "@/lib/motion";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -23,36 +23,35 @@ export function EvalComparisonChart({
       const container = containerRef.current;
       if (!container) return;
 
-      const mm = gsap.matchMedia();
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        const bars = container.querySelectorAll<HTMLElement>("[data-eval-bar]");
-        if (bars.length === 0) return;
+      if (shouldReduceAppMotion()) return;
 
-        const rect = container.getBoundingClientRect();
-        const alreadyNearTop = rect.top < window.innerHeight * 0.94;
+      const bars = container.querySelectorAll<HTMLElement>("[data-eval-bar]");
+      if (bars.length === 0) return;
 
-        gsap.fromTo(
-          bars,
-          { scaleX: 0 },
-          {
-            scaleX: 1,
-            duration: 0.55,
-            stagger: 0.05,
-            ease: MOTION.gsapEase,
-            transformOrigin: "left center",
-            clearProps: "transform",
-            ...(alreadyNearTop
-              ? {}
-              : {
-                  scrollTrigger: {
-                    trigger: container,
-                    start: "top 90%",
-                    once: true,
-                  },
-                }),
-          }
-        );
-      });
+      const rect = container.getBoundingClientRect();
+      const alreadyNearTop = rect.top < window.innerHeight * 0.94;
+
+      gsap.fromTo(
+        bars,
+        { scaleX: 0 },
+        {
+          scaleX: 1,
+          duration: 0.55,
+          stagger: 0.05,
+          ease: MOTION.gsapEase,
+          transformOrigin: "left center",
+          clearProps: "transform",
+          ...(alreadyNearTop
+            ? {}
+            : {
+                scrollTrigger: {
+                  trigger: container,
+                  start: "top 90%",
+                  once: true,
+                },
+              }),
+        }
+      );
     },
     { scope: containerRef }
   );

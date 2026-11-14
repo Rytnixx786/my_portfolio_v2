@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { shouldReduceAppMotion } from "@/lib/motion";
 
 interface MagneticButtonProps {
   children: ReactNode;
@@ -24,14 +25,17 @@ export function MagneticButton({
   const enabledRef = useRef(false);
 
   useEffect(() => {
-    const reduced =
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    const finePointer =
-      window.matchMedia?.("(pointer: fine)").matches ?? false;
-    enabledRef.current = !reduced && finePointer;
+    const syncMotion = () => {
+      const finePointer =
+        window.matchMedia?.("(pointer: fine)")?.matches ?? true;
+      enabledRef.current = !shouldReduceAppMotion() && finePointer;
+    };
+    syncMotion();
+    window.addEventListener("portfolio:motion-mode", syncMotion);
     const el = wrapRef.current;
 
     return () => {
+      window.removeEventListener("portfolio:motion-mode", syncMotion);
       if (rafRef.current !== null) {
         window.cancelAnimationFrame(rafRef.current);
       }

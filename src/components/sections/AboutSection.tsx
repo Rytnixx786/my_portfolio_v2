@@ -13,8 +13,9 @@ import {
   Terminal,
 } from "@phosphor-icons/react";
 import { experience, lab, principles, profile } from "@/data/site";
-import { KineticHeading } from "@/components/motion/KineticText";
-import { SectionReveal } from "./SectionReveal";
+import { KineticHeading, ScrollScrubText } from "@/components/motion/KineticText";
+import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
+import { attachBidirectionalScrollEnvelope, SectionReveal } from "./SectionReveal";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -38,6 +39,7 @@ export function AboutSection() {
   const waypointRefs = useRef<Array<SVGCircleElement | null>>([]);
   const [selectedLabIdx, setSelectedLabIdx] = useState(0);
   const [activeMilestone, setActiveMilestone] = useState(0);
+  const appReduced = useAppReducedMotion();
 
   useGSAP(
     () => {
@@ -77,39 +79,72 @@ export function AboutSection() {
         });
       };
 
-      const mm = gsap.matchMedia();
+      const milestones = el.querySelectorAll<HTMLElement>("[data-about-milestone]");
+      const stickyInner = el.querySelector<HTMLElement>("[data-about-sticky-inner]");
 
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        gsap.set(path, {
-          strokeDasharray: totalLength,
-          strokeDashoffset: totalLength,
-        });
-        applySpineProgress(0);
-
-        gsap.to(path, {
-          strokeDashoffset: 0,
-          ease: "none",
-          scrollTrigger: {
-            trigger: el,
-            start: "top 70%",
-            end: "bottom 75%",
-            scrub: 0.65,
-            onUpdate: (self) => {
-              applySpineProgress(self.progress);
-            },
-          },
-        });
-      });
-
-      mm.add("(prefers-reduced-motion: reduce)", () => {
+      if (appReduced) {
         gsap.set(path, {
           strokeDasharray: "none",
           strokeDashoffset: 0,
         });
         applySpineProgress(1);
+        gsap.set(milestones, { clearProps: "transform,opacity" });
+        if (stickyInner) gsap.set(stickyInner, { clearProps: "transform,opacity" });
+        return;
+      }
+
+      gsap.set(path, {
+        strokeDasharray: totalLength,
+        strokeDashoffset: totalLength,
       });
+      applySpineProgress(0);
+
+      gsap.to(path, {
+        strokeDashoffset: 0,
+        ease: "none",
+        scrollTrigger: {
+          trigger: el,
+          start: "top 70%",
+          end: "bottom 75%",
+          scrub: 0.65,
+          onUpdate: (self) => {
+            applySpineProgress(self.progress);
+          },
+        },
+      });
+
+      milestones.forEach((card) => {
+        attachBidirectionalScrollEnvelope(card, {
+          enterOpacity: 0.08,
+          enterY: 42,
+          enterScale: 0.94,
+          exitOpacity: 0.06,
+          exitY: -40,
+          exitScale: 0.94,
+        });
+      });
+
+      if (stickyInner) {
+        gsap.fromTo(
+          stickyInner,
+          { opacity: 1, scale: 1, y: 0 },
+          {
+            opacity: 0.12,
+            scale: 0.95,
+            y: -28,
+            ease: "power2.in",
+            scrollTrigger: {
+              trigger: el,
+              start: "bottom 54%",
+              end: "bottom 6%",
+              scrub: 0.6,
+              invalidateOnRefresh: true,
+            },
+          }
+        );
+      }
     },
-    { scope: sectionRef }
+    { scope: sectionRef, dependencies: [appReduced] }
   );
 
   const activeLab = lab[selectedLabIdx] ?? lab[0];
@@ -125,6 +160,7 @@ export function AboutSection() {
           {/* Left Sticky Engineering Dial (5 cols) */}
           <div className="lg:col-span-5">
             <div className="lg:sticky lg:top-24">
+              <div data-about-sticky-inner>
               <p className="font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#38BDF8]">
                 03 / Background &amp; Track
               </p>
@@ -139,9 +175,9 @@ export function AboutSection() {
                 </span>
               </KineticHeading>
 
-              <p className="mt-4 max-w-[44ch] font-sans text-base leading-relaxed text-[#9DA7B3]">
+              <ScrollScrubText className="mt-4 max-w-[44ch] font-sans text-base leading-relaxed text-[#9DA7B3]">
                 {profile.summary}
-              </p>
+              </ScrollScrubText>
 
               {/* Editorial Portrait + Live Track Dial */}
               <div className="mt-8 overflow-hidden rounded-3xl border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 p-5">
@@ -243,13 +279,14 @@ export function AboutSection() {
                   </svg>
                 </div>
               </div>
+              </div>
             </div>
           </div>
 
           {/* Right Scrolling Narrative Column (7 cols) */}
           <div className="space-y-12 lg:col-span-7">
             {/* 1. Experience & Education Timeline */}
-            <SectionReveal variant="reveal">
+            <div>
               <div className="mb-6 flex items-center justify-between border-b border-[rgba(240,246,252,0.08)] pb-3">
                 <h3 className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-[#8B949E]">
                   Experience &amp; Education
@@ -263,6 +300,7 @@ export function AboutSection() {
                   return (
                     <article
                       key={item.org}
+                      data-about-milestone
                       className={`relative rounded-2xl border bg-[#161B22]/75 p-5 transition-colors duration-300 sm:p-6 ${
                         isMilestoneActive
                           ? "border-[#38BDF8]/35"
@@ -325,7 +363,7 @@ export function AboutSection() {
                   );
                 })}
               </div>
-            </SectionReveal>
+            </div>
 
             {/* 2. Operating Principles (hairline typographic index) */}
             <SectionReveal variant="bento-cascade">

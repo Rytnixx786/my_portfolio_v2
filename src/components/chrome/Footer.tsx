@@ -11,7 +11,10 @@ export function Footer() {
       role="contentinfo"
       className="border-t border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-8 text-[#8B949E] sm:py-10"
     >
-      <SectionReveal className="mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-4 px-4 font-mono text-xs sm:flex-row sm:items-center sm:px-8">
+      <SectionReveal
+        settleAtBottom
+        className="mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-4 px-4 font-mono text-xs sm:flex-row sm:items-center sm:px-8"
+      >
         <div className="flex flex-wrap items-center gap-3">
           <span className="font-semibold text-[#E6EDF3]">{profile.name}</span>
           <span aria-hidden="true">·</span>

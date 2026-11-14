@@ -11,7 +11,7 @@ import {
 import { profile } from "@/data/site";
 import { useCopy } from "@/hooks/usePortfolioUtils";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
-import { KineticHeading } from "@/components/motion/KineticText";
+import { KineticHeading, ScrollScrubText } from "@/components/motion/KineticText";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { AskTerminal } from "./AskTerminal";
 import { SectionReveal } from "./SectionReveal";
@@ -82,7 +82,7 @@ export function ContactSection() {
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <div className="grid grid-cols-1 items-center gap-10 border-b border-[rgba(240,246,252,0.08)] pb-12 lg:grid-cols-12">
-          <SectionReveal className="lg:col-span-7">
+          <SectionReveal disableExitFade className="lg:col-span-7">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3.5 py-1 font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#7DD3FC]">
                 <span className="h-2 w-2 rounded-full bg-[#10B981]" aria-hidden="true" />
@@ -97,9 +97,9 @@ export function ContactSection() {
                 <span className="text-[#38BDF8]">DETERMINISTIC.</span>
               </KineticHeading>
 
-              <p className="mt-5 max-w-[46ch] font-sans text-base leading-relaxed text-[#9DA7B3] sm:text-lg">
+              <ScrollScrubText className="mt-5 max-w-[46ch] font-sans text-base leading-relaxed text-[#9DA7B3] sm:text-lg">
                 Available for AI engineering, LLM serving, and backend teams.
-              </p>
+              </ScrollScrubText>
 
               <div className="mt-8 flex flex-wrap items-center gap-3.5">
                 <MagneticButton>
@@ -162,7 +162,7 @@ export function ContactSection() {
             </div>
           </SectionReveal>
 
-          <SectionReveal variant="scrub-depth" className="lg:col-span-5">
+          <SectionReveal variant="scrub-depth" disableExitFade className="lg:col-span-5">
             <div className="double-bezel-outer">
               <div className="double-bezel-core overflow-hidden p-3">
                 <LazyTelemetryGlobe3D />
@@ -171,7 +171,9 @@ export function ContactSection() {
           </SectionReveal>
         </div>
 
-        <AskTerminal />
+        <SectionReveal settleAtBottom>
+          <AskTerminal />
+        </SectionReveal>
       </div>
     </section>
   );

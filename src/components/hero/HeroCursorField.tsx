@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type RefObject } from "react";
+import { shouldReduceAppMotion } from "@/lib/motion";
 
 interface HeroCursorFieldProps {
   containerRef: RefObject<HTMLElement | null>;
@@ -33,8 +34,7 @@ export function HeroCursorField({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reducedMotion =
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const reducedMotion = shouldReduceAppMotion();
     const isCoarseOnly =
       window.matchMedia?.("(pointer: coarse) and (hover: none)").matches ?? false;
 

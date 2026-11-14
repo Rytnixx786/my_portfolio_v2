@@ -5,7 +5,12 @@ import { usePathname } from "next/navigation";
 import Lenis from "lenis";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { completePendingViewTransition, MOTION } from "@/lib/motion";
+import {
+  completePendingViewTransition,
+  MOTION,
+  setPortfolioScrollState,
+  shouldReduceAppMotion,
+} from "@/lib/motion";
 
 gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.config({ ignoreMobileResize: true });
@@ -90,42 +95,87 @@ export function LenisProvider({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
-    const motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    const reduced = motionQuery?.matches ?? false;
-    reducedRef.current = reduced;
-
-    const updateProgress = () => {
+    const updateProgress = (velocity = 0, direction: 1 | -1 | 0 = 0, explicitScrollY?: number) => {
+      const scrollY = explicitScrollY ?? window.scrollY;
       const maxScroll = Math.max(
         1,
         document.documentElement.scrollHeight - window.innerHeight
       );
-      const ratio = Math.min(1, Math.max(0, window.scrollY / maxScroll));
+      const ratio = Math.min(1, Math.max(0, scrollY / maxScroll));
+      setPortfolioScrollState({
+        scrollY,
+        progress: ratio,
+        velocity,
+        direction,
+      });
+      document.documentElement.style.setProperty(
+        "--scroll-velocity-abs",
+        Math.min(1, Math.abs(velocity) / 40).toFixed(3)
+      );
       const bar = progressBarRef.current;
       if (bar) {
         bar.style.transform = `scaleX(${ratio.toFixed(4)})`;
       }
       window.dispatchEvent(
-        new CustomEvent("portfolio:scroll-progress", { detail: { ratio } })
+        new CustomEvent("portfolio:scroll-progress", { detail: { ratio, velocity } })
       );
     };
 
     let lenis: Lenis | null = null;
     let tickFn: ((time: number) => void) | null = null;
     let unsubScroll: (() => void) | null = null;
+    let nativeListening = false;
 
-    if (!reduced) {
+    const onNativeScroll = () => {
+      ScrollTrigger.update();
+      updateProgress(0, 0);
+    };
+
+    const teardownLenis = () => {
+      if (tickFn) {
+        gsap.ticker.remove(tickFn);
+        tickFn = null;
+      }
+      unsubScroll?.();
+      unsubScroll = null;
+      lenis?.destroy();
+      lenis = null;
+      lenisRef.current = null;
+    };
+
+    const setupScrollDriver = (reduced: boolean) => {
+      reducedRef.current = reduced;
+      if (reduced) {
+        teardownLenis();
+        if (!nativeListening) {
+          window.addEventListener("scroll", onNativeScroll, { passive: true });
+          nativeListening = true;
+        }
+        updateProgress(0, 0);
+        return;
+      }
+
+      if (nativeListening) {
+        window.removeEventListener("scroll", onNativeScroll);
+        nativeListening = false;
+      }
+      if (lenis) return;
+
       lenis = new Lenis({
         autoRaf: false,
-        lerp: 0.1,
+        lerp: 0.072,
+        wheelMultiplier: 0.95,
+        touchMultiplier: 1.45,
         smoothWheel: true,
         syncTouch: false,
         anchors: false,
       });
       lenisRef.current = lenis;
 
-      unsubScroll = lenis.on("scroll", () => {
+      unsubScroll = lenis.on("scroll", (instance) => {
         ScrollTrigger.update();
-        updateProgress();
+        const dir = instance.direction > 0 ? 1 : instance.direction < 0 ? -1 : 0;
+        updateProgress(instance.velocity ?? 0, dir, instance.scroll ?? window.scrollY);
       });
 
       tickFn = (time: number) => {
@@ -133,7 +183,15 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       };
       gsap.ticker.add(tickFn);
       gsap.ticker.lagSmoothing(0);
-    }
+    };
+
+    setupScrollDriver(shouldReduceAppMotion());
+
+    const onMotionMode = (event: Event) => {
+      const reduced = Boolean((event as CustomEvent<{ reduced?: boolean }>).detail?.reduced);
+      setupScrollDriver(reduced);
+    };
+    window.addEventListener("portfolio:motion-mode", onMotionMode);
 
     const onScrollLock = (event: Event) => {
       const locked = Boolean((event as CustomEvent<{ locked?: boolean }>).detail?.locked);
@@ -156,14 +214,6 @@ export function LenisProvider({ children }: { children: ReactNode }) {
     };
 
     window.__portfolioScrollTo = scrollToTarget;
-
-    const onNativeScroll = () => {
-      ScrollTrigger.update();
-      updateProgress();
-    };
-    if (!lenis) {
-      window.addEventListener("scroll", onNativeScroll, { passive: true });
-    }
 
     const onHashClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
@@ -240,18 +290,14 @@ export function LenisProvider({ children }: { children: ReactNode }) {
         window.clearTimeout(resizeTimer);
       }
       resizeObserver?.disconnect();
+      window.removeEventListener("portfolio:motion-mode", onMotionMode);
       window.removeEventListener("portfolio:scroll-lock", onScrollLock);
-      if (!lenis) {
+      if (nativeListening) {
         window.removeEventListener("scroll", onNativeScroll);
       }
       document.removeEventListener("click", onHashClick);
       window.removeEventListener("resize", onResize);
-      if (tickFn) {
-        gsap.ticker.remove(tickFn);
-      }
-      unsubScroll?.();
-      lenis?.destroy();
-      lenisRef.current = null;
+      teardownLenis();
       delete window.__portfolioScrollTo;
     };
   }, []);

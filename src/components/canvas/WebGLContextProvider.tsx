@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -199,6 +200,15 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
     setContextLost(false);
     updateStoredPreference(next);
   }, []);
+
+  useEffect(() => {
+    if (!hasMounted || typeof document === "undefined") return;
+    const isReduced = preference === "2d";
+    document.documentElement.dataset.motion = isReduced ? "reduced" : "full";
+    window.dispatchEvent(
+      new CustomEvent("portfolio:motion-mode", { detail: { reduced: isReduced } })
+    );
+  }, [hasMounted, preference]);
 
   const effectiveTier = useMemo(() => {
     if (!hasMounted) return "low";

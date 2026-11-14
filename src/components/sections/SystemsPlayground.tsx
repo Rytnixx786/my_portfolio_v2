@@ -17,6 +17,7 @@ import {
 import { MOTION } from "@/lib/motion";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
 import { KineticHeading, ScrambleMetric } from "@/components/motion/KineticText";
+import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
 import { useSlidingIndicator } from "@/components/motion/useSlidingIndicator";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { PlaygroundPipeline2D } from "./PlaygroundPipeline2D";
@@ -52,8 +53,10 @@ export function SystemsPlayground() {
   const [focusedStageId, setFocusedStageId] = useState<string | null>(null);
   const [lastStageId, setLastStageId] = useState<string | null>(null);
   const didToggleInspectorRef = useRef(false);
+  const sectionRef = useRef<HTMLElement>(null);
   const telemetryPanelRef = useRef<HTMLDivElement>(null);
   const hasTelemetryChangedRef = useRef(false);
+  const appReduced = useAppReducedMotion();
 
   const scenarios = tab === "cinch" ? CINCH_SCENARIOS : RAG_SCENARIOS;
   const stages = tab === "cinch" ? CINCH_STAGES : RAG_STAGES;
@@ -77,31 +80,55 @@ export function SystemsPlayground() {
 
   useGSAP(
     () => {
+      const section = sectionRef.current;
+      if (!section || appReduced) return;
+      const rule = section.querySelector<HTMLElement>("[data-section-rule]");
+      if (!rule) return;
+
+      gsap.fromTo(
+        rule,
+        { scaleX: 0 },
+        {
+          scaleX: 1,
+          ease: "power2.out",
+          transformOrigin: "left center",
+          scrollTrigger: {
+            trigger: section,
+            start: "top 86%",
+            end: "top 44%",
+            scrub: 0.55,
+            invalidateOnRefresh: true,
+          },
+        }
+      );
+    },
+    { scope: sectionRef, dependencies: [appReduced] }
+  );
+
+  useGSAP(
+    () => {
       if (!hasTelemetryChangedRef.current) {
         hasTelemetryChangedRef.current = true;
         return;
       }
       const el = telemetryPanelRef.current;
-      if (!el) return;
+      if (!el || appReduced) return;
 
-      const mm = gsap.matchMedia();
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        gsap.fromTo(
-          el,
-          { y: 6, opacity: 0.72 },
-          {
-            y: 0,
-            opacity: 1,
-            duration: MOTION.durations.ui,
-            ease: MOTION.gsapEase,
-            clearProps: "transform,opacity",
-          }
-        );
-      });
+      gsap.fromTo(
+        el,
+        { y: 6, opacity: 0.72 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: MOTION.durations.ui,
+          ease: MOTION.gsapEase,
+          clearProps: "transform,opacity",
+        }
+      );
     },
     {
       scope: telemetryPanelRef,
-      dependencies: [tab, activeScenario.id, piiGuardEnabled, semanticCacheEnabled],
+      dependencies: [tab, activeScenario.id, piiGuardEnabled, semanticCacheEnabled, appReduced],
     }
   );
 
@@ -139,12 +166,18 @@ export function SystemsPlayground() {
 
   return (
     <section
+      ref={sectionRef}
       id="simulator"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-28 sm:py-36 lg:py-40"
+      className="relative z-[2] overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-28 sm:py-36 lg:py-40"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
-          <div className="flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
+          <div className="relative flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
+            <span
+              data-section-rule
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 -bottom-px h-px origin-left bg-gradient-to-r from-[#38BDF8]/70 via-[#38BDF8]/25 to-transparent"
+            />
             <div>
               <p className="font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#38BDF8]">
                 02 / Interactive Pipeline Simulator

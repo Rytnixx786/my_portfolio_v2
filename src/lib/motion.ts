@@ -23,7 +23,7 @@ export const MOTION = {
     revealStart: "top 92%",
     bentoStart: "top 88%",
     metricStart: "top 92%",
-    scrub: 0.65,
+    scrub: 0.45,
   },
   damp: {
     camera: 4.5,
@@ -73,9 +73,58 @@ export function normalizeRoutePath(hrefOrPath: string): string {
   return (pathAndQuery.split("?")[0] || "/").replace(/\/+$/, "") || "/";
 }
 
+export const MOTION_QUALITY_STORAGE_KEY = "portfolio-v2-3d-quality";
+
+export interface PortfolioScrollState {
+  scrollY: number;
+  progress: number;
+  velocity: number;
+  direction: 1 | -1 | 0;
+}
+
+declare global {
+  interface Window {
+    __portfolioScroll?: PortfolioScrollState;
+  }
+}
+
+export function getPortfolioScrollState(): PortfolioScrollState {
+  if (typeof window === "undefined" || !window.__portfolioScroll) {
+    return { scrollY: 0, progress: 0, velocity: 0, direction: 0 };
+  }
+  return window.__portfolioScroll;
+}
+
+export function setPortfolioScrollState(next: PortfolioScrollState): void {
+  if (typeof window === "undefined") return;
+  window.__portfolioScroll = next;
+}
+
 export function prefersReducedMotion(): boolean {
   if (typeof window === "undefined") return false;
   return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+}
+
+/**
+ * Application-level reduced-motion gate controlled by the HUD "2D SAFE" preference
+ * (`data-motion="reduced"`) rather than being silently disabled by OS desktop settings.
+ */
+export function shouldReduceAppMotion(): boolean {
+  if (typeof document !== "undefined") {
+    const mode = document.documentElement?.dataset?.motion;
+    if (mode === "reduced") return true;
+    if (mode === "full") return false;
+  }
+  if (typeof window === "undefined") return false;
+  try {
+    const saved =
+      window.localStorage?.getItem(MOTION_QUALITY_STORAGE_KEY) ??
+      window.sessionStorage?.getItem(MOTION_QUALITY_STORAGE_KEY);
+    if (saved === "2d") return true;
+  } catch {
+    // Ignore storage access errors
+  }
+  return false;
 }
 
 interface PendingViewTransition {
@@ -118,7 +167,7 @@ export async function runViewTransition(
 ): Promise<void> {
   if (
     typeof document === "undefined" ||
-    prefersReducedMotion() ||
+    shouldReduceAppMotion() ||
     typeof document.startViewTransition !== "function"
   ) {
     await navigate();

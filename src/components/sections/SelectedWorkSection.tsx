@@ -12,13 +12,18 @@ import {
   type ProjectCategory,
 } from "@/data/projects";
 import { getCategoryHue } from "@/lib/palette";
-import { MOTION } from "@/lib/motion";
+import { MOTION, shouldReduceAppMotion } from "@/lib/motion";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
 import { MagneticButton } from "@/components/motion/MagneticButton";
+import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
 import { useSlidingIndicator } from "@/components/motion/useSlidingIndicator";
 import { ProjectPreviewPlate } from "./ProjectPreviewPlate";
-import { SectionReveal } from "./SectionReveal";
-import { KineticHeading, ScrambleMetric } from "@/components/motion/KineticText";
+import { attachBidirectionalScrollEnvelope, SectionReveal } from "./SectionReveal";
+import {
+  KineticHeading,
+  ScrambleMetric,
+  ScrollScrubText,
+} from "@/components/motion/KineticText";
 
 gsap.registerPlugin(ScrollTrigger, Flip, useGSAP);
 
@@ -35,9 +40,11 @@ const FILTER_OPTIONS: ReadonlyArray<{ label: string; value: FilterValue }> = [
 export function SelectedWorkSection() {
   const [activeFilter, setActiveFilter] = useState<FilterValue>("All");
   const [showAllSystems, setShowAllSystems] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const flipStateRef = useRef<ReturnType<typeof Flip.getState> | null>(null);
   const hasInteractedRef = useRef(false);
+  const appReduced = useAppReducedMotion();
 
   const {
     containerRef: filterRailRef,
@@ -52,7 +59,7 @@ export function SelectedWorkSection() {
   const captureGridFlip = () => {
     const grid = gridRef.current;
     if (!grid) return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+    if (shouldReduceAppMotion()) {
       flipStateRef.current = null;
       return;
     }
@@ -73,67 +80,119 @@ export function SelectedWorkSection() {
 
   useGSAP(
     () => {
-      if (!hasInteractedRef.current) {
-        hasInteractedRef.current = true;
-        return;
-      }
+      const section = sectionRef.current;
+      if (!section || appReduced) return;
+      const rule = section.querySelector<HTMLElement>("[data-section-rule]");
+      if (!rule) return;
+
+      gsap.fromTo(
+        rule,
+        { scaleX: 0 },
+        {
+          scaleX: 1,
+          ease: "power2.out",
+          transformOrigin: "left center",
+          scrollTrigger: {
+            trigger: section,
+            start: "top 86%",
+            end: "top 44%",
+            scrub: 0.55,
+            invalidateOnRefresh: true,
+          },
+        }
+      );
+    },
+    { scope: sectionRef, dependencies: [appReduced] }
+  );
+
+  useGSAP(
+    () => {
       const grid = gridRef.current;
       if (!grid) return;
+
+      const items = grid.querySelectorAll<HTMLElement>("[data-bento-item]");
+      if (items.length === 0) return;
 
       const capturedFlip = flipStateRef.current;
       flipStateRef.current = null;
 
-      const mm = gsap.matchMedia();
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        const items = grid.querySelectorAll("[data-bento-item]");
-        if (items.length === 0) return;
+      if (appReduced) {
+        gsap.set(items, { clearProps: "transform,opacity" });
+        return;
+      }
 
-        if (capturedFlip) {
-          Flip.from(capturedFlip, {
-            targets: items,
-            duration: 0.44,
-            ease: MOTION.gsapEase,
-            stagger: 0.035,
-            scale: false,
-            simple: true,
-            clearProps: "transform",
-            onEnter: (elements) =>
-              gsap.fromTo(
-                elements,
-                { y: 16, opacity: 0 },
-                {
-                  y: 0,
-                  opacity: 1,
-                  duration: 0.34,
-                  stagger: 0.04,
-                  ease: MOTION.gsapEase,
-                  clearProps: "transform,opacity",
-                }
-              ),
+      const setupCardEnvelopes = () => {
+        items.forEach((item) => {
+          attachBidirectionalScrollEnvelope(item, {
+            enterOpacity: 0.05,
+            enterY: 48,
+            enterScale: 0.93,
+            exitOpacity: 0.05,
+            exitY: -46,
+            exitScale: 0.935,
           });
-          return;
+        });
+      };
+
+      if (!hasInteractedRef.current) {
+        hasInteractedRef.current = true;
+        setupCardEnvelopes();
+        return;
+      }
+
+      if (capturedFlip) {
+        Flip.from(capturedFlip, {
+          targets: items,
+          duration: 0.44,
+          ease: MOTION.gsapEase,
+          stagger: 0.035,
+          scale: false,
+          simple: true,
+          clearProps: "transform",
+          onEnter: (elements) =>
+            gsap.fromTo(
+              elements,
+              { y: 16, opacity: 0 },
+              {
+                y: 0,
+                opacity: 1,
+                duration: 0.34,
+                stagger: 0.04,
+                ease: MOTION.gsapEase,
+                clearProps: "transform,opacity",
+              }
+            ),
+          onComplete: () => {
+            setupCardEnvelopes();
+            ScrollTrigger.refresh();
+          },
+        });
+        return;
+      }
+
+      const staggerStep =
+        items.length > 1
+          ? Math.min(0.05, MOTION.stagger.bentoCap / (items.length - 1))
+          : 0;
+
+      gsap.fromTo(
+        items,
+        { y: 14, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.36,
+          stagger: staggerStep,
+          ease: MOTION.gsapEase,
+          clearProps: "transform,opacity",
+          onComplete: () => {
+            setupCardEnvelopes();
+            ScrollTrigger.refresh();
+          },
         }
-
-        const staggerStep =
-          items.length > 1
-            ? Math.min(0.05, MOTION.stagger.bentoCap / (items.length - 1))
-            : 0;
-
-        gsap.fromTo(
-          items,
-          { y: 14, opacity: 0 },
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.36,
-            stagger: staggerStep,
-            ease: MOTION.gsapEase,
-            clearProps: "transform,opacity",
-          }
-        );
-      });
+      );
     },
-    { scope: gridRef, dependencies: [activeFilter, showAllSystems] }
+    { scope: gridRef, dependencies: [activeFilter, showAllSystems, appReduced] }
   );
 
   useEffect(() => {
@@ -170,12 +229,13 @@ export function SelectedWorkSection() {
 
   return (
     <section
+      ref={sectionRef}
       id="work"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-28 sm:py-36 lg:py-40"
+      className="relative z-[3] -mt-6 overflow-x-clip rounded-t-[1.75rem] border-t border-t-[rgba(56,189,248,0.22)] border-b border-b-[rgba(240,246,252,0.08)] bg-[linear-gradient(180deg,#111722_0%,#0D1117_140px)] py-28 shadow-[0_-28px_72px_rgba(0,0,0,0.9)] sm:-mt-8 sm:rounded-t-[2.25rem] sm:py-36 lg:py-40"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
-          <div className="flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
+          <div className="relative flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
             <div>
               <p className="font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#38BDF8]">
                 01 / Selected Work
@@ -191,11 +251,15 @@ export function SelectedWorkSection() {
               </KineticHeading>
             </div>
 
-            <SectionReveal parallaxY={8}>
-              <p className="max-w-[42ch] font-sans text-base leading-relaxed text-[#9DA7B3]">
-                Flagship architectures first, with category filters and live 3D system topologies.
-              </p>
-            </SectionReveal>
+            <ScrollScrubText className="max-w-[42ch] font-sans text-base leading-relaxed text-[#9DA7B3]">
+              Flagship architectures first, with category filters and live 3D system topologies.
+            </ScrollScrubText>
+
+            <span
+              data-section-rule
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 -bottom-px h-px origin-left bg-gradient-to-r from-[#38BDF8]/70 via-[#38BDF8]/25 to-transparent"
+            />
           </div>
 
           {/* Interactive Category Filter Pills with GPU Sliding Active Rail */}
@@ -284,7 +348,6 @@ export function SelectedWorkSection() {
           </div>
         </SectionReveal>
 
-        <SectionReveal variant="bento-cascade">
           <div
             ref={gridRef}
             className="mt-10 grid grid-flow-dense grid-cols-1 gap-6 lg:grid-cols-12"
@@ -304,8 +367,8 @@ export function SelectedWorkSection() {
                 el.style.setProperty("--mouse-y", `${relY}px`);
 
                 const canTilt =
-                  window.matchMedia?.("(hover: hover) and (pointer: fine)")?.matches &&
-                  !window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+                  (window.matchMedia?.("(hover: hover) and (pointer: fine)")?.matches ?? true) &&
+                  !shouldReduceAppMotion();
                 if (!canTilt || rect.width <= 0 || rect.height <= 0) return;
 
                 const nx = relX / rect.width - 0.5;
@@ -419,7 +482,6 @@ export function SelectedWorkSection() {
               );
             })}
           </div>
-        </SectionReveal>
 
         {activeFilter === "All" && (
           <div className="mt-8 flex justify-center">

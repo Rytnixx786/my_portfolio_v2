@@ -10,6 +10,7 @@ import { profile } from "@/data/site";
 import { MOTION } from "@/lib/motion";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { KineticHeading } from "@/components/motion/KineticText";
+import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
 import { HeroOrbitalBootSilhouette } from "./HeroOrbitalBootSilhouette";
 import { HeroSystemSwitcher } from "./HeroSystemSwitcher";
 import { HeroCursorField } from "./HeroCursorField";
@@ -37,76 +38,96 @@ const LazyHeroOrbitalCore3D = dynamic(
 export function HeroEditorial() {
   const [activeSystemIndex, setActiveSystemIndex] = useState(0);
   const heroRef = useRef<HTMLElement>(null);
+  const appReduced = useAppReducedMotion();
 
   useGSAP(
     () => {
       const hero = heroRef.current;
       if (!hero) return;
 
-      const mm = gsap.matchMedia();
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        // 3-beat entrance: Beat 1 eyebrow -> Beat 2 KineticHeading (handled by immediate) -> Beat 3 copy/CTAs + stage settle
-        const tl = gsap.timeline({ defaults: { ease: MOTION.gsapEase } });
-        tl.from("[data-hero-beat='1']", {
-          y: 12,
-          duration: 0.45,
-          clearProps: "transform",
-        })
-          .from(
-            "[data-hero-beat='3']",
-            {
-              y: 16,
-              duration: MOTION.durations.reveal,
-              stagger: MOTION.stagger.hero,
-              clearProps: "transform",
-            },
-            0.14
-          )
-          .from(
-            "[data-hero-stage-enter]",
-            {
-              y: 14,
-              duration: MOTION.durations.reveal,
-              clearProps: "transform",
-            },
-            0.18
-          );
-
-        // Scroll-linked foreground/stage depth separation on hero exit
-        gsap.to("[data-hero-copy]", {
-          y: -26,
-          ease: "none",
-          scrollTrigger: {
-            trigger: hero,
-            start: "top top",
-            end: "bottom top",
-            scrub: MOTION.scrollTrigger.scrub,
-          },
+      if (appReduced) {
+        gsap.set(["[data-hero-copy]", "[data-hero-stage]", "[data-hero-exit-veil]"], {
+          clearProps: "transform,opacity",
         });
+        return;
+      }
 
-        gsap.to("[data-hero-stage]", {
-          y: -12,
-          ease: "none",
-          scrollTrigger: {
-            trigger: hero,
-            start: "top top",
-            end: "bottom top",
-            scrub: MOTION.scrollTrigger.scrub,
+      // 3-beat entrance: Beat 1 eyebrow -> Beat 2 KineticHeading (handled by immediate) -> Beat 3 copy/CTAs + stage settle
+      const tl = gsap.timeline({ defaults: { ease: MOTION.gsapEase } });
+      tl.from("[data-hero-beat='1']", {
+        y: 12,
+        duration: 0.45,
+        clearProps: "transform",
+      })
+        .from(
+          "[data-hero-beat='3']",
+          {
+            y: 16,
+            duration: MOTION.durations.reveal,
+            stagger: MOTION.stagger.hero,
+            clearProps: "transform",
           },
-        });
+          0.14
+        )
+        .from(
+          "[data-hero-stage-enter]",
+          {
+            y: 14,
+            duration: MOTION.durations.reveal,
+            clearProps: "transform",
+          },
+          0.18
+        );
+
+      // Cinematic curtain recession & bidirectional fade-out as #work rises over #hero
+      const exitTl = gsap.timeline({
+        scrollTrigger: {
+          trigger: hero,
+          start: "top top",
+          end: "bottom 22%",
+          scrub: 0.45,
+          invalidateOnRefresh: true,
+        },
       });
+
+      exitTl
+        .fromTo(
+          "[data-hero-copy]",
+          { y: 0, scale: 1, opacity: 1 },
+          { y: -86, scale: 0.93, opacity: 0.04, ease: "power1.in" },
+          0
+        )
+        .fromTo(
+          "[data-hero-stage]",
+          { y: 0, scale: 1, opacity: 1 },
+          { y: -42, scale: 0.9, opacity: 0.06, ease: "power1.in" },
+          0
+        )
+        .fromTo(
+          "[data-hero-exit-veil]",
+          { opacity: 0 },
+          { opacity: 0.72, ease: "none" },
+          0
+        );
     },
-    { scope: heroRef }
+    { scope: heroRef, dependencies: [appReduced] }
   );
 
   return (
     <section
       ref={heroRef}
       id="hero"
-      className="relative z-[2] flex min-h-[100dvh] items-center overflow-hidden border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] pt-20 pb-16 sm:pt-24 sm:pb-14 lg:pt-20 lg:pb-8"
+      className="relative z-[2] flex min-h-[100dvh] items-center overflow-hidden bg-[#0D1117] pt-20 pb-20 sm:pt-24 sm:pb-20 lg:pt-20 lg:pb-14"
     >
       {/* Interactive Cursor-Reactive Precision Lattice Field */}
       <HeroCursorField containerRef={heroRef} />
+
+      {/* Scroll-Driven Hero Darkening Curtain Veil */}
+      <div
+        data-hero-exit-veil
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-[15] bg-[radial-gradient(ellipse_at_center,rgba(13,17,23,0.45)_0%,#0D1117_82%)] opacity-0"
+      />
 
       {/* Subtle Bottom Edge Vignette */}
       <div

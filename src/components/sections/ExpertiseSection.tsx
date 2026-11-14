@@ -3,16 +3,18 @@
 import dynamic from "next/dynamic";
 import { useRef, useState, type KeyboardEvent } from "react";
 import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { Cpu, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
 import { stack } from "@/data/site";
 import { MOTION } from "@/lib/motion";
 import { STACK_LAYER_HUES } from "@/lib/palette";
 import { KineticHeading } from "@/components/motion/KineticText";
+import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
 import { useSlidingIndicator } from "@/components/motion/useSlidingIndicator";
 import { SectionReveal } from "./SectionReveal";
 
-gsap.registerPlugin(useGSAP);
+gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const LazyStackRack3D = dynamic(
   () => import("@/components/canvas/StackRack3D").then((mod) => mod.StackRack3D),
@@ -64,8 +66,10 @@ export function ExpertiseSection() {
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const sectionRef = useRef<HTMLElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const hasSwitchedLayerRef = useRef(false);
+  const appReduced = useAppReducedMotion();
 
   const activeLayer = stack[activeLayerIdx];
   const layerHue = STACK_LAYER_HUES[activeLayerIdx] ?? "#38BDF8";
@@ -79,32 +83,56 @@ export function ExpertiseSection() {
 
   useGSAP(
     () => {
+      const section = sectionRef.current;
+      if (!section || appReduced) return;
+      const rule = section.querySelector<HTMLElement>("[data-section-rule]");
+      if (!rule) return;
+
+      gsap.fromTo(
+        rule,
+        { scaleX: 0 },
+        {
+          scaleX: 1,
+          ease: "power2.out",
+          transformOrigin: "left center",
+          scrollTrigger: {
+            trigger: section,
+            start: "top 86%",
+            end: "top 44%",
+            scrub: 0.55,
+            invalidateOnRefresh: true,
+          },
+        }
+      );
+    },
+    { scope: sectionRef, dependencies: [appReduced] }
+  );
+
+  useGSAP(
+    () => {
       if (!hasSwitchedLayerRef.current) {
         hasSwitchedLayerRef.current = true;
         return;
       }
       const panel = panelRef.current;
-      if (!panel) return;
+      if (!panel || appReduced) return;
 
-      const mm = gsap.matchMedia();
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        const pills = panel.querySelectorAll("[data-stack-tool]");
-        if (pills.length === 0) return;
-        gsap.fromTo(
-          pills,
-          { y: 8, opacity: 0 },
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.28,
-            stagger: 0.028,
-            ease: MOTION.gsapEase,
-            clearProps: "transform,opacity",
-          }
-        );
-      });
+      const pills = panel.querySelectorAll("[data-stack-tool]");
+      if (pills.length === 0) return;
+      gsap.fromTo(
+        pills,
+        { y: 8, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.28,
+          stagger: 0.028,
+          ease: MOTION.gsapEase,
+          clearProps: "transform,opacity",
+        }
+      );
     },
-    { scope: panelRef, dependencies: [activeLayer.code] }
+    { scope: panelRef, dependencies: [activeLayer.code, appReduced] }
   );
 
   const handleSelectTool = (tool: string) => {
@@ -145,12 +173,18 @@ export function ExpertiseSection() {
 
   return (
     <section
+      ref={sectionRef}
       id="expertise"
       className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-28 sm:py-36 lg:py-40"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
-          <div className="flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
+          <div className="relative flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
+            <span
+              data-section-rule
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 -bottom-px h-px origin-left bg-gradient-to-r from-[#38BDF8]/70 via-[#38BDF8]/25 to-transparent"
+            />
             <div>
               <p className="font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#38BDF8]">
                 04 / Capabilities
@@ -182,14 +216,16 @@ export function ExpertiseSection() {
               </button>
             </div>
           </div>
+        </SectionReveal>
 
           <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
+            <SectionReveal className="lg:col-span-5">
             <div
               ref={layerRailRef}
               role="tablist"
               aria-label="Engineering stack layers"
               onKeyDown={handleTabKeyDown}
-              className="relative flex flex-col divide-y divide-[rgba(240,246,252,0.08)] border-y border-[rgba(240,246,252,0.08)] lg:col-span-5"
+              className="relative flex flex-col divide-y divide-[rgba(240,246,252,0.08)] border-y border-[rgba(240,246,252,0.08)]"
             >
               {layerRailReady && layerRailRect && (
                 <span
@@ -250,6 +286,7 @@ export function ExpertiseSection() {
                 );
               })}
             </div>
+            </SectionReveal>
 
             <SectionReveal variant="scrub-depth" className="lg:col-span-7">
               <div
@@ -317,7 +354,6 @@ export function ExpertiseSection() {
               </div>
             </SectionReveal>
           </div>
-        </SectionReveal>
       </div>
     </section>
   );

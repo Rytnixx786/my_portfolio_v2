@@ -5,7 +5,7 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { ArrowUpRight, CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { projects } from "@/data/projects";
-import { MOTION } from "@/lib/motion";
+import { MOTION, shouldReduceAppMotion } from "@/lib/motion";
 import { getCategoryHue } from "@/lib/palette";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
 import { ScrambleMetric } from "@/components/motion/KineticText";
@@ -61,21 +61,20 @@ export function HeroSystemSwitcher({
             ? 1
             : -1;
 
-      const mm = gsap.matchMedia();
-      mm.add("(prefers-reduced-motion: no-preference)", () => {
-        gsap.fromTo(
-          "[data-switcher-slide]",
-          { x: dir * 12, opacity: 0.25 },
-          {
-            x: 0,
-            opacity: 1,
-            duration: MOTION.durations.ui,
-            stagger: 0.03,
-            ease: MOTION.gsapEase,
-            clearProps: "transform,opacity",
-          }
-        );
-      });
+      if (shouldReduceAppMotion()) return;
+
+      gsap.fromTo(
+        "[data-switcher-slide]",
+        { x: dir * 12, opacity: 0.25 },
+        {
+          x: 0,
+          opacity: 1,
+          duration: MOTION.durations.ui,
+          stagger: 0.03,
+          ease: MOTION.gsapEase,
+          clearProps: "transform,opacity",
+        }
+      );
     },
     { scope: cardRef, dependencies: [safeIndex] }
   );
