@@ -135,26 +135,12 @@ export function Navbar() {
         aria-label="Primary navigation"
         className="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-3 px-4 sm:gap-6 sm:px-8"
       >
-        {/* Left: Machined Monogram + Identity (visible across all viewports) */}
+        {/* Left: Clean Editorial Wordmark */}
         <Link
           href="/"
-          className="group inline-flex min-h-[44px] min-w-0 shrink-0 items-center gap-2.5 whitespace-nowrap transition-colors sm:gap-3"
+          className="inline-flex min-h-[44px] min-w-0 shrink-0 items-center whitespace-nowrap font-mono text-xs font-semibold uppercase tracking-[0.18em] text-[#E6EDF3] transition-colors hover:text-[#38BDF8]"
         >
-          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[rgba(240,246,252,0.16)] bg-[#161B22] font-mono text-xs font-semibold tracking-wider text-[#E6EDF3] shadow-[inset_0_1px_0_rgba(240,246,252,0.08)] transition-colors group-hover:border-[#38BDF8]/60 group-hover:text-[#38BDF8]">
-            {profile.initials}
-          </span>
-          <span className="flex min-w-0 flex-col">
-            <span className="truncate font-mono text-xs font-semibold uppercase tracking-[0.15em] text-[#E6EDF3] transition-colors group-hover:text-[#38BDF8] sm:tracking-[0.16em]">
-              {profile.name}
-            </span>
-            <span className="hidden items-center gap-1.5 font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E] sm:inline-flex">
-              <span
-                className="h-1.5 w-1.5 rounded-full bg-[#10B981]"
-                aria-hidden="true"
-              />
-              <span>AI Systems · Dhaka</span>
-            </span>
-          </span>
+          {profile.name}
         </Link>
 
         {/* Center: Clean Architectural Hairline Links */}
