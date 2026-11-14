@@ -186,16 +186,19 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
               if (uHasMap > 0.5) {
                 vec2 uvCover = coverUv(vUv, uPlaneAspect, uImgAspect);
                 vec4 texel = texture2D(uMap, uvCover);
-                col = texel.rgb;
+                // Recover shadow headroom before ACESFilmic tone mapping so portrait matches photographic exposure
+                col = pow(max(texel.rgb, vec3(0.0)), vec3(0.94)) * 1.14;
               }
 
-              // Subtle vignette + razor-clean SDF hairline border
+              // Subtle edge blend + razor-clean SDF hairline border
               float borderBand = smoothstep(-0.024, -0.008, d) * (1.0 - smoothstep(-0.008, 0.006, d));
-              float innerGlow = smoothstep(-0.085, 0.0, d) * 0.22;
-              col = mix(col, mix(col, uAccent, 0.45), innerGlow);
+              float innerGlow = smoothstep(-0.075, 0.0, d) * 0.14;
+              col = mix(col, mix(col, uAccent, 0.4), innerGlow);
               col = mix(col, mix(vec3(0.9, 0.94, 0.98), uAccent, 0.65), borderBand * 0.72);
 
               gl_FragColor = vec4(col, mask);
+              #include <tonemapping_fragment>
+              #include <colorspace_fragment>
             }
           `}
         />
