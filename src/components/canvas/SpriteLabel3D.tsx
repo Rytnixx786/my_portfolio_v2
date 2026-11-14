@@ -64,10 +64,10 @@ export function SpriteLabel3D({
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
-    texture.minFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
     texture.magFilter = THREE.LinearFilter;
-    texture.anisotropy = 4;
-    texture.generateMipmaps = false;
+    texture.anisotropy = 8;
+    texture.generateMipmaps = true;
     texture.needsUpdate = true;
 
     const aspect = width / height;

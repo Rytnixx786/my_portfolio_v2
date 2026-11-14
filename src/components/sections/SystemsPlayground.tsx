@@ -196,7 +196,7 @@ export function SystemsPlayground() {
                   value={rpsMultiplier}
                   aria-label="Simulated request stream multiplier"
                   onChange={(e) => setRpsMultiplier(Number(e.target.value))}
-                  className="w-28 accent-[#38BDF8]"
+                  className="h-11 w-28 cursor-pointer accent-[#38BDF8]"
                 />
 
                 {tab === "cinch" && (

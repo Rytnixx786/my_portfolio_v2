@@ -1,9 +1,12 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { answerPortfolioQuery, matchPortfolioQuery } from "@/lib/query-engine";
 import { CATEGORY_HUES } from "@/lib/palette";
 import { resolveEffectiveTier, resolveQualityReason } from "@/lib/device-tier";
 import { classifyNodeKind } from "@/lib/architecture";
 import { projects } from "@/data/projects";
+import { profile } from "@/data/site";
 import {
   CINCH_SCENARIOS,
   CINCH_STAGES,
@@ -197,5 +200,18 @@ describe("architecture topology integrity & semantic classification", () => {
     expect(classifyNodeKind("db_rls", 2)).toBe("storage");
     expect(classifyNodeKind("golden", 2)).toBe("storage");
     expect(classifyNodeKind("vllm_engine", 5)).toBe("compute");
+  });
+
+  it("ensures portrait assets exist on disk and flagship deck slugs resolve cleanly", () => {
+    const publicDir = path.resolve(process.cwd(), "public");
+    expect(profile.portrait).toBe("/img/mehedi-portrait.jpg");
+    expect(fs.existsSync(path.join(publicDir, profile.portrait.replace(/^\//, "")))).toBe(true);
+    expect(fs.existsSync(path.join(publicDir, profile.heroPortrait.replace(/^\//, "")))).toBe(true);
+
+    for (const slug of ["cinch", "nexus-researcher", "ares", "mindstack"]) {
+      const p = projects.find((item) => item.slug === slug);
+      expect(p).toBeDefined();
+      expect(p?.highlightMetrics[0]?.value.trim().length).toBeGreaterThan(0);
+    }
   });
 });

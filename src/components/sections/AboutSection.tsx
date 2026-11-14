@@ -100,9 +100,10 @@ export function AboutSection() {
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                   <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.14)] bg-[#0D1117]">
                     <Image
-                      src={profile.heroPortrait}
+                      src={profile.portrait}
                       alt={`${profile.name} portrait`}
                       fill
+                      loading="eager"
                       sizes="96px"
                       className="object-cover object-top"
                     />

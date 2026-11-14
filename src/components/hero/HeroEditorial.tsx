@@ -21,7 +21,7 @@ const LazyHeroOrbitalCore3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[320px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/40 sm:h-[380px] lg:h-[420px]">
+      <div className="flex h-[248px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/40 sm:h-[380px] lg:h-[420px]">
         <span className="font-mono text-xs uppercase tracking-[0.16em] text-[#8B949E]">
           Initializing Orbital Stage...
         </span>
@@ -59,7 +59,7 @@ export function HeroEditorial() {
     <section
       ref={heroRef}
       id="hero"
-      className="relative z-[2] flex min-h-[100dvh] items-center overflow-hidden border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] pt-20 pb-10 sm:pt-24 sm:pb-12"
+      className="relative z-[2] flex min-h-[100dvh] items-center overflow-hidden border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] pt-20 pb-20 sm:pt-24 sm:pb-16 lg:pb-12"
     >
       {/* Interactive Cursor-Reactive Precision Lattice Field */}
       <HeroCursorField containerRef={heroRef} />
@@ -71,21 +71,21 @@ export function HeroEditorial() {
       />
 
       <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 sm:px-8">
-        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-12">
+        <div className="grid grid-cols-1 items-center gap-6 sm:gap-10 lg:grid-cols-12 lg:gap-12">
           {/* Left 7 Cols: Focused Editorial Identity */}
           <div className="min-w-0 lg:col-span-7">
             <p
               data-hero-stagger
-              className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-2xl border border-[rgba(240,246,252,0.12)] bg-[#161B22]/75 px-3.5 py-1.5 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3] backdrop-blur-sm sm:rounded-full"
+              className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-[rgba(240,246,252,0.12)] bg-[#161B22]/75 px-3.5 py-1.5 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3] backdrop-blur-sm sm:rounded-full"
             >
               <span className="h-2 w-2 shrink-0 rounded-full bg-[#10B981]" aria-hidden="true" />
-              <span>{profile.role} · FlyRank Intern</span>
+              <span className="min-w-0">{profile.role}</span>
             </p>
 
             <KineticHeading
               as="h1"
               immediate
-              className="mt-5 max-w-5xl font-display text-[clamp(2.45rem,6.4vw,5.5rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
+              className="mt-4 max-w-5xl font-display text-[clamp(2.45rem,6.4vw,5.5rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3] sm:mt-5"
             >
               RELIABLE{" "}
               <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
@@ -95,12 +95,12 @@ export function HeroEditorial() {
 
             <p
               data-hero-stagger
-              className="mt-4 max-w-[46ch] font-sans text-base leading-relaxed text-[#9DA7B3] sm:text-lg"
+              className="mt-3 max-w-[46ch] font-sans text-base leading-relaxed text-[#9DA7B3] sm:mt-4 sm:text-lg"
             >
               Quantized serving, grounded RAG, and fault-isolated backends.
             </p>
 
-            <div data-hero-stagger className="mt-7 flex flex-wrap items-center gap-3.5">
+            <div data-hero-stagger className="mt-5 flex flex-wrap items-center gap-3.5 sm:mt-7">
               <MagneticButton>
                 <a
                   href="#work"

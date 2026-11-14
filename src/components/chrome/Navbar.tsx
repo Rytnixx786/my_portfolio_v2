@@ -123,15 +123,6 @@ export function Navbar() {
     return () => observer.disconnect();
   }, [pathname]);
 
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpenedPath(null);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [mobileOpen]);
-
   return (
     <header
       className={`fixed inset-x-0 top-0 z-40 transition-all duration-300 ${

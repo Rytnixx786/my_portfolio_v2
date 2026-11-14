@@ -225,7 +225,7 @@ export function ArchitectureDiagram({
               type="button"
               onClick={() => setPlaying((p) => !p)}
               aria-pressed={playing}
-              className={`inline-flex min-h-[38px] items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono text-xs uppercase tracking-[0.1em] transition-colors ${
+              className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border px-4 py-2 font-mono text-xs uppercase tracking-[0.1em] transition-colors ${
                 playing
                   ? "border-[#10B981]/60 bg-[#10B981]/15 text-[#10B981] hover:border-[#10B981]"
                   : "border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#E6EDF3] hover:border-[#38BDF8] hover:text-[#38BDF8]"
@@ -251,7 +251,7 @@ export function ArchitectureDiagram({
                 setActiveIndex((i) => (i - 1 + nodes.length) % nodes.length);
               }}
               aria-label="Previous pipeline stage"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
             >
               <CaretLeft className="h-4 w-4" weight="regular" aria-hidden="true" />
             </button>
@@ -283,7 +283,7 @@ export function ArchitectureDiagram({
                 type="button"
                 onClick={() => setMode("2d")}
                 aria-pressed={mode === "2d"}
-                className={`rounded-full px-3 py-1 font-mono text-xs uppercase transition-colors ${
+                className={`min-h-[44px] rounded-full px-3.5 py-2 font-mono text-xs uppercase transition-colors ${
                   mode === "2d"
                     ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                     : "text-[#9DA7B3] hover:text-[#E6EDF3]"
@@ -295,7 +295,7 @@ export function ArchitectureDiagram({
                 type="button"
                 onClick={() => setMode("3d")}
                 aria-pressed={mode === "3d"}
-                className={`rounded-full px-3 py-1 font-mono text-xs uppercase transition-colors ${
+                className={`min-h-[44px] rounded-full px-3.5 py-2 font-mono text-xs uppercase transition-colors ${
                   mode === "3d"
                     ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                     : "text-[#9DA7B3] hover:text-[#E6EDF3]"

@@ -479,7 +479,7 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
               step="0.01"
               value={aresThreshold}
               onChange={(e) => setAresThreshold(Number(e.target.value))}
-              className="w-28 accent-[#A8CE6C]"
+              className="h-11 w-28 cursor-pointer accent-[#A8CE6C]"
             />
           </label>
         )}

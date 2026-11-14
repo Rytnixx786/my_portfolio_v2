@@ -472,7 +472,7 @@ export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
       className="relative h-[340px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[410px]"
     >
       {/* Legend Pill (bottom-left on narrow mobile so it never collides with Zoom HUD; top-left on sm+) */}
-      <div className="pointer-events-none absolute bottom-2.5 left-2.5 z-30 flex flex-wrap items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22]/90 px-2.5 py-1 font-mono text-xs text-[#9DA7B3] backdrop-blur-md sm:bottom-auto sm:left-3 sm:top-3 sm:gap-3 sm:px-3">
+      <div className="pointer-events-none absolute bottom-2.5 left-2.5 z-30 flex flex-wrap items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22]/90 px-2.5 py-1 font-mono text-xs uppercase tracking-[0.1em] text-[#9DA7B3] backdrop-blur-md sm:bottom-auto sm:left-3 sm:top-3 sm:gap-3 sm:px-3">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-[#10B981]" /> Entry
         </span>

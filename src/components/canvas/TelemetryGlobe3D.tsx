@@ -651,14 +651,14 @@ export function TelemetryGlobe3D() {
         />
       </ViewportCanvas>
 
-      <div className="absolute bottom-2 left-2 right-2 z-30 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-3 py-1.5 backdrop-blur-md">
-        <div className="flex items-center gap-1.5">
+      <div className="absolute bottom-2 left-2 right-2 z-30 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-3 py-1 backdrop-blur-md">
+        <div className="flex items-center gap-1">
           {REGIONS.map((region) => (
             <button
               key={region.id}
               type="button"
               onClick={() => setSelectedId(region.id)}
-              className={`rounded-md px-2 py-0.5 font-mono text-xs transition-colors ${
+              className={`min-h-[44px] rounded-lg px-2.5 py-2 font-mono text-xs transition-colors ${
                 selectedId === region.id
                   ? "bg-[#38BDF8]/15 font-semibold text-[#E6EDF3]"
                   : "text-[#8B949E] hover:text-[#E6EDF3]"

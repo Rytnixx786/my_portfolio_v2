@@ -115,7 +115,7 @@ export function CommandPalette() {
             type="button"
             onClick={closeModal}
             aria-label="Close command palette"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#9DA7B3] hover:border-[#38BDF8] hover:text-[#E6EDF3]"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#9DA7B3] hover:border-[#38BDF8] hover:text-[#E6EDF3]"
           >
             <X className="h-4 w-4" weight="regular" aria-hidden="true" />
           </button>
@@ -135,7 +135,7 @@ export function CommandPalette() {
             <button
               type="submit"
               disabled={loading || !query.trim()}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#38BDF8] px-4 py-1.5 font-mono text-xs font-semibold uppercase tracking-[0.1em] text-[#0D1117] disabled:opacity-40"
+              className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full bg-[#38BDF8] px-4 py-2 font-mono text-xs font-semibold uppercase tracking-[0.1em] text-[#0D1117] disabled:opacity-40"
             >
               <span>{loading ? "..." : "Run"}</span>
               <PaperPlaneRight className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />

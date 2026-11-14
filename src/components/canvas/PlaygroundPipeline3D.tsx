@@ -36,7 +36,7 @@ const TOKEN_COUNT = 36;
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
 
 const PRESET_VANTAGES: Record<PlaygroundCameraPreset, [number, number, number]> = {
-  isometric: [3.1, 3.6, 6.1],
+  isometric: [1.3, 3.85, 7.2],
   top: [0, 7.6, 2.2],
   orbit: [3.6, 2.8, 5.5],
 };

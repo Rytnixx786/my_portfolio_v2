@@ -98,7 +98,7 @@ export function ProjectPreviewPlate({
                 type="button"
                 onClick={() => setViewMode("3d")}
                 aria-pressed={viewMode === "3d"}
-                className={`min-h-[44px] rounded-full px-3 py-1 font-mono text-xs uppercase transition-colors ${
+                className={`min-h-[44px] min-w-[44px] rounded-full px-3 py-1 font-mono text-xs uppercase transition-colors ${
                   viewMode === "3d"
                     ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                     : "text-[#8B949E] hover:text-[#E6EDF3]"
@@ -110,7 +110,7 @@ export function ProjectPreviewPlate({
                 type="button"
                 onClick={() => setViewMode("2d")}
                 aria-pressed={viewMode === "2d"}
-                className={`min-h-[44px] rounded-full px-3 py-1 font-mono text-xs uppercase transition-colors ${
+                className={`min-h-[44px] min-w-[44px] rounded-full px-3 py-1 font-mono text-xs uppercase transition-colors ${
                   viewMode === "2d"
                     ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                     : "text-[#8B949E] hover:text-[#E6EDF3]"

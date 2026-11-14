@@ -48,7 +48,7 @@ export function AskTerminal() {
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            className="inline-flex min-h-[38px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-4 py-1.5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors duration-300 hover:border-[#38BDF8] hover:text-[#38BDF8]"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors duration-300 hover:border-[#38BDF8] hover:text-[#38BDF8]"
           >
             <span>{open ? "Collapse" : "Open console"}</span>
             <CaretDown

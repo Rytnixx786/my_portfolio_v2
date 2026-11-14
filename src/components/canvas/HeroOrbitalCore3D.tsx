@@ -742,12 +742,12 @@ export function HeroOrbitalCore3D({
         if (canRender3D) setWheelEngaged(true);
       }}
       onPointerLeave={() => setWheelEngaged(false)}
-      className="relative h-[320px] w-full overflow-hidden rounded-2xl sm:h-[380px] lg:h-[420px]"
+      className="relative h-[248px] w-full overflow-hidden rounded-2xl sm:h-[380px] lg:h-[420px]"
     >
-      <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/88 px-3 py-1 font-mono text-xs text-[#E6EDF3] backdrop-blur-md">
+      <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex max-w-[calc(100%-164px)] items-center gap-1.5 truncate rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/88 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] backdrop-blur-md sm:max-w-none sm:gap-2 sm:px-3">
         <span style={{ color: displaySys.hue }}>{displaySys.code}</span>
         <span className="font-semibold">{displaySys.label}</span>
-        <span className="text-[#9DA7B3]">· {displaySys.metric}</span>
+        <span className="hidden text-[#9DA7B3] sm:inline">· {displaySys.metric}</span>
       </div>
 
       {canRender3D && (
