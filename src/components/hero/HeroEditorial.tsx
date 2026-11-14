@@ -21,7 +21,7 @@ const LazyHeroOrbitalCore3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[248px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/40 sm:h-[380px] lg:h-[420px]">
+      <div className="flex h-[280px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#161B22]/40 sm:h-[380px] lg:h-[420px]">
         <span className="font-mono text-xs uppercase tracking-[0.16em] text-[#8B949E]">
           Initializing Orbital Stage...
         </span>
@@ -59,7 +59,7 @@ export function HeroEditorial() {
     <section
       ref={heroRef}
       id="hero"
-      className="relative z-[2] flex min-h-[100dvh] items-center overflow-hidden border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] pt-20 pb-20 sm:pt-24 sm:pb-16 lg:pb-12"
+      className="relative z-[2] flex min-h-[100dvh] items-center overflow-hidden border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] pt-20 pb-16 sm:pt-24 sm:pb-14 lg:pt-20 lg:pb-8"
     >
       {/* Interactive Cursor-Reactive Precision Lattice Field */}
       <HeroCursorField containerRef={heroRef} />
@@ -76,7 +76,7 @@ export function HeroEditorial() {
           <div className="min-w-0 lg:col-span-7">
             <p
               data-hero-stagger
-              className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-[rgba(240,246,252,0.12)] bg-[#161B22]/75 px-3.5 py-1.5 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3] backdrop-blur-sm sm:rounded-full"
+              className="inline-flex max-w-full items-center gap-2.5 border-0 bg-transparent px-0 font-mono text-xs uppercase tracking-[0.14em] text-[#9DA7B3]"
             >
               <span className="h-2 w-2 shrink-0 rounded-full bg-[#10B981]" aria-hidden="true" />
               <span className="min-w-0">{profile.role}</span>

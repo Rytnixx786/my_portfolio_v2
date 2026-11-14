@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
@@ -34,6 +34,11 @@ function CinchGpuSculpture({
   const pulseRef = useRef<THREE.Mesh>(null);
   const elapsedRef = useRef(0);
   const hue = CATEGORY_HUES["Inference & Serving"].hex;
+  const { frameloop, invalidate } = useThree();
+
+  useEffect(() => {
+    invalidate();
+  }, [mode, invalidate]);
 
   const bypassCurve = useMemo(() => {
     return new THREE.CatmullRomCurve3([
@@ -45,14 +50,17 @@ function CinchGpuSculpture({
   }, []);
 
   useFrame((_, delta) => {
+    const isStatic = frameloop === "demand";
     const dt = Math.min(delta, 0.05);
-    elapsedRef.current += dt;
-    if (groupRef.current && !draggingRef.current) {
-      groupRef.current.rotation.y += dt * 0.22;
+    if (!isStatic) {
+      elapsedRef.current += dt;
+      if (groupRef.current && !draggingRef.current) {
+        groupRef.current.rotation.y += dt * 0.22;
+      }
     }
     if (pulseRef.current) {
       const speed = mode === "cache" ? 0.62 : mode === "marlin" ? 0.42 : 0.85;
-      const t = (elapsedRef.current * speed) % 1;
+      const t = isStatic ? 0.42 : (elapsedRef.current * speed) % 1;
       bypassCurve.getPointAt(t, pulseRef.current.position);
     }
   });
@@ -113,6 +121,11 @@ function NexusDagSculpture({
   const groupRef = useRef<THREE.Group>(null);
   const nodeRefs = useRef<Array<THREE.Mesh | null>>([]);
   const rose = CATEGORY_HUES["Agents & RAG"].hex;
+  const { frameloop, invalidate } = useThree();
+
+  useEffect(() => {
+    invalidate();
+  }, [hitlApproved, activeNodeIdx, invalidate]);
 
   const nodes = useMemo(
     () => [
@@ -150,15 +163,16 @@ function NexusDagSculpture({
   }, [lineGeom]);
 
   useFrame((_, delta) => {
+    const isStatic = frameloop === "demand";
     const dt = Math.min(delta, 0.05);
-    if (groupRef.current && !draggingRef.current) {
+    if (!isStatic && groupRef.current && !draggingRef.current) {
       groupRef.current.rotation.y += dt * 0.18;
     }
     nodes.forEach((_, idx) => {
       const mesh = nodeRefs.current[idx];
       if (!mesh) return;
       const target = idx === activeNodeIdx ? 1.28 : 0.95;
-      const next = THREE.MathUtils.damp(mesh.scale.x, target, 8, dt);
+      const next = isStatic ? target : THREE.MathUtils.damp(mesh.scale.x, target, 8, dt);
       mesh.scale.setScalar(next);
     });
   });
@@ -231,6 +245,7 @@ function AresGateSculpture({
   const groupRef = useRef<THREE.Group>(null);
   const planeRef = useRef<THREE.Mesh>(null);
   const lime = CATEGORY_HUES["MLOps & Security"].hex;
+  const { frameloop, invalidate } = useThree();
 
   const slices = useMemo(
     () => [
@@ -244,18 +259,20 @@ function AresGateSculpture({
 
   const targetPlaneY = -0.55 + threshold * 1.1;
 
+  useEffect(() => {
+    invalidate();
+  }, [threshold, invalidate]);
+
   useFrame((_, delta) => {
+    const isStatic = frameloop === "demand";
     const dt = Math.min(delta, 0.05);
-    if (groupRef.current && !draggingRef.current) {
+    if (!isStatic && groupRef.current && !draggingRef.current) {
       groupRef.current.rotation.y += dt * 0.2;
     }
     if (planeRef.current) {
-      planeRef.current.position.y = THREE.MathUtils.damp(
-        planeRef.current.position.y,
-        targetPlaneY,
-        10,
-        dt
-      );
+      planeRef.current.position.y = isStatic
+        ? targetPlaneY
+        : THREE.MathUtils.damp(planeRef.current.position.y, targetPlaneY, 10, dt);
     }
   });
 
@@ -364,7 +381,7 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
         if (canRender3D) setWheelEngaged(true);
       }}
       onPointerLeave={() => setWheelEngaged(false)}
-      className={`relative h-[225px] w-full overflow-hidden rounded-b-[calc(1.5rem-0.375rem)] sm:h-[260px] ${className}`}
+      className={`relative h-[252px] w-full overflow-hidden rounded-b-[calc(1.5rem-0.375rem)] sm:h-[260px] ${className}`}
     >
       {canRender3D && (
         <CanvasZoomHUD
@@ -422,22 +439,22 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
           onEnd={() => {
             draggingRef.current = false;
           }}
-          touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+          touches={{ ONE: undefined, TWO: undefined }}
         />
       </ViewportCanvas>
 
       {/* Bottom Mini-Lab Control Bar */}
-      <div className="absolute bottom-2.5 left-3 right-3 z-30 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(240,246,252,0.12)] bg-[#161B22]/90 px-3 py-1.5 backdrop-blur-md">
+      <div className="absolute bottom-2.5 left-2.5 right-2.5 z-30 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[rgba(240,246,252,0.12)] bg-[#161B22]/90 px-2.5 py-1.5 backdrop-blur-md sm:left-3 sm:right-3 sm:px-3">
         {slug === "cinch" && (
           <>
-            <span className="font-mono text-xs text-[#9DA7B3]">Route Probe:</span>
-            <div className="flex items-center gap-1.5">
+            <span className="hidden font-mono text-xs text-[#9DA7B3] sm:inline">Route Probe:</span>
+            <div className="flex w-full items-center gap-1.5 sm:w-auto">
               {(["cache", "marlin", "breaker"] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => setCinchMode(m)}
-                  className={`min-h-[44px] rounded-md px-2.5 py-2 font-mono text-xs uppercase transition-colors ${
+                  className={`min-h-[44px] flex-1 whitespace-nowrap rounded-md px-2 py-2 font-mono text-[11px] uppercase transition-colors sm:flex-initial sm:px-2.5 sm:text-xs ${
                     cinchMode === m
                       ? "bg-[#38BDF8] font-semibold text-[#0D1117]"
                       : "bg-[#0D1117] text-[#9DA7B3] hover:text-[#E6EDF3]"

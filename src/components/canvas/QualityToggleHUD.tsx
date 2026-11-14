@@ -48,17 +48,28 @@ export function QualityToggleHUD() {
       }
     };
 
+    const onCloseHud = () => setOpen(false);
+
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("mousedown", onPointerDown);
     window.addEventListener("touchstart", onPointerDown);
+    window.addEventListener("portfolio:close-quality-hud", onCloseHud);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("mousedown", onPointerDown);
       window.removeEventListener("touchstart", onPointerDown);
+      window.removeEventListener("portfolio:close-quality-hud", onCloseHud);
     };
   }, [open]);
 
-  if (!hasMounted) return null;
+  if (!hasMounted) {
+    return (
+      <div
+        aria-hidden="true"
+        className="h-11 w-[90px] shrink-0 rounded-lg border border-[rgba(240,246,252,0.08)] bg-[#161B22]/50 sm:w-[98px]"
+      />
+    );
+  }
 
   const activeId: QualityPreference =
     preference !== "auto"
@@ -72,12 +83,29 @@ export function QualityToggleHUD() {
   const activeMeta = OPTIONS.find((o) => o.id === activeId) ?? OPTIONS[1];
 
   return (
-    <div ref={containerRef} className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+    <div ref={containerRef} className="relative flex shrink-0 items-center">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-label={`Graphics mode ${activeMeta.shortLabel}. ${qualityReason}. Click to adjust.`}
+        className="inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-lg border border-[rgba(240,246,252,0.12)] bg-[#161B22]/85 px-2.5 py-2 font-mono text-[11px] uppercase tracking-[0.1em] text-[#E6EDF3] transition-colors duration-200 hover:border-[#38BDF8]/60 hover:text-[#38BDF8] sm:gap-2 sm:px-3 sm:text-xs"
+      >
+        {activeId === "2d" ? (
+          <Desktop className="h-3.5 w-3.5 shrink-0 text-[#F59E0B]" weight="regular" aria-hidden="true" />
+        ) : activeId === "balanced" ? (
+          <Gauge className="h-3.5 w-3.5 shrink-0 text-[#38BDF8]" weight="regular" aria-hidden="true" />
+        ) : (
+          <Cube className="h-3.5 w-3.5 shrink-0 text-[#10B981]" weight="regular" aria-hidden="true" />
+        )}
+        <span>{activeMeta.shortLabel}</span>
+      </button>
+
       {open && (
         <div
           role="dialog"
           aria-label="3D graphics quality controls"
-          className="w-64 rounded-2xl border border-[rgba(240,246,252,0.14)] bg-[#161B22]/95 p-2.5 shadow-2xl backdrop-blur-xl"
+          className="fixed right-4 top-[72px] z-50 w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-[rgba(240,246,252,0.16)] bg-[#161B22] p-2.5 shadow-[0_24px_56px_-12px_rgba(0,0,0,0.92)] sm:absolute sm:right-0 sm:top-full sm:mt-2"
         >
           <div className="flex items-center justify-between border-b border-[rgba(240,246,252,0.08)] px-2 pb-2 pt-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E]">
             <span>WebGL Stage</span>
@@ -137,23 +165,6 @@ export function QualityToggleHUD() {
           </div>
         </div>
       )}
-
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-expanded={open}
-        aria-label={`Graphics mode ${activeMeta.shortLabel}. ${qualityReason}. Click to adjust.`}
-        className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22]/90 px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] backdrop-blur-md transition-all duration-300 hover:border-[#38BDF8] hover:text-[#38BDF8]"
-      >
-        {activeId === "2d" ? (
-          <Desktop className="h-3.5 w-3.5 text-[#F59E0B]" weight="regular" aria-hidden="true" />
-        ) : activeId === "balanced" ? (
-          <Gauge className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
-        ) : (
-          <Cube className="h-3.5 w-3.5 text-[#10B981]" weight="regular" aria-hidden="true" />
-        )}
-        <span>{activeMeta.shortLabel}</span>
-      </button>
     </div>
   );
 }

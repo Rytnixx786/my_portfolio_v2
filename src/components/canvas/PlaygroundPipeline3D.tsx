@@ -86,13 +86,24 @@ function CameraRigController({
   }, [preset, presetTrigger, camera, frameloop, invalidate]);
 
   useFrame((state, delta) => {
+    const isStatic = frameloop === "demand";
     const dt = Math.min(delta, 0.05);
-    elapsedRef.current += dt;
+    if (!isStatic) {
+      elapsedRef.current += dt;
+    }
     const controls = controlsRef.current;
     const cam = state.camera;
     if (!controls) return;
 
     if (transitioningRef.current && !draggingRef.current) {
+      if (isStatic) {
+        cam.position.copy(targetPosRef.current);
+        controls.target.copy(lookTargetRef.current);
+        controls.update();
+        transitioningRef.current = false;
+        return;
+      }
+
       transitionElapsedRef.current += dt;
       controls.autoRotate = false;
 
@@ -113,7 +124,7 @@ function CameraRigController({
       return;
     }
 
-    if (draggingRef.current) {
+    if (draggingRef.current || isStatic) {
       controls.autoRotate = false;
       lastInteractElapsedRef.current = elapsedRef.current;
       return;
@@ -170,7 +181,7 @@ function CameraRigController({
         enableDamping
         dampingFactor={0.07}
         rotateSpeed={0.68}
-        autoRotate={preset === "orbit"}
+        autoRotate={preset === "orbit" && frameloop !== "demand"}
         autoRotateSpeed={1.65}
         minPolarAngle={0.22}
         maxPolarAngle={Math.PI * 0.39}
@@ -183,7 +194,7 @@ function CameraRigController({
           draggingRef.current = false;
           lastInteractElapsedRef.current = elapsedRef.current;
         }}
-        touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+        touches={{ ONE: undefined, TWO: undefined }}
       />
     </>
   );
@@ -267,11 +278,20 @@ function InstancedPacketStream({
     []
   );
 
+  const { frameloop, invalidate } = useThree();
+
+  useEffect(() => {
+    invalidate();
+  }, [scenarioId, lastActiveIdx, statusColor, rpsMultiplier, invalidate]);
+
   useFrame((_, delta) => {
     const mesh = meshRef.current;
     if (!mesh) return;
+    const isStatic = frameloop === "demand";
     const dt = Math.min(delta, 0.05);
-    elapsedRef.current += dt;
+    if (!isStatic) {
+      elapsedRef.current += dt;
+    }
 
     const speed =
       (scenarioId === "cache-hit" ? 0.36 : scenarioId === "hitl-replan" ? 0.26 : 0.3) *
@@ -333,29 +353,36 @@ function StationPedestal({
   const ringRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const elapsedRef = useRef(0);
+  const { frameloop, invalidate } = useThree();
 
   const pedestalColor = isFocused ? UI_ACCENT : isActive ? statusColor : "#2B3647";
 
+  useEffect(() => {
+    invalidate();
+  }, [isActive, isFocused, statusColor, hovered, invalidate]);
+
   useFrame((_, delta) => {
+    const isStatic = frameloop === "demand";
     const dt = Math.min(delta, 0.05);
-    elapsedRef.current += dt;
+    if (!isStatic) {
+      elapsedRef.current += dt;
+    }
     if (bodyRef.current) {
-      const wave = isActive ? Math.sin(elapsedRef.current * 2.6 + pulsePhase) * 0.035 : 0;
+      const wave = !isStatic && isActive ? Math.sin(elapsedRef.current * 2.6 + pulsePhase) * 0.035 : 0;
       const targetY = (isFocused ? 0.16 : isActive ? 0.08 : 0) + (hovered ? 0.06 : 0) + wave;
-      bodyRef.current.position.y = THREE.MathUtils.damp(
-        bodyRef.current.position.y,
-        targetY,
-        8,
-        dt
-      );
+      bodyRef.current.position.y = isStatic
+        ? targetY
+        : THREE.MathUtils.damp(bodyRef.current.position.y, targetY, 8, dt);
     }
     if (ringRef.current) {
       const targetScale = isFocused
         ? 1.15
         : isActive
-          ? 1.0 + Math.sin(elapsedRef.current * 3 + pulsePhase) * 0.08
+          ? 1.0 + (!isStatic ? Math.sin(elapsedRef.current * 3 + pulsePhase) * 0.08 : 0)
           : 0.7;
-      const next = THREE.MathUtils.damp(ringRef.current.scale.x, targetScale, 8, dt);
+      const next = isStatic
+        ? targetScale
+        : THREE.MathUtils.damp(ringRef.current.scale.x, targetScale, 8, dt);
       ringRef.current.scale.set(next, next, 1);
     }
   });
@@ -573,7 +600,7 @@ export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {
       </ViewportCanvas>
 
       {canRender3D && (
-        <span className="pointer-events-none absolute bottom-2.5 right-3 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/85 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.1em] text-[#8B949E] backdrop-blur-md">
+        <span className="pointer-events-none absolute bottom-2.5 right-3 z-20 hidden rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/85 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.1em] text-[#8B949E] backdrop-blur-md sm:inline-flex">
           Drag to orbit · +/- or click &amp; scroll to zoom · Click station
         </span>
       )}

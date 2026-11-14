@@ -53,20 +53,22 @@ function RackCameraFit({
   }, [zoomSeq]);
 
   useEffect(() => {
-    settlingRef.current = true;
     elapsedRef.current = 0;
     if (frameloop === "demand") {
+      settlingRef.current = false;
       camera.position.copy(target);
       if (controlsRef.current) {
         controlsRef.current.target.copy(lookTarget);
         controlsRef.current.update();
       }
+    } else {
+      settlingRef.current = true;
     }
     invalidate();
   }, [camera, target, lookTarget, frameloop, invalidate, controlsRef]);
 
   useFrame((state, delta) => {
-    if (!settlingRef.current || draggingRef.current) return;
+    if (frameloop === "demand" || !settlingRef.current || draggingRef.current) return;
     const dt = Math.min(delta, 0.05);
     elapsedRef.current += dt;
     const cam = state.camera;
@@ -90,7 +92,6 @@ function KeycapNode({
   isSelected,
   rippleDelay,
   selectKey,
-  reducedMotion,
   onSelect,
 }: {
   label: string;
@@ -99,9 +100,9 @@ function KeycapNode({
   isSelected: boolean;
   rippleDelay: number;
   selectKey: string;
-  reducedMotion: boolean;
   onSelect: () => void;
 }) {
+  const { frameloop, invalidate } = useThree();
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
   const elapsedRef = useRef(0);
@@ -109,13 +110,14 @@ function KeycapNode({
 
   useEffect(() => {
     waveStartRef.current = elapsedRef.current;
-  }, [selectKey]);
+    invalidate();
+  }, [selectKey, isSelected, invalidate]);
 
   useFrame((_, delta) => {
     if (!groupRef.current) return;
     const baseY = isSelected ? -0.14 : hovered ? -0.06 : 0;
 
-    if (reducedMotion) {
+    if (frameloop === "demand") {
       groupRef.current.position.y = baseY;
       return;
     }
@@ -301,7 +303,7 @@ export function StackRack3D({
   selectedTool,
   onSelectTool,
 }: StackRack3DProps) {
-  const { canRender3D, reducedMotion } = useCanRender3D();
+  const { canRender3D } = useCanRender3D();
   const selectedIndex = Math.max(0, tools.indexOf(selectedTool ?? ""));
   const selectKey = `${layerCode}-${selectedTool ?? ""}`;
   const cols = tools.length <= 4 ? 2 : 3;
@@ -417,7 +419,6 @@ export function StackRack3D({
             isSelected={selectedTool === tool}
             rippleDelay={Math.abs(idx - selectedIndex) * 0.05}
             selectKey={selectKey}
-            reducedMotion={reducedMotion}
             onSelect={() => onSelectTool(tool)}
           />
         ))}
@@ -441,7 +442,7 @@ export function StackRack3D({
           onEnd={() => {
             draggingRef.current = false;
           }}
-          touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+          touches={{ ONE: undefined, TWO: undefined }}
         />
       </ViewportCanvas>
     </div>

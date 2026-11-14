@@ -90,7 +90,7 @@ export function ExpertiseSection() {
   return (
     <section
       id="expertise"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-24 sm:py-32"
+      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-28 sm:py-36 lg:py-40"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>

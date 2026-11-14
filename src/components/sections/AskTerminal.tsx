@@ -69,7 +69,7 @@ export function AskTerminal() {
                   key={item}
                   type="button"
                   onClick={() => void submitQuestion(item)}
-                  className="rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117] px-3 py-1.5 font-mono text-xs text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
+                  className="inline-flex min-h-[44px] items-center rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117] px-3.5 py-2 font-mono text-xs text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
                 >
                   {item}
                 </button>
@@ -93,7 +93,7 @@ export function AskTerminal() {
                         <Link
                           key={c.href}
                           href={c.href}
-                          className="rounded-md border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-2 py-0.5 font-mono text-xs text-[#7DD3FC] hover:bg-[#38BDF8]/20"
+                          className="inline-flex min-h-[44px] items-center rounded-md border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs text-[#7DD3FC] hover:bg-[#38BDF8]/20"
                         >
                           {c.label} ↗
                         </Link>

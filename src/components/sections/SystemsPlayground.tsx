@@ -66,7 +66,7 @@ export function SystemsPlayground() {
   return (
     <section
       id="simulator"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-24 sm:py-32"
+      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-28 sm:py-36 lg:py-40"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
@@ -128,12 +128,13 @@ export function SystemsPlayground() {
           </div>
         </SectionReveal>
 
-        <div
-          id="panel-simulator"
-          role="tabpanel"
-          aria-labelledby={tab === "cinch" ? "tab-cinch" : "tab-rag"}
-          className="double-bezel-outer mt-8"
-        >
+        <SectionReveal variant="scrub-depth" className="mt-8">
+          <div
+            id="panel-simulator"
+            role="tabpanel"
+            aria-labelledby={tab === "cinch" ? "tab-cinch" : "tab-rag"}
+            className="double-bezel-outer"
+          >
           <div className="double-bezel-core overflow-hidden">
             {/* Simulator Header Controls */}
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[rgba(240,246,252,0.08)] bg-[#1C222B] px-4 py-3 sm:px-6">
@@ -408,7 +409,8 @@ export function SystemsPlayground() {
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        </SectionReveal>
       </div>
     </section>
   );

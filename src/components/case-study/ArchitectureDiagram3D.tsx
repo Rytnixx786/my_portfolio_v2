@@ -69,6 +69,7 @@ function SpatialDagScene({
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const size = useThree((s) => s.size);
   const camera = useThree((s) => s.camera);
+  const frameloop = useThree((s) => s.frameloop);
   const invalidate = useThree((s) => s.invalidate);
 
   const aspect = size.width / Math.max(1, size.height);
@@ -186,9 +187,16 @@ function SpatialDagScene({
   const activeNode = positioned[activeIndex] ?? positioned[0];
   const stageWidth = Math.max(7.2, layoutCols * stepX + 1.8);
 
+  useEffect(() => {
+    invalidate();
+  }, [activeIndex, playing, hoveredIdx, invalidate]);
+
   useFrame((_, delta) => {
+    const isStatic = frameloop === "demand";
     const dt = Math.min(delta, 0.05);
-    elapsedRef.current += dt;
+    if (!isStatic) {
+      elapsedRef.current += dt;
+    }
     const t = elapsedRef.current;
 
     controlsRef.current?.update();
@@ -200,11 +208,13 @@ function SpatialDagScene({
       const isHovered = idx === hoveredIdx;
       const targetY =
         node.vec.y +
-        (isActive ? 0.16 + Math.sin(t * 3.2) * 0.03 : isHovered ? 0.08 : 0);
-      grp.position.y = THREE.MathUtils.damp(grp.position.y, targetY, 9, dt);
+        (isActive ? 0.16 + (!isStatic ? Math.sin(t * 3.2) * 0.03 : 0) : isHovered ? 0.08 : 0);
+      grp.position.y = isStatic
+        ? targetY
+        : THREE.MathUtils.damp(grp.position.y, targetY, 9, dt);
 
       const targetScale = isActive ? 1.12 : isHovered ? 1.06 : 1.0;
-      const s = THREE.MathUtils.damp(grp.scale.x, targetScale, 9, dt);
+      const s = isStatic ? targetScale : THREE.MathUtils.damp(grp.scale.x, targetScale, 9, dt);
       grp.scale.setScalar(s);
     });
 
@@ -214,7 +224,7 @@ function SpatialDagScene({
       const isOutgoing = c.fromId === activeNode?.id;
       const isIncoming = c.toId === activeNode?.id;
       const speed = isOutgoing ? (playing ? 0.85 : 0.62) : isIncoming ? 0.5 : 0.32;
-      const u = (t * speed + idx * 0.17) % 1;
+      const u = isStatic ? (0.45 + idx * 0.17) % 1 : (t * speed + idx * 0.17) % 1;
       c.curve.getPointAt(u, mesh.position);
     });
   });
@@ -440,7 +450,7 @@ function SpatialDagScene({
         onStart={() => {
           userAdjustedCamRef.current = true;
         }}
-        touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+        touches={{ ONE: undefined, TWO: undefined }}
       />
     </group>
   );

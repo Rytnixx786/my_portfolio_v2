@@ -36,12 +36,12 @@ export function ContactSection() {
   return (
     <section
       id="contact"
-      className="overflow-x-clip bg-[#0D1117] pt-24 pb-16 sm:pt-32 sm:pb-24"
+      className="overflow-x-clip bg-[#0D1117] py-28 sm:py-36 lg:py-40"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
-        <SectionReveal>
-          <div className="grid grid-cols-1 items-center gap-10 border-b border-[rgba(240,246,252,0.08)] pb-12 lg:grid-cols-12">
-            <div className="lg:col-span-7">
+        <div className="grid grid-cols-1 items-center gap-10 border-b border-[rgba(240,246,252,0.08)] pb-12 lg:grid-cols-12">
+          <SectionReveal className="lg:col-span-7">
+            <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3.5 py-1 font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#7DD3FC]">
                 <span className="h-2 w-2 rounded-full bg-[#10B981]" aria-hidden="true" />
                 <span>{profile.status}</span>
@@ -107,16 +107,16 @@ export function ContactSection() {
                 </a>
               </div>
             </div>
+          </SectionReveal>
 
-            <div className="lg:col-span-5">
-              <div className="double-bezel-outer">
-                <div className="double-bezel-core overflow-hidden p-3">
-                  <LazyTelemetryGlobe3D />
-                </div>
+          <SectionReveal variant="scrub-depth" className="lg:col-span-5">
+            <div className="double-bezel-outer">
+              <div className="double-bezel-core overflow-hidden p-3">
+                <LazyTelemetryGlobe3D />
               </div>
             </div>
-          </div>
-        </SectionReveal>
+          </SectionReveal>
+        </div>
 
         <AskTerminal />
       </div>

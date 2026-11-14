@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ArrowUpRight, FilePdf, List, TerminalWindow, X } from "@phosphor-icons/react";
 import { nav, profile } from "@/data/site";
 import { useBodyScrollLock } from "@/hooks/usePortfolioUtils";
+import { QualityToggleHUD } from "@/components/canvas/QualityToggleHUD";
 
 const emptySubscribe = () => () => {};
 
@@ -133,12 +134,12 @@ export function Navbar() {
     >
       <nav
         aria-label="Primary navigation"
-        className="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-3 px-4 sm:gap-6 sm:px-8"
+        className="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-2 px-4 sm:gap-3 sm:px-6 xl:gap-6 xl:px-8"
       >
         {/* Left: Clean Editorial Wordmark */}
         <Link
           href="/"
-          className="inline-flex min-h-[44px] min-w-0 shrink-0 items-center whitespace-nowrap font-mono text-xs font-semibold uppercase tracking-[0.18em] text-[#E6EDF3] transition-colors hover:text-[#38BDF8]"
+          className="inline-flex min-h-[44px] min-w-0 shrink-0 items-center whitespace-nowrap font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#E6EDF3] transition-colors hover:text-[#38BDF8] xl:tracking-[0.18em]"
         >
           {profile.name}
         </Link>
@@ -152,7 +153,7 @@ export function Navbar() {
                 <Link
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
-                  className={`group/nav relative inline-flex h-16 items-center gap-1.5 whitespace-nowrap px-2.5 font-mono text-xs uppercase tracking-[0.12em] transition-colors xl:px-3 ${
+                  className={`group/nav relative inline-flex h-16 items-center gap-1.5 whitespace-nowrap px-2 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors xl:px-3 xl:text-xs xl:tracking-[0.12em] ${
                     isActive
                       ? "font-semibold text-[#E6EDF3]"
                       : "text-[#8B949E] hover:text-[#E6EDF3]"
@@ -161,7 +162,7 @@ export function Navbar() {
                   <span>{item.label}</span>
                   <span
                     aria-hidden="true"
-                    className={`absolute inset-x-2.5 bottom-0 h-[2px] rounded-full bg-[#38BDF8] transition-all duration-300 xl:inset-x-3 ${
+                    className={`absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-[#38BDF8] transition-all duration-300 xl:inset-x-3 ${
                       isActive ? "scale-x-100 opacity-100" : "scale-x-0 opacity-0 group-hover/nav:scale-x-50 group-hover/nav:opacity-40"
                     }`}
                   />
@@ -172,17 +173,30 @@ export function Navbar() {
         </ul>
 
         {/* Right: Quiet Secondary Utilities (preserving Hero's singular primary CTA) */}
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div
+          className="flex shrink-0 items-center gap-1.5 sm:gap-2 xl:gap-2.5"
+          onClickCapture={(e) => {
+            if (mobileOpen && !(e.target as HTMLElement).closest("[aria-controls='mobile-nav-drawer']")) {
+              setOpenedPath(null);
+            }
+          }}
+        >
+          <QualityToggleHUD />
+
           <button
             type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent("portfolio:open-palette"))}
+            onClick={() => {
+              setOpenedPath(null);
+              window.dispatchEvent(new CustomEvent("portfolio:close-quality-hud"));
+              window.dispatchEvent(new CustomEvent("portfolio:open-palette"));
+            }}
             aria-label="Open interactive query command palette (Cmd/Ctrl+K)"
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-[rgba(240,246,252,0.12)] bg-[#161B22]/80 px-3 py-2 font-mono text-xs text-[#9DA7B3] transition-colors hover:border-[#38BDF8]/50 hover:text-[#E6EDF3] sm:gap-2.5"
+            className="inline-flex h-11 w-11 items-center justify-center gap-2 rounded-lg border border-[rgba(240,246,252,0.12)] bg-[#161B22]/80 font-mono text-xs text-[#9DA7B3] transition-colors hover:border-[#38BDF8]/50 hover:text-[#E6EDF3] sm:h-auto sm:min-h-[44px] sm:w-auto sm:px-2.5 sm:py-2 sm:gap-2 xl:px-3 xl:gap-2.5"
           >
-            <TerminalWindow className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
+            <TerminalWindow className="h-4 w-4 text-[#38BDF8] sm:h-3.5 sm:w-3.5" weight="regular" aria-hidden="true" />
             <span className="hidden sm:inline">Query</span>
-            <span aria-hidden="true" className="hidden h-3 w-px bg-[rgba(240,246,252,0.12)] sm:inline-block" />
-            <kbd className="font-mono text-xs tracking-wider text-[#8B949E]">
+            <span aria-hidden="true" className="hidden h-3 w-px bg-[rgba(240,246,252,0.12)] xl:inline-block" />
+            <kbd className="hidden font-mono text-xs tracking-wider text-[#8B949E] xl:inline">
               {shortcutLabel}
             </kbd>
           </button>
@@ -191,7 +205,7 @@ export function Navbar() {
             href={profile.resume}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden min-h-[44px] items-center gap-1.5 rounded-lg px-3 py-2 font-mono text-xs font-medium uppercase tracking-[0.12em] text-[#9DA7B3] transition-colors hover:bg-[#161B22]/80 hover:text-[#38BDF8] md:inline-flex"
+            className="hidden min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs font-medium uppercase tracking-[0.1em] text-[#9DA7B3] transition-colors hover:bg-[#161B22]/80 hover:text-[#38BDF8] md:inline-flex xl:px-3 xl:tracking-[0.12em]"
           >
             <FilePdf className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
             <span>Resume</span>
@@ -201,7 +215,12 @@ export function Navbar() {
           <button
             ref={menuButtonRef}
             type="button"
-            onClick={() => setOpenedPath((prev) => (prev === pathname ? null : pathname))}
+            onClick={() => {
+              if (!mobileOpen) {
+                window.dispatchEvent(new CustomEvent("portfolio:close-quality-hud"));
+              }
+              setOpenedPath((prev) => (prev === pathname ? null : pathname));
+            }}
             aria-expanded={mobileOpen}
             aria-controls="mobile-nav-drawer"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}

@@ -45,7 +45,7 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
   const imgAspectRef = useRef(1);
   const currentAccentRef = useRef(new THREE.Color(accentHue));
   const targetAccentRef = useRef(new THREE.Color(accentHue));
-  const { invalidate } = useThree();
+  const { frameloop, invalidate } = useThree();
 
   useEffect(() => {
     let active = true;
@@ -97,7 +97,17 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
 
   useEffect(() => {
     targetAccentRef.current.set(accentHue);
-  }, [accentHue]);
+    if (frameloop === "demand") {
+      currentAccentRef.current.copy(targetAccentRef.current);
+      if (shaderRef.current) {
+        shaderRef.current.uniforms.uAccent.value.copy(currentAccentRef.current);
+      }
+      if (backMatRef.current) {
+        backMatRef.current.emissive.copy(currentAccentRef.current);
+      }
+    }
+    invalidate();
+  }, [accentHue, frameloop, invalidate]);
 
   const uniforms = useMemo(
     () => ({
@@ -112,7 +122,11 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
-    currentAccentRef.current.lerp(targetAccentRef.current, Math.min(1, dt * 6));
+    if (frameloop === "demand") {
+      currentAccentRef.current.copy(targetAccentRef.current);
+    } else {
+      currentAccentRef.current.lerp(targetAccentRef.current, Math.min(1, dt * 6));
+    }
 
     if (shaderRef.current) {
       shaderRef.current.uniforms.uMap.value = textureRef.current;
@@ -219,6 +233,7 @@ function HeroOrbitalScene({
   enableWheelZoom: boolean;
   zoomSignal: ZoomSignal;
 }) {
+  const { camera, frameloop, invalidate, size } = useThree();
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const tiltGroupRef = useRef<THREE.Group>(null);
   const ringMatRef = useRef<THREE.MeshBasicMaterial>(null);
@@ -227,22 +242,49 @@ function HeroOrbitalScene({
   const gimbalsRef = useRef<Array<THREE.Mesh | null>>([]);
   const activeIdxRef = useRef(activeSystemIndex);
   const hoveredIdxRef = useRef<number | null>(null);
+  const userInteractedRef = useRef(false);
   const orbitSpeedRef = useRef(0.38);
-  const orbitAngleRef = useRef(0);
+  const orbitAngleRef = useRef(0.42);
   const elapsedRef = useRef(0);
   const currentRingColorRef = useRef(new THREE.Color(HERO_ORBIT_HUES[0]));
   const targetRingColorRef = useRef(new THREE.Color(HERO_ORBIT_HUES[0]));
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
+  const isCompactStage = size.width < 520;
+  const responsiveCamPos = useMemo<[number, number, number]>(
+    () => (isCompactStage ? [0, 0.44, 6.25] : HERO_CAM_POS),
+    [isCompactStage]
+  );
+  const responsiveTarget = useMemo<[number, number, number]>(
+    () => (isCompactStage ? [0, 0.24, 0] : [0, 0, 0]),
+    [isCompactStage]
+  );
+
+  useEffect(() => {
+    if (zoomSignal.seq > 0) {
+      userInteractedRef.current = true;
+    }
+  }, [zoomSignal.seq]);
+
+  useEffect(() => {
+    if (userInteractedRef.current) return;
+    camera.position.set(...responsiveCamPos);
+    controlsRef.current?.target.set(...responsiveTarget);
+    controlsRef.current?.update();
+    invalidate();
+  }, [camera, responsiveCamPos, responsiveTarget, invalidate]);
+
   useEffect(() => {
     activeIdxRef.current = activeSystemIndex;
     const sys = ORBITAL_SYSTEMS[activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
     targetRingColorRef.current.set(sys.hue);
-  }, [activeSystemIndex]);
+    invalidate();
+  }, [activeSystemIndex, invalidate]);
 
   useEffect(() => {
     hoveredIdxRef.current = hoveredIdx;
-  }, [hoveredIdx]);
+    invalidate();
+  }, [hoveredIdx, invalidate]);
 
   useEffect(() => {
     return () => {
@@ -253,27 +295,33 @@ function HeroOrbitalScene({
   const activeSystem = ORBITAL_SYSTEMS[activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
 
   useFrame((_, delta) => {
+    const isStatic = frameloop === "demand";
     const dt = Math.min(delta, 0.05);
-    elapsedRef.current += dt;
+
+    if (!isStatic) {
+      elapsedRef.current += dt;
+      // Smoothly damp angular velocity when hovering a node (no abrupt speed step)
+      const targetSpeed = hoveredIdxRef.current !== null ? 0.1 : 0.38;
+      orbitSpeedRef.current = THREE.MathUtils.damp(orbitSpeedRef.current, targetSpeed, 6, dt);
+      orbitAngleRef.current += dt * orbitSpeedRef.current;
+      currentRingColorRef.current.lerp(targetRingColorRef.current, Math.min(1, dt * 6));
+    } else {
+      currentRingColorRef.current.copy(targetRingColorRef.current);
+    }
+
     const t = elapsedRef.current;
 
-    // Smoothly damp angular velocity when hovering a node (no abrupt speed step)
-    const targetSpeed = hoveredIdxRef.current !== null ? 0.1 : 0.38;
-    orbitSpeedRef.current = THREE.MathUtils.damp(orbitSpeedRef.current, targetSpeed, 6, dt);
-    orbitAngleRef.current += dt * orbitSpeedRef.current;
-
-    currentRingColorRef.current.lerp(targetRingColorRef.current, Math.min(1, dt * 6));
     if (ringMatRef.current) {
       ringMatRef.current.color.copy(currentRingColorRef.current);
     }
 
     // Gentle vertical float without fighting OrbitControls rotation
     if (tiltGroupRef.current) {
-      tiltGroupRef.current.position.y = Math.sin(t * 1.05) * 0.032;
+      tiltGroupRef.current.position.y = isStatic ? 0 : Math.sin(t * 1.05) * 0.032;
     }
 
     if (innerRingRef.current) {
-      innerRingRef.current.rotation.z = -t * 0.22;
+      innerRingRef.current.rotation.z = isStatic ? 0 : -t * 0.22;
     }
 
     ORBITAL_SYSTEMS.forEach((_, idx) => {
@@ -289,13 +337,15 @@ function HeroOrbitalScene({
       const isActive = idx === activeIdxRef.current;
       const isHovered = idx === hoveredIdxRef.current;
       const targetScale = isActive ? 1.24 : isHovered ? 1.14 : 0.94;
-      const nextScale = THREE.MathUtils.damp(node.scale.x, targetScale, 8, dt);
+      const nextScale = isStatic
+        ? targetScale
+        : THREE.MathUtils.damp(node.scale.x, targetScale, 8, dt);
       node.scale.setScalar(nextScale);
 
       const gimbal = gimbalsRef.current[idx];
       if (gimbal) {
-        gimbal.rotation.x = t * 0.85 + idx;
-        gimbal.rotation.y = t * 0.65 + idx * 0.7;
+        gimbal.rotation.x = isStatic ? idx * 0.6 : t * 0.85 + idx;
+        gimbal.rotation.y = isStatic ? idx * 0.9 : t * 0.65 + idx * 0.7;
       }
     });
   });
@@ -397,7 +447,8 @@ function HeroOrbitalScene({
 
       <CameraZoomController
         controlsRef={controlsRef}
-        defaultPosition={HERO_CAM_POS}
+        defaultPosition={responsiveCamPos}
+        defaultTarget={responsiveTarget}
         minDistance={3.2}
         maxDistance={9.2}
         zoomSignal={zoomSignal}
@@ -405,6 +456,7 @@ function HeroOrbitalScene({
 
       <OrbitControls
         ref={controlsRef}
+        target={responsiveTarget}
         enableZoom={enableWheelZoom}
         zoomSpeed={0.8}
         minDistance={3.2}
@@ -417,7 +469,10 @@ function HeroOrbitalScene({
         maxPolarAngle={Math.PI * 0.64}
         minAzimuthAngle={-Math.PI * 0.32}
         maxAzimuthAngle={Math.PI * 0.32}
-        touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+        onStart={() => {
+          userInteractedRef.current = true;
+        }}
+        touches={{ ONE: undefined, TWO: undefined }}
       />
     </group>
   );
@@ -436,6 +491,7 @@ function HeroOrbital2DFallback({
   const stageRef = useRef<HTMLDivElement>(null);
   const portraitRef = useRef<HTMLDivElement>(null);
   const beaconRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const beaconVisualRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const hoveredRef = useRef(false);
   const speedRef = useRef(0.36);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
@@ -444,8 +500,6 @@ function HeroOrbital2DFallback({
     const stage = stageRef.current;
     if (!stage) return;
 
-    const prefersReducedMotion =
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const finePointer =
       window.matchMedia?.("(hover: hover) and (pointer: fine)").matches ?? false;
 
@@ -470,6 +524,7 @@ function HeroOrbital2DFallback({
 
       for (let idx = 0; idx < ORBITAL_SYSTEMS.length; idx++) {
         const btn = beaconRefs.current[idx];
+        const visual = beaconVisualRefs.current[idx];
         if (!btn) continue;
 
         const a = baseAngle + (idx * Math.PI) / 2;
@@ -485,21 +540,17 @@ function HeroOrbital2DFallback({
         const scale = 0.84 + (depth + 1) * 0.12;
         const opacity = isFront ? 1 : 0.62;
 
-        btn.style.transform = `translate3d(calc(-50% + ${x.toFixed(1)}px), calc(-50% + ${y.toFixed(1)}px), 0) scale(${scale.toFixed(3)})`;
+        // Keep button hitbox strictly 44x44 by applying depth scale only to the inner visual wrapper
+        btn.style.transform = `translate3d(calc(-50% + ${x.toFixed(1)}px), calc(-50% + ${y.toFixed(1)}px), 0)`;
         btn.style.zIndex = isFront ? "25" : "5";
         btn.style.opacity = opacity.toFixed(2);
+        if (visual) {
+          visual.style.transform = `scale(${scale.toFixed(3)})`;
+        }
       }
     };
 
     positionBeacons(theta);
-
-    if (prefersReducedMotion) {
-      const onResize = () => positionBeacons(theta);
-      window.addEventListener("resize", onResize, { passive: true });
-      return () => {
-        window.removeEventListener("resize", onResize);
-      };
-    }
 
     const tick = (now: number) => {
       const dt = Math.min((now - lastTs) / 1000, 0.05);
@@ -678,26 +729,32 @@ function HeroOrbital2DFallback({
             }}
             className="group absolute flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none"
           >
-            {/* Tilted Outer Gimbal Ring */}
             <span
-              aria-hidden="true"
-              className="absolute inset-1 rounded-full border transition-all duration-200"
-              style={{
-                borderColor: sys.hue,
-                opacity: isActive ? 0.92 : isHovered ? 0.78 : 0.52,
-                transform: `rotate(-24deg) scale(${isActive ? 1.18 : isHovered ? 1.08 : 0.94})`,
-                boxShadow: isActive ? `0 0 14px -2px ${sys.hue}88` : undefined,
+              ref={(el) => {
+                beaconVisualRefs.current[idx] = el;
               }}
-            />
-            {/* Inner Core Orb */}
-            <span
               aria-hidden="true"
-              className="relative h-3.5 w-3.5 rounded-full transition-transform duration-200 group-hover:scale-110"
-              style={{
-                backgroundColor: sys.hue,
-                boxShadow: `0 0 10px ${sys.hue}AA`,
-              }}
-            />
+              className="relative flex h-9 w-9 items-center justify-center will-change-transform"
+            >
+              {/* Tilted Outer Gimbal Ring */}
+              <span
+                className="absolute inset-0 rounded-full border transition-all duration-200"
+                style={{
+                  borderColor: sys.hue,
+                  opacity: isActive ? 0.92 : isHovered ? 0.78 : 0.52,
+                  transform: `rotate(-24deg) scale(${isActive ? 1.18 : isHovered ? 1.08 : 0.94})`,
+                  boxShadow: isActive ? `0 0 14px -2px ${sys.hue}88` : undefined,
+                }}
+              />
+              {/* Inner Core Orb */}
+              <span
+                className="relative h-3.5 w-3.5 rounded-full transition-transform duration-200 group-hover:scale-110"
+                style={{
+                  backgroundColor: sys.hue,
+                  boxShadow: `0 0 10px ${sys.hue}AA`,
+                }}
+              />
+            </span>
             {/* Compact Micro-Tag on Active / Hover */}
             {(isActive || isHovered) && (
               <span
@@ -742,9 +799,9 @@ export function HeroOrbitalCore3D({
         if (canRender3D) setWheelEngaged(true);
       }}
       onPointerLeave={() => setWheelEngaged(false)}
-      className="relative h-[248px] w-full overflow-hidden rounded-2xl sm:h-[380px] lg:h-[420px]"
+      className="relative h-[280px] w-full overflow-hidden rounded-2xl sm:h-[380px] lg:h-[420px]"
     >
-      <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex max-w-[calc(100%-164px)] items-center gap-1.5 truncate rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/88 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] backdrop-blur-md sm:max-w-none sm:gap-2 sm:px-3">
+      <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex max-w-[calc(100%-174px)] items-center gap-1.5 truncate rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/88 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] backdrop-blur-md sm:max-w-none sm:gap-2 sm:px-3">
         <span style={{ color: displaySys.hue }}>{displaySys.code}</span>
         <span className="font-semibold">{displaySys.label}</span>
         <span className="hidden text-[#9DA7B3] sm:inline">· {displaySys.metric}</span>
@@ -752,6 +809,7 @@ export function HeroOrbitalCore3D({
 
       {canRender3D && (
         <CanvasZoomHUD
+          className="right-2.5 top-2.5 sm:right-3 sm:top-3"
           onZoomIn={() => triggerZoom("in")}
           onZoomOut={() => triggerZoom("out")}
           onReset={() => triggerZoom("reset")}

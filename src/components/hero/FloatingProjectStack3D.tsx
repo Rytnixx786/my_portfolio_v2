@@ -144,27 +144,34 @@ export function FloatingProjectStack3D({
         </div>
       </div>
 
+      {/* Mobile-only full-width topMetric row so long labels never truncate on 375px */}
+      {topMetric && (
+        <div className="flex items-baseline justify-between gap-2 rounded-lg border border-[rgba(240,246,252,0.06)] bg-[#0D1117]/70 px-2.5 py-1.5 sm:hidden">
+          <span className="font-mono text-[11px] text-[#9DA7B3]">
+            {topMetric.label}
+          </span>
+          <span
+            className="shrink-0 font-mono text-xs font-semibold tabular-nums"
+            style={{ color: hue.labelText }}
+          >
+            {topMetric.value}
+          </span>
+        </div>
+      )}
+
       {/* Bottom Action & Controls Row */}
       <div className="flex items-center justify-between gap-2 px-0.5">
         <div className="flex min-w-0 items-center gap-2">
-          {topMetric && (
-            <div className="flex min-w-0 items-center gap-1.5 sm:hidden">
-              <span
-                className="shrink-0 font-mono text-xs font-semibold tabular-nums"
-                style={{ color: hue.labelText }}
-              >
-                {topMetric.value}
-              </span>
-              <span className="truncate font-mono text-[11px] text-[#8B949E]">
-                {topMetric.label}
-              </span>
-            </div>
-          )}
-          <div className="hidden min-w-0 items-center gap-1.5 sm:flex">
-            {current.tech.slice(0, 3).map((tag) => (
+          <span className="whitespace-nowrap font-mono text-[11px] text-[#8B949E] sm:hidden">
+            {String(safeIndex + 1).padStart(2, "0")}/04 · {current.name.split(" ")[0]}
+          </span>
+          <div className="hidden min-w-0 flex-1 items-center gap-1.5 overflow-hidden sm:flex">
+            {current.tech.slice(0, 3).map((tag, idx) => (
               <span
                 key={tag}
-                className="rounded-md border border-[rgba(240,246,252,0.08)] bg-[#0D1117]/80 px-2 py-0.5 font-mono text-[11px] text-[#9DA7B3]"
+                className={`shrink-0 whitespace-nowrap rounded-md border border-[rgba(240,246,252,0.08)] bg-[#0D1117]/80 px-2 py-0.5 font-mono text-[11px] text-[#9DA7B3] ${
+                  idx === 2 ? "hidden xl:inline-flex" : "inline-flex"
+                }`}
               >
                 {tag}
               </span>

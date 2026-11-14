@@ -88,7 +88,7 @@ function GlobeAssembly({
   const focusAngleRef = useRef<number | null>(null);
   const lastSelectedRef = useRef<string>(selectedId);
   const lastResetSeqRef = useRef<number>(resetSeq);
-  const { invalidate } = useThree();
+  const { frameloop, invalidate } = useThree();
 
   const dhakaPos = useMemo(() => latLonToVec3(DHAKA_LAT, DHAKA_LON, 1.32), []);
 
@@ -157,23 +157,31 @@ function GlobeAssembly({
   }, []);
 
   useFrame((_, delta) => {
+    const isStatic = frameloop === "demand";
     const dt = Math.min(delta, 0.05);
-    elapsedRef.current += dt;
+    if (!isStatic) {
+      elapsedRef.current += dt;
+    }
     const t = elapsedRef.current;
 
     if (groupRef.current && !draggingRef.current) {
       if (focusAngleRef.current !== null) {
-        const diff = shortestAngleDiff(
-          groupRef.current.rotation.y,
-          focusAngleRef.current
-        );
-        if (Math.abs(diff) < 0.012) {
+        if (isStatic) {
           groupRef.current.rotation.y = focusAngleRef.current;
           focusAngleRef.current = null;
         } else {
-          groupRef.current.rotation.y += diff * Math.min(1, dt * 5.2);
+          const diff = shortestAngleDiff(
+            groupRef.current.rotation.y,
+            focusAngleRef.current
+          );
+          if (Math.abs(diff) < 0.012) {
+            groupRef.current.rotation.y = focusAngleRef.current;
+            focusAngleRef.current = null;
+          } else {
+            groupRef.current.rotation.y += diff * Math.min(1, dt * 5.2);
+          }
         }
-      } else {
+      } else if (!isStatic) {
         groupRef.current.rotation.y += dt * 0.095;
       }
     } else if (draggingRef.current) {
@@ -181,20 +189,20 @@ function GlobeAssembly({
     }
 
     if (pulseRef.current) {
-      const s = 1 + Math.sin(t * 2.8) * 0.25;
+      const s = isStatic ? 1.0 : 1 + Math.sin(t * 2.8) * 0.25;
       pulseRef.current.scale.set(s, s, s);
     }
 
     if (targetRingRef.current) {
-      targetRingRef.current.rotation.z = t * 1.1;
-      const rs = 1 + Math.sin(t * 3.2) * 0.1;
+      targetRingRef.current.rotation.z = isStatic ? 0 : t * 1.1;
+      const rs = isStatic ? 1.0 : 1 + Math.sin(t * 3.2) * 0.1;
       targetRingRef.current.scale.setScalar(rs);
     }
 
     routes.forEach((r, idx) => {
       const mesh = packetRefs.current[idx];
       if (!mesh) return;
-      const u = (t * 0.36 + idx * 0.32) % 1;
+      const u = isStatic ? (0.35 + idx * 0.2) % 1 : (t * 0.36 + idx * 0.32) % 1;
       r.curve.getPointAt(u, mesh.position);
     });
   });
@@ -605,7 +613,12 @@ export function TelemetryGlobe3D() {
       <ViewportCanvas
         cameraPosition={GLOBE_CAM_POS}
         fov={38}
-        fallback={<Globe2DFallback selectedId={selectedId} onSelect={setSelectedId} />}
+        fallback={
+          <Globe2DFallback
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
+        }
         className="h-full w-full"
       >
         <ambientLight intensity={0.72} />
@@ -647,7 +660,7 @@ export function TelemetryGlobe3D() {
           onEnd={() => {
             draggingRef.current = false;
           }}
-          touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+          touches={{ ONE: undefined, TWO: undefined }}
         />
       </ViewportCanvas>
 

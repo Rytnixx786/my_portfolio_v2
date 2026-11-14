@@ -56,7 +56,7 @@ export function SelectedWorkSection() {
   return (
     <section
       id="work"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-24 sm:py-32"
+      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-28 sm:py-36 lg:py-40"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
@@ -147,8 +147,8 @@ export function SelectedWorkSection() {
 
         <div className="mt-10 grid grid-flow-dense grid-cols-1 gap-6 lg:grid-cols-12">
           {visibleProjects.map(({ project, num }, position) => {
-            const isHeroFeature = position === 0;
             const spanClass = getCardSpanClass(position, visibleProjects.length);
+            const isWideCard = spanClass === "lg:col-span-12";
             const hue = getCategoryHue(project.category);
 
             const handleSpotlightMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -173,8 +173,8 @@ export function SelectedWorkSection() {
                       style={{ "--spotlight-color": hue.softBg } as CSSProperties}
                       className="double-bezel-core spotlight-card flex h-full flex-col justify-between overflow-hidden p-5 sm:p-7"
                     >
-                      <div className={isHeroFeature ? "grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-center" : "flex flex-col gap-6"}>
-                        <div className={isHeroFeature ? "lg:col-span-6" : ""}>
+                      <div className={isWideCard ? "grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-center" : "flex flex-col gap-6"}>
+                        <div className={isWideCard ? "lg:col-span-6" : ""}>
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span
                               className="inline-flex items-center gap-2 rounded-full border px-3 py-1 font-mono text-xs uppercase tracking-[0.12em]"
@@ -241,11 +241,11 @@ export function SelectedWorkSection() {
                           </div>
                         </div>
 
-                        <div className={isHeroFeature ? "lg:col-span-6" : ""}>
+                        <div className={isWideCard ? "lg:col-span-6" : ""}>
                           <ProjectPreviewPlate
                             project={project}
                             indexLabel={num}
-                            variant={isHeroFeature ? "featured" : "compact"}
+                            variant={isWideCard ? "featured" : "compact"}
                           />
                         </div>
                       </div>

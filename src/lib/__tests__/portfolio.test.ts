@@ -1,7 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { answerPortfolioQuery, matchPortfolioQuery } from "@/lib/query-engine";
+import {
+  answerPortfolioQuery,
+  extractCitationsFromText,
+  matchPortfolioQuery,
+} from "@/lib/query-engine";
 import { CATEGORY_HUES } from "@/lib/palette";
 import { resolveEffectiveTier, resolveQualityReason } from "@/lib/device-tier";
 import { classifyNodeKind } from "@/lib/architecture";
@@ -163,6 +167,152 @@ describe("/api/query handler", () => {
     } finally {
       fetchSpy.mockRestore();
       errSpy.mockRestore();
+      if (prevKey === undefined) delete process.env.GEMINI_API_KEY;
+      else process.env.GEMINI_API_KEY = prevKey;
+    }
+  });
+
+  it("extracts exact /work/[slug] and FlyRank citations from generated text", () => {
+    const multi = extractCitationsFromText(
+      "Cinch pairs with MindStack and OFFBoarder, alongside work at FlyRank."
+    );
+    expect(multi.map((c) => c.href)).toContain("/work/cinch");
+    expect(multi.map((c) => c.href)).toContain("/work/mindstack");
+    expect(multi.map((c) => c.href)).toContain("/work/offboarder");
+    expect(multi.map((c) => c.href)).toContain("/#about");
+
+    expect(extractCitationsFromText("Nexus Researcher and ARES and MaSheba AI").map((c) => c.href)).toEqual([
+      "/work/nexus-researcher",
+      "/work/ares",
+      "/work/masheba-ai",
+    ]);
+
+    expect(extractCitationsFromText("General engineering summary without specific slugs")).toEqual([
+      { label: "Selected Work", href: "/#work" },
+    ]);
+  });
+
+  it("emits extracted /work/[slug] citations in SSE event: done for Gemini stream responses", async () => {
+    const prevKey = process.env.GEMINI_API_KEY;
+    process.env.GEMINI_API_KEY = "test-mock-key";
+
+    const encoder = new TextEncoder();
+    const geminiStream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              candidates: [{ content: { parts: [{ text: "Compare Cinch and " }] } }],
+            })}\n\n`
+          )
+        );
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              candidates: [
+                {
+                  content: { parts: [{ text: "ARES promotion gates plus FlyRank billing." }] },
+                  finishReason: "STOP",
+                },
+              ],
+            })}\n\n`
+          )
+        );
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      },
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(geminiStream, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      );
+
+    try {
+      const req = new Request("http://localhost:3100/api/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+          "x-forwarded-for": "198.51.100.105",
+        },
+        body: JSON.stringify({ message: "xyzzy compare custom deployment tradeoffs" }),
+      });
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+      const sseText = await res.text();
+      expect(sseText).toContain("event: done");
+      const doneLine = sseText
+        .split("\n\n")
+        .find((block) => block.startsWith("event: done"));
+      expect(doneLine).toBeDefined();
+      const jsonPart = doneLine!.split("\n").find((l) => l.startsWith("data:"))!.slice(5).trim();
+      const payload = JSON.parse(jsonPart) as {
+        source: string;
+        citations: Array<{ label: string; href: string }>;
+      };
+      expect(payload.source).toBe("gemini");
+      expect(payload.citations.some((c) => c.href === "/work/cinch")).toBe(true);
+      expect(payload.citations.some((c) => c.href === "/work/ares")).toBe(true);
+      expect(payload.citations.some((c) => c.href === "/#about")).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      if (prevKey === undefined) delete process.env.GEMINI_API_KEY;
+      else process.env.GEMINI_API_KEY = prevKey;
+    }
+  });
+
+  it("emits exact /work/[slug] citations on non-SSE Gemini JSON responses", async () => {
+    const prevKey = process.env.GEMINI_API_KEY;
+    process.env.GEMINI_API_KEY = "test-mock-key";
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: "MindStack hybrid retrieval pairs well with OFFBoarder RLS and MaSheba AI offline inference.",
+                  },
+                ],
+              },
+              finishReason: "STOP",
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+
+    try {
+      const req = new Request("http://localhost:3100/api/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "198.51.100.106",
+        },
+        body: JSON.stringify({ message: "xyzzy compare deployment tradeoffs across workloads" }),
+      });
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+      const payload = (await res.json()) as {
+        source: string;
+        citations: Array<{ label: string; href: string }>;
+      };
+      expect(payload.source).toBe("gemini");
+      expect(payload.citations.map((c) => c.href)).toEqual([
+        "/work/mindstack",
+        "/work/offboarder",
+        "/work/masheba-ai",
+      ]);
+    } finally {
+      fetchSpy.mockRestore();
       if (prevKey === undefined) delete process.env.GEMINI_API_KEY;
       else process.env.GEMINI_API_KEY = prevKey;
     }

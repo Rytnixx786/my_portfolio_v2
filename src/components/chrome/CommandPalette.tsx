@@ -157,7 +157,7 @@ export function CommandPalette() {
                   key={s}
                   type="button"
                   onClick={() => void submitQuestion(s)}
-                  className="rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117] px-3 py-1.5 font-mono text-xs text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
+                  className="inline-flex min-h-[44px] items-center rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117] px-3.5 py-2 font-mono text-xs text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
                 >
                   {s}
                 </button>
@@ -177,7 +177,7 @@ export function CommandPalette() {
                         key={c.href}
                         href={c.href}
                         onClick={closeModal}
-                        className="rounded-md border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-2 py-0.5 font-mono text-xs text-[#7DD3FC] hover:bg-[#38BDF8]/20"
+                        className="inline-flex min-h-[44px] items-center rounded-md border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3 py-1 font-mono text-xs text-[#7DD3FC] hover:bg-[#38BDF8]/20"
                       >
                         {c.label} ↗
                       </Link>
@@ -199,7 +199,7 @@ export function CommandPalette() {
                     <button
                       type="button"
                       onClick={() => handleNavigate(`/work/${p.slug}`)}
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left font-mono text-xs text-[#9DA7B3] hover:bg-[#1C222B] hover:text-[#E6EDF3]"
+                      className="flex min-h-[44px] w-full items-center justify-between rounded-xl px-3 py-2 text-left font-mono text-xs text-[#9DA7B3] hover:bg-[#1C222B] hover:text-[#E6EDF3]"
                     >
                       <span>{p.name}</span>
                       <ArrowRight className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
@@ -219,7 +219,7 @@ export function CommandPalette() {
                     <button
                       type="button"
                       onClick={() => handleNavigate(item.href)}
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left font-mono text-xs text-[#9DA7B3] hover:bg-[#1C222B] hover:text-[#E6EDF3]"
+                      className="flex min-h-[44px] w-full items-center justify-between rounded-xl px-3 py-2 text-left font-mono text-xs text-[#9DA7B3] hover:bg-[#1C222B] hover:text-[#E6EDF3]"
                     >
                       <span>{item.label}</span>
                       <ArrowRight className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
@@ -230,7 +230,7 @@ export function CommandPalette() {
                   <button
                     type="button"
                     onClick={() => void copy(profile.email)}
-                    className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left font-mono text-xs text-[#9DA7B3] hover:bg-[#1C222B] hover:text-[#E6EDF3]"
+                    className="flex min-h-[44px] w-full items-center justify-between rounded-xl px-3 py-2 text-left font-mono text-xs text-[#9DA7B3] hover:bg-[#1C222B] hover:text-[#E6EDF3]"
                   >
                     <span>{copied ? "Copied email!" : `Copy ${profile.email}`}</span>
                     {copied ? (
@@ -246,7 +246,7 @@ export function CommandPalette() {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={closeModal}
-                    className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left font-mono text-xs text-[#38BDF8] hover:bg-[#1C222B]"
+                    className="flex min-h-[44px] w-full items-center justify-between rounded-xl px-3 py-2 text-left font-mono text-xs text-[#38BDF8] hover:bg-[#1C222B]"
                   >
                     <span>Open Resume PDF</span>
                     <FilePdf className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { experience, lab, profile } from "@/data/site";
 import { projects } from "@/data/projects";
 import {
+  extractCitationsFromText,
   fallbackPortfolioMatch,
   matchPortfolioQuery,
   type QueryCitation,
@@ -114,6 +115,16 @@ function sseResponse(
   });
 }
 
+function resolveReplyCitations(
+  answerText: string,
+  initialCitations: QueryCitation[]
+): QueryCitation[] {
+  const extracted = extractCitationsFromText(answerText);
+  const hasSpecificHit = extracted.some((c) => c.href !== "/#work");
+  if (hasSpecificHit) return extracted;
+  return initialCitations;
+}
+
 function jsonReply(
   payload: Record<string, unknown>,
   status = 200,
@@ -207,7 +218,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const citations: QueryCitation[] = [{ label: "Selected Work", href: "/#work" }];
+  const initialCitations: QueryCitation[] = extractCitationsFromText(message);
 
   try {
     const endpoint = wantsStream
@@ -251,7 +262,7 @@ export async function POST(request: Request) {
 
           controller.enqueue(
             encoder.encode(
-              `event: meta\ndata: ${JSON.stringify({ source: "gemini", citations })}\n\n`
+              `event: meta\ndata: ${JSON.stringify({ source: "gemini", citations: initialCitations })}\n\n`
             )
           );
 
@@ -308,12 +319,14 @@ export async function POST(request: Request) {
                 )
               );
             } else {
+              const trimmedText = fullText.trim();
+              const resolvedCitations = resolveReplyCitations(trimmedText, initialCitations);
               controller.enqueue(
                 encoder.encode(
                   `event: done\ndata: ${JSON.stringify({
-                    text: fullText.trim(),
+                    text: trimmedText,
                     source: "gemini",
-                    citations,
+                    citations: resolvedCitations,
                   })}\n\n`
                 )
               );
@@ -356,10 +369,11 @@ export async function POST(request: Request) {
       });
     }
 
+    const resolvedCitations = resolveReplyCitations(text, initialCitations);
     if (wantsStream) {
-      return sseResponse(text, "gemini", citations);
+      return sseResponse(text, "gemini", resolvedCitations);
     }
-    return jsonReply({ text, source: "gemini", citations });
+    return jsonReply({ text, source: "gemini", citations: resolvedCitations });
   } catch (err) {
     console.error("[/api/query] Gemini request failed:", err);
     const fallback = fallbackPortfolioMatch(message);

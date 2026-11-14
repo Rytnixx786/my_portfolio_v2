@@ -120,8 +120,8 @@ export function ProjectPreviewPlate({
               </button>
             </div>
           ) : (
-            <span className="hidden font-mono text-xs text-[#8B949E] sm:inline">
-              {nodes.length} stages
+            <span className="shrink-0 font-mono text-xs text-[#8B949E] tabular-nums">
+              2D Graph · {nodes.length} stages
             </span>
           )}
         </div>

@@ -137,3 +137,92 @@ export function fallbackPortfolioMatch(query: string): PortfolioQueryMatch {
 export function fallbackPortfolioAnswer(query: string): string {
   return fallbackPortfolioMatch(query).answer;
 }
+
+const CITATION_PATTERNS: ReadonlyArray<{
+  slug: string;
+  patterns: readonly RegExp[];
+}> = [
+  {
+    slug: "cinch",
+    patterns: [/\/work\/cinch\b/i, /\bcinch\b/i],
+  },
+  {
+    slug: "nexus-researcher",
+    patterns: [/\/work\/nexus-researcher\b/i, /\bnexus[\s-]+researcher\b/i, /\bnexus\b/i],
+  },
+  {
+    slug: "ares",
+    patterns: [/\/work\/ares\b/i, /\bares\b/i],
+  },
+  {
+    slug: "mindstack",
+    patterns: [/\/work\/mindstack\b/i, /\bmind[\s-]?stack\b/i],
+  },
+  {
+    slug: "offboarder",
+    patterns: [/\/work\/offboarder\b/i, /\boff[\s-]?boarder\b/i],
+  },
+  {
+    slug: "masheba-ai",
+    patterns: [/\/work\/masheba-ai\b/i, /\bma[\s-]?sheba(?:\s+ai)?\b/i],
+  },
+];
+
+/**
+ * Dynamically extracts exact /work/[slug] and FlyRank citations referenced inside
+ * generated Gemini responses so SSE `event: done` and JSON replies cite specific pages.
+ */
+export function extractCitationsFromText(text: string): QueryCitation[] {
+  const hits: Array<{ index: number; citation: QueryCitation }> = [];
+  const seenHrefs = new Set<string>();
+
+  for (const entry of CITATION_PATTERNS) {
+    let earliest = -1;
+    for (const pattern of entry.patterns) {
+      const match = pattern.exec(text);
+      if (match && (earliest === -1 || match.index < earliest)) {
+        earliest = match.index;
+      }
+    }
+    if (earliest !== -1) {
+      const project = projects.find((p) => p.slug === entry.slug);
+      if (project) {
+        const href = `/work/${project.slug}`;
+        if (!seenHrefs.has(href)) {
+          seenHrefs.add(href);
+          hits.push({
+            index: earliest,
+            citation: { label: `${project.name} Case Study`, href },
+          });
+        }
+      }
+    }
+  }
+
+  const flyrankMatch = /\bflyrank\b/i.exec(text);
+  if (flyrankMatch) {
+    const flyrank = experience[0];
+    if (flyrank?.href && !seenHrefs.has(flyrank.href)) {
+      seenHrefs.add(flyrank.href);
+      hits.push({
+        index: flyrankMatch.index,
+        citation: { label: "FlyRank Capstone", href: flyrank.href },
+      });
+    }
+    const aboutHref = "/#about";
+    if (!seenHrefs.has(aboutHref)) {
+      seenHrefs.add(aboutHref);
+      hits.push({
+        index: flyrankMatch.index + 1,
+        citation: { label: "Experience & Track", href: aboutHref },
+      });
+    }
+  }
+
+  hits.sort((a, b) => a.index - b.index);
+  const citations = hits.map((h) => h.citation);
+
+  return citations.length > 0
+    ? citations
+    : [{ label: "Selected Work", href: "/#work" }];
+}

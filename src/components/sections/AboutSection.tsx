@@ -70,7 +70,7 @@ export function AboutSection() {
     <section
       ref={sectionRef}
       id="about"
-      className="relative z-[2] border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-20 sm:py-28 lg:py-32"
+      className="relative z-[2] border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-28 sm:py-36 lg:py-40"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:gap-14">

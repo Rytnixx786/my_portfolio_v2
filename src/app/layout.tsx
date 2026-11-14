@@ -11,7 +11,6 @@ import { Navbar } from "@/components/chrome/Navbar";
 import { CommandPalette } from "@/components/chrome/CommandPalette";
 import { Footer } from "@/components/chrome/Footer";
 import { WebGLContextProvider } from "@/components/canvas/WebGLContextProvider";
-import { QualityToggleHUD } from "@/components/canvas/QualityToggleHUD";
 import "./globals.css";
 
 const antonio = Antonio({
@@ -180,7 +179,6 @@ export default function RootLayout({
               {children}
             </main>
             <Footer />
-            <QualityToggleHUD />
           </LenisProvider>
         </WebGLContextProvider>
       </body>
