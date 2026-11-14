@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
+import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { STACK_LAYER_HUES } from "@/lib/palette";
+import {
+  CameraZoomController,
+  CanvasZoomHUD,
+  type ZoomAction,
+  type ZoomSignal,
+} from "./CanvasZoomHUD";
 import { SpriteLabel3D } from "./SpriteLabel3D";
 import { ViewportCanvas } from "./ViewportCanvas";
 
@@ -20,10 +27,12 @@ function RackCameraFit({
   totalRows,
   draggingRef,
   controlsRef,
+  zoomSeq,
 }: {
   totalRows: number;
   draggingRef: React.MutableRefObject<boolean>;
   controlsRef: React.RefObject<React.ComponentRef<typeof OrbitControls> | null>;
+  zoomSeq: number;
 }) {
   const { camera, frameloop, invalidate } = useThree();
   const target = useMemo(
@@ -36,6 +45,12 @@ function RackCameraFit({
   const lookTarget = useMemo(() => new THREE.Vector3(0, 0.08, 0), []);
   const settlingRef = useRef(true);
   const elapsedRef = useRef(0);
+
+  useEffect(() => {
+    if (zoomSeq > 0) {
+      settlingRef.current = false;
+    }
+  }, [zoomSeq]);
 
   useEffect(() => {
     settlingRef.current = true;
@@ -258,6 +273,7 @@ export function StackRack3D({
   selectedTool,
   onSelectTool,
 }: StackRack3DProps) {
+  const { canRender3D } = useCanRender3D();
   const pulseTime = layerCode ? 0.1 : 0;
   const cols = tools.length <= 4 ? 2 : 3;
   const totalRows = Math.ceil(tools.length / cols);
@@ -267,6 +283,18 @@ export function StackRack3D({
   const accentHue = STACK_LAYER_HUES[layerIdx] ?? STACK_LAYER_HUES[0];
   const draggingRef = useRef(false);
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
+  const [wheelEngaged, setWheelEngaged] = useState(false);
+  const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
+
+  const triggerZoom = useCallback((action: ZoomAction) => {
+    setZoomSignal((prev) => ({ action, seq: prev.seq + 1 }));
+  }, []);
+
+  const defaultCamPos = useMemo<[number, number, number]>(
+    () => (totalRows >= 3 ? [0, 3.0, 4.15] : [0, 2.55, 3.55]),
+    [totalRows]
+  );
+  const defaultTarget = useMemo<[number, number, number]>(() => [0, 0.08, 0], []);
 
   useEffect(() => {
     return () => {
@@ -287,7 +315,14 @@ export function StackRack3D({
   const baseD = totalRows * zSpacing + 0.55;
 
   return (
-    <div className="relative h-[290px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[265px]">
+    <div
+      data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
+      onPointerDown={() => {
+        if (canRender3D) setWheelEngaged(true);
+      }}
+      onPointerLeave={() => setWheelEngaged(false)}
+      className="relative h-[290px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[265px]"
+    >
       <div className="pointer-events-none absolute left-3 top-2.5 z-30 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3]">
         <span className="font-semibold" style={{ color: accentHue }}>
           {layerCode}
@@ -295,8 +330,17 @@ export function StackRack3D({
         <span>{layerName}</span>
       </div>
 
+      {canRender3D && (
+        <CanvasZoomHUD
+          className="right-3 top-2.5"
+          onZoomIn={() => triggerZoom("in")}
+          onZoomOut={() => triggerZoom("out")}
+          onReset={() => triggerZoom("reset")}
+        />
+      )}
+
       <ViewportCanvas
-        cameraPosition={totalRows >= 3 ? [0, 3.0, 4.15] : [0, 2.55, 3.55]}
+        cameraPosition={defaultCamPos}
         fov={40}
         fallback={
           <StackRack2DFallback
@@ -314,6 +358,15 @@ export function StackRack3D({
           totalRows={totalRows}
           draggingRef={draggingRef}
           controlsRef={controlsRef}
+          zoomSeq={zoomSignal.seq}
+        />
+        <CameraZoomController
+          controlsRef={controlsRef}
+          defaultPosition={defaultCamPos}
+          defaultTarget={defaultTarget}
+          minDistance={2.2}
+          maxDistance={8.5}
+          zoomSignal={zoomSignal}
         />
         <ambientLight intensity={0.62} />
         <hemisphereLight args={["#B8D9FF", "#0D1117", 1.0]} />
@@ -341,7 +394,10 @@ export function StackRack3D({
         <OrbitControls
           ref={controlsRef}
           target={[0, 0.08, 0]}
-          enableZoom={false}
+          enableZoom={wheelEngaged}
+          zoomSpeed={0.8}
+          minDistance={2.2}
+          maxDistance={8.5}
           enablePan={false}
           enableDamping
           dampingFactor={0.07}

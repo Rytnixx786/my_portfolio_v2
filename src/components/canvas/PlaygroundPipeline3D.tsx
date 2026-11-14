@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { STATE_FAULT, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { PlaygroundPipeline2D } from "@/components/sections/PlaygroundPipeline2D";
+import {
+  CameraZoomController,
+  CanvasZoomHUD,
+  type ZoomAction,
+  type ZoomSignal,
+} from "./CanvasZoomHUD";
 import { SpriteLabel3D } from "./SpriteLabel3D";
 import { ViewportCanvas } from "./ViewportCanvas";
 
@@ -38,9 +44,13 @@ const PRESET_VANTAGES: Record<PlaygroundCameraPreset, [number, number, number]> 
 function CameraRigController({
   preset,
   presetTrigger,
+  enableWheelZoom,
+  zoomSignal,
 }: {
   preset: PlaygroundCameraPreset;
   presetTrigger: number;
+  enableWheelZoom: boolean;
+  zoomSignal: ZoomSignal;
 }) {
   const { camera, frameloop, invalidate } = useThree();
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
@@ -131,30 +141,51 @@ function CameraRigController({
     }
   });
 
+  const handleUserZoomTrigger = useCallback(() => {
+    transitioningRef.current = false;
+    lastInteractElapsedRef.current = elapsedRef.current;
+  }, []);
+
+  const defaultTarget: [number, number, number] = [0, preset === "top" ? 0 : 0.08, 0];
+
   return (
-    <OrbitControls
-      ref={controlsRef}
-      target={[0, 0.08, 0]}
-      enableZoom={false}
-      enablePan={false}
-      enableDamping
-      dampingFactor={0.07}
-      rotateSpeed={0.68}
-      autoRotate={preset === "orbit"}
-      autoRotateSpeed={1.65}
-      minPolarAngle={0.22}
-      maxPolarAngle={Math.PI * 0.39}
-      onStart={() => {
-        draggingRef.current = true;
-        transitioningRef.current = false;
-        lastInteractElapsedRef.current = elapsedRef.current;
-      }}
-      onEnd={() => {
-        draggingRef.current = false;
-        lastInteractElapsedRef.current = elapsedRef.current;
-      }}
-      touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
-    />
+    <>
+      <CameraZoomController
+        controlsRef={controlsRef}
+        defaultPosition={PRESET_VANTAGES[preset]}
+        defaultTarget={defaultTarget}
+        minDistance={3.2}
+        maxDistance={12.5}
+        zoomSignal={zoomSignal}
+        onUserZoomTrigger={handleUserZoomTrigger}
+      />
+      <OrbitControls
+        ref={controlsRef}
+        target={[0, 0.08, 0]}
+        enableZoom={enableWheelZoom}
+        zoomSpeed={0.8}
+        minDistance={3.2}
+        maxDistance={12.5}
+        enablePan={false}
+        enableDamping
+        dampingFactor={0.07}
+        rotateSpeed={0.68}
+        autoRotate={preset === "orbit"}
+        autoRotateSpeed={1.65}
+        minPolarAngle={0.22}
+        maxPolarAngle={Math.PI * 0.39}
+        onStart={() => {
+          draggingRef.current = true;
+          transitioningRef.current = false;
+          lastInteractElapsedRef.current = elapsedRef.current;
+        }}
+        onEnd={() => {
+          draggingRef.current = false;
+          lastInteractElapsedRef.current = elapsedRef.current;
+        }}
+        touches={{ ONE: undefined, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+      />
+    </>
   );
 }
 
@@ -402,7 +433,12 @@ function PipelineDioramaScene({
   focusedStageId = null,
   rpsMultiplier = 1,
   onSelectStage,
-}: PlaygroundPipeline3DProps) {
+  enableWheelZoom,
+  zoomSignal,
+}: PlaygroundPipeline3DProps & {
+  enableWheelZoom: boolean;
+  zoomSignal: ZoomSignal;
+}) {
   const isFaultBurst =
     scenarioId === "breaker-open" ||
     scenarioId === "budget-cutoff" ||
@@ -429,7 +465,12 @@ function PipelineDioramaScene({
       <pointLight position={[-3.5, 2.2, 2.5]} intensity={1.35} decay={0} color={UI_ACCENT} />
       <pointLight position={[3.5, 2.2, 2.5]} intensity={1.25} decay={0} color={statusColor} />
 
-      <CameraRigController preset={cameraPreset} presetTrigger={presetTrigger} />
+      <CameraRigController
+        preset={cameraPreset}
+        presetTrigger={presetTrigger}
+        enableWheelZoom={enableWheelZoom}
+        zoomSignal={zoomSignal}
+      />
 
       <mesh position={[0, -0.35, 0]}>
         <boxGeometry args={[9.8, 0.08, 2.5]} />
@@ -482,10 +523,31 @@ function PipelineDioramaScene({
  */
 export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {
   const { canRender3D } = useCanRender3D();
+  const [wheelEngaged, setWheelEngaged] = useState(false);
+  const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
   const initialPos = PRESET_VANTAGES[props.cameraPreset] ?? PRESET_VANTAGES.isometric;
 
+  const triggerZoom = useCallback((action: ZoomAction) => {
+    setZoomSignal((prev) => ({ action, seq: prev.seq + 1 }));
+  }, []);
+
   return (
-    <div className="relative h-[265px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[315px]">
+    <div
+      data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
+      onPointerDown={() => {
+        if (canRender3D) setWheelEngaged(true);
+      }}
+      onPointerLeave={() => setWheelEngaged(false)}
+      className="relative h-[265px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[315px]"
+    >
+      {canRender3D && (
+        <CanvasZoomHUD
+          onZoomIn={() => triggerZoom("in")}
+          onZoomOut={() => triggerZoom("out")}
+          onReset={() => triggerZoom("reset")}
+        />
+      )}
+
       <ViewportCanvas
         cameraPosition={initialPos}
         fov={38}
@@ -503,12 +565,16 @@ export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {
           />
         }
       >
-        <PipelineDioramaScene {...props} />
+        <PipelineDioramaScene
+          {...props}
+          enableWheelZoom={wheelEngaged}
+          zoomSignal={zoomSignal}
+        />
       </ViewportCanvas>
 
       {canRender3D && (
         <span className="pointer-events-none absolute bottom-2.5 right-3 z-20 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/85 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[#8B949E] backdrop-blur-md">
-          Drag to orbit · Click station
+          Drag to orbit · +/- or click &amp; scroll to zoom · Click station
         </span>
       )}
     </div>

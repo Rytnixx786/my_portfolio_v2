@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
+import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { CATEGORY_HUES, STATE_FAULT, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
+import {
+  CameraZoomController,
+  CanvasZoomHUD,
+  type ZoomAction,
+  type ZoomSignal,
+} from "./CanvasZoomHUD";
 import { ViewportCanvas } from "./ViewportCanvas";
 
 interface ProjectTopology3DProps {
@@ -327,10 +334,13 @@ function TopologySlotFallback({ slug }: { slug: string }) {
   );
 }
 
+const TOPOLOGY_CAM_POS: [number, number, number] = [0, 0.85, 3.65];
+
 /**
  * Interactive 3D mini-labs mounted inside flagship Selected Work cards.
  */
 export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DProps) {
+  const { canRender3D } = useCanRender3D();
   const [cinchMode, setCinchMode] = useState<"cache" | "marlin" | "breaker">("cache");
   const [hitlApproved, setHitlApproved] = useState(true);
   const [nexusNode, setNexusNode] = useState<{ idx: number; label: string }>({
@@ -338,12 +348,34 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
     label: "HITL",
   });
   const [aresThreshold, setAresThreshold] = useState(0.82);
+  const [wheelEngaged, setWheelEngaged] = useState(false);
+  const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
   const draggingRef = useRef(false);
+  const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
+
+  const triggerZoom = useCallback((action: ZoomAction) => {
+    setZoomSignal((prev) => ({ action, seq: prev.seq + 1 }));
+  }, []);
 
   return (
-    <div className={`relative h-[225px] w-full overflow-hidden rounded-b-[calc(1.5rem-0.375rem)] sm:h-[260px] ${className}`}>
+    <div
+      data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
+      onPointerDown={() => {
+        if (canRender3D) setWheelEngaged(true);
+      }}
+      onPointerLeave={() => setWheelEngaged(false)}
+      className={`relative h-[225px] w-full overflow-hidden rounded-b-[calc(1.5rem-0.375rem)] sm:h-[260px] ${className}`}
+    >
+      {canRender3D && (
+        <CanvasZoomHUD
+          onZoomIn={() => triggerZoom("in")}
+          onZoomOut={() => triggerZoom("out")}
+          onReset={() => triggerZoom("reset")}
+        />
+      )}
+
       <ViewportCanvas
-        cameraPosition={[0, 0.85, 3.65]}
+        cameraPosition={TOPOLOGY_CAM_POS}
         fov={38}
         fallback={<TopologySlotFallback slug={slug} />}
         className="h-full w-full"
@@ -366,8 +398,20 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
           <AresGateSculpture threshold={aresThreshold} draggingRef={draggingRef} />
         )}
 
+        <CameraZoomController
+          controlsRef={controlsRef}
+          defaultPosition={TOPOLOGY_CAM_POS}
+          minDistance={2.0}
+          maxDistance={7.0}
+          zoomSignal={zoomSignal}
+        />
+
         <OrbitControls
-          enableZoom={false}
+          ref={controlsRef}
+          enableZoom={wheelEngaged}
+          zoomSpeed={0.8}
+          minDistance={2.0}
+          maxDistance={7.0}
           enablePan={false}
           enableDamping
           dampingFactor={0.07}

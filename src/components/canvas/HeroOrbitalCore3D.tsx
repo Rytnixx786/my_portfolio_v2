@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 import { profile } from "@/data/site";
+import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { HERO_ORBIT_HUES, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
+import {
+  CameraZoomController,
+  CanvasZoomHUD,
+  type ZoomAction,
+  type ZoomSignal,
+} from "./CanvasZoomHUD";
 import { ViewportCanvas } from "./ViewportCanvas";
 
 const ORBITAL_SYSTEMS = [
@@ -197,11 +204,20 @@ function PortraitDepthSlab({ accentHue }: { accentHue: string }) {
   );
 }
 
+const HERO_CAM_POS: [number, number, number] = [0, 0.2, 5.55];
+
 function HeroOrbitalScene({
   activeSystemIndex,
   onSelectSystem,
   onHoverSystem,
-}: HeroOrbitalCore3DProps & { onHoverSystem: (index: number | null) => void }) {
+  enableWheelZoom,
+  zoomSignal,
+}: HeroOrbitalCore3DProps & {
+  onHoverSystem: (index: number | null) => void;
+  enableWheelZoom: boolean;
+  zoomSignal: ZoomSignal;
+}) {
+  const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const tiltGroupRef = useRef<THREE.Group>(null);
   const ringMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const innerRingRef = useRef<THREE.Mesh>(null);
@@ -377,8 +393,20 @@ function HeroOrbitalScene({
         </group>
       </group>
 
+      <CameraZoomController
+        controlsRef={controlsRef}
+        defaultPosition={HERO_CAM_POS}
+        minDistance={3.2}
+        maxDistance={9.2}
+        zoomSignal={zoomSignal}
+      />
+
       <OrbitControls
-        enableZoom={false}
+        ref={controlsRef}
+        enableZoom={enableWheelZoom}
+        zoomSpeed={0.8}
+        minDistance={3.2}
+        maxDistance={9.2}
         enablePan={false}
         enableDamping
         dampingFactor={0.055}
@@ -683,21 +711,44 @@ export function HeroOrbitalCore3D({
   activeSystemIndex,
   onSelectSystem,
 }: HeroOrbitalCore3DProps) {
+  const { canRender3D } = useCanRender3D();
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const [wheelEngaged, setWheelEngaged] = useState(false);
+  const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
+
+  const triggerZoom = useCallback((action: ZoomAction) => {
+    setZoomSignal((prev) => ({ action, seq: prev.seq + 1 }));
+  }, []);
+
   const displaySys =
     ORBITAL_SYSTEMS[hoveredIdx ?? activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
 
   return (
-    <div className="relative h-[320px] w-full overflow-hidden rounded-2xl sm:h-[380px] lg:h-[420px]">
+    <div
+      data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
+      onPointerDown={() => {
+        if (canRender3D) setWheelEngaged(true);
+      }}
+      onPointerLeave={() => setWheelEngaged(false)}
+      className="relative h-[320px] w-full overflow-hidden rounded-2xl sm:h-[380px] lg:h-[420px]"
+    >
       <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/88 px-3 py-1 font-mono text-xs text-[#E6EDF3] backdrop-blur-md">
         <span style={{ color: displaySys.hue }}>{displaySys.code}</span>
         <span className="font-semibold">{displaySys.label}</span>
         <span className="text-[#9DA7B3]">· {displaySys.metric}</span>
       </div>
 
+      {canRender3D && (
+        <CanvasZoomHUD
+          onZoomIn={() => triggerZoom("in")}
+          onZoomOut={() => triggerZoom("out")}
+          onReset={() => triggerZoom("reset")}
+        />
+      )}
+
       <ViewportCanvas
         eager
-        cameraPosition={[0, 0.2, 5.55]}
+        cameraPosition={HERO_CAM_POS}
         fov={40}
         fallback={
           <HeroOrbital2DFallback
@@ -711,6 +762,8 @@ export function HeroOrbitalCore3D({
           activeSystemIndex={activeSystemIndex}
           onSelectSystem={onSelectSystem}
           onHoverSystem={setHoveredIdx}
+          enableWheelZoom={wheelEngaged}
+          zoomSignal={zoomSignal}
         />
       </ViewportCanvas>
     </div>

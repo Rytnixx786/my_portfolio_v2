@@ -1,10 +1,17 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { CATEGORY_HUES, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
+import {
+  CameraZoomController,
+  CanvasZoomHUD,
+  type ZoomAction,
+  type ZoomSignal,
+} from "./CanvasZoomHUD";
 import { ViewportCanvas } from "./ViewportCanvas";
 
 const DHAKA_LAT = (23.8103 * Math.PI) / 180;
@@ -71,6 +78,12 @@ function GlobeAssembly({
       return { ...region, target, curve };
     });
   }, [dhakaPos]);
+
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = "auto";
+    };
+  }, []);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
@@ -148,6 +161,13 @@ function GlobeAssembly({
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect(route.id);
+              }}
+              onPointerOver={(e) => {
+                e.stopPropagation();
+                document.body.style.cursor = "pointer";
+              }}
+              onPointerOut={() => {
+                document.body.style.cursor = "auto";
               }}
             >
               <sphereGeometry args={[isSelected ? 0.068 : 0.05, 14, 14]} />
@@ -312,20 +332,46 @@ function Globe2DFallback({
   );
 }
 
+const GLOBE_CAM_POS: [number, number, number] = [0, 0.3, 4.1];
+
 export function TelemetryGlobe3D() {
+  const { canRender3D } = useCanRender3D();
   const [selectedId, setSelectedId] = useState<string>(REGIONS[0].id);
+  const [wheelEngaged, setWheelEngaged] = useState(false);
+  const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
   const draggingRef = useRef(false);
+  const controlsRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const activeRegion = REGIONS.find((r) => r.id === selectedId) ?? REGIONS[0];
 
+  const triggerZoom = useCallback((action: ZoomAction) => {
+    setZoomSignal((prev) => ({ action, seq: prev.seq + 1 }));
+  }, []);
+
   return (
-    <div className="relative h-[265px] w-full overflow-hidden rounded-2xl sm:h-[295px]">
+    <div
+      data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
+      onPointerDown={() => {
+        if (canRender3D) setWheelEngaged(true);
+      }}
+      onPointerLeave={() => setWheelEngaged(false)}
+      className="relative h-[265px] w-full overflow-hidden rounded-2xl sm:h-[295px]"
+    >
       <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 inline-flex items-center gap-2 rounded-full border border-[#10B981]/40 bg-[#0D1117]/90 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#10B981] backdrop-blur-md">
         <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]" aria-hidden="true" />
         <span>Dhaka · UTC+6</span>
       </div>
 
+      {canRender3D && (
+        <CanvasZoomHUD
+          className="right-2.5 top-2.5"
+          onZoomIn={() => triggerZoom("in")}
+          onZoomOut={() => triggerZoom("out")}
+          onReset={() => triggerZoom("reset")}
+        />
+      )}
+
       <ViewportCanvas
-        cameraPosition={[0, 0.3, 4.1]}
+        cameraPosition={GLOBE_CAM_POS}
         fov={38}
         fallback={<Globe2DFallback selectedId={selectedId} onSelect={setSelectedId} />}
         className="h-full w-full"
@@ -341,8 +387,20 @@ export function TelemetryGlobe3D() {
           onSelect={setSelectedId}
         />
 
+        <CameraZoomController
+          controlsRef={controlsRef}
+          defaultPosition={GLOBE_CAM_POS}
+          minDistance={2.2}
+          maxDistance={8.0}
+          zoomSignal={zoomSignal}
+        />
+
         <OrbitControls
-          enableZoom={false}
+          ref={controlsRef}
+          enableZoom={wheelEngaged}
+          zoomSpeed={0.8}
+          minDistance={2.2}
+          maxDistance={8.0}
           enablePan={false}
           enableDamping
           dampingFactor={0.07}

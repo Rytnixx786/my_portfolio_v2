@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { answerPortfolioQuery, matchPortfolioQuery } from "@/lib/query-engine";
 import { CATEGORY_HUES } from "@/lib/palette";
 import { resolveEffectiveTier, resolveQualityReason } from "@/lib/device-tier";
+import { classifyNodeKind } from "@/lib/architecture";
 import { projects } from "@/data/projects";
 import { POST } from "@/app/api/query/route";
 
@@ -100,5 +101,39 @@ describe("/api/query handler", () => {
     const bodyText = await res.text();
     expect(bodyText).toContain("MaSheba AI");
     expect(bodyText).toContain("0.90 AUC");
+  });
+});
+
+describe("architecture topology integrity & semantic classification", () => {
+  it("validates unique stage IDs and valid connection endpoints on every project", () => {
+    for (const project of projects) {
+      const nodeIds = project.architecture.nodes.map((n) => n.id);
+      const uniqueIds = new Set(nodeIds);
+      expect(nodeIds.length).toBeGreaterThanOrEqual(5);
+      expect(uniqueIds.size).toBe(nodeIds.length);
+
+      for (const conn of project.architecture.connections) {
+        expect(uniqueIds.has(conn.from)).toBe(true);
+        expect(uniqueIds.has(conn.to)).toBe(true);
+        expect(conn.from).not.toBe(conn.to);
+        if ("label" in conn && typeof conn.label === "string") {
+          expect(conn.label.trim().length).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it("classifies entry, guard, storage, and compute nodes without false positives", () => {
+    expect(classifyNodeKind("circuit_breaker", 0)).toBe("entry");
+    expect(classifyNodeKind("query", 0)).toBe("entry");
+    expect(classifyNodeKind("query_gen", 1)).toBe("compute");
+    expect(classifyNodeKind("gateway", 4)).toBe("compute");
+    expect(classifyNodeKind("finops_gate", 1)).toBe("guard");
+    expect(classifyNodeKind("gate", 4)).toBe("guard");
+    expect(classifyNodeKind("guardrails", 2)).toBe("guard");
+    expect(classifyNodeKind("semantic_cache", 3)).toBe("storage");
+    expect(classifyNodeKind("db_rls", 2)).toBe("storage");
+    expect(classifyNodeKind("golden", 2)).toBe("storage");
+    expect(classifyNodeKind("vllm_engine", 5)).toBe("compute");
   });
 });

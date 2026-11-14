@@ -14,7 +14,7 @@ interface SpriteLabel3DProps {
 }
 
 /**
- * Pure WebGL pill label rendered onto a disposed high-DPI CanvasTexture <sprite>.
+ * Pure WebGL pill label rendered onto a high-DPI CanvasTexture <sprite> with clean disposal.
  * Clamps extreme widths cleanly while preserving readable vertical height via minHeightScale.
  */
 export function SpriteLabel3D({
@@ -33,13 +33,13 @@ export function SpriteLabel3D({
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    const fontSize = 36;
+    const fontSize = 44;
     const font = `600 ${fontSize}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`;
     ctx.font = font;
     const textWidth = Math.ceil(ctx.measureText(text).width);
-    const padX = 28;
-    const width = Math.max(96, textWidth + padX * 2);
-    const height = 76;
+    const padX = 36;
+    const width = Math.max(120, textWidth + padX * 2);
+    const height = 96;
 
     canvas.width = width;
     canvas.height = height;
@@ -48,13 +48,13 @@ export function SpriteLabel3D({
     ctx.font = font;
     ctx.clearRect(0, 0, width, height);
 
-    const r = 20;
+    const r = 24;
     ctx.beginPath();
-    ctx.roundRect(4, 4, width - 8, height - 8, r);
-    ctx.fillStyle = active ? "rgba(13, 17, 23, 0.97)" : "rgba(18, 25, 35, 0.94)";
+    ctx.roundRect(5, 5, width - 10, height - 10, r);
+    ctx.fillStyle = active ? "rgba(13, 17, 23, 0.98)" : "rgba(16, 22, 31, 0.94)";
     ctx.fill();
-    ctx.lineWidth = active ? 3.5 : 2.2;
-    ctx.strokeStyle = active ? accentColor : "rgba(240, 246, 252, 0.34)";
+    ctx.lineWidth = active ? 4.5 : 2.6;
+    ctx.strokeStyle = active ? accentColor : "rgba(240, 246, 252, 0.36)";
     ctx.stroke();
 
     ctx.fillStyle = active ? "#F8FAFC" : "#E6EDF3";
@@ -66,6 +66,7 @@ export function SpriteLabel3D({
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
+    texture.anisotropy = 4;
     texture.generateMipmaps = false;
     texture.needsUpdate = true;
 
