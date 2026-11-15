@@ -8,6 +8,14 @@ export interface StageNodeSpec {
   faultBehavior: string;
 }
 
+export interface TraceSpanSpec {
+  stageId: string;
+  durationMs: number;
+  status: "PASS" | "HIT" | "MISS" | "SKIP" | "TRIP" | "DENY" | "PAUSE";
+  metricDelta: string;
+  logLine: string;
+}
+
 export interface ScenarioSpec {
   id: string;
   label: string;
@@ -20,6 +28,7 @@ export interface ScenarioSpec {
   activeStages: string[];
   summary: string;
   payload: Record<string, string | number | boolean>;
+  traceSpans: ReadonlyArray<TraceSpanSpec>;
 }
 
 export const CINCH_STAGES: ReadonlyArray<StageNodeSpec> = [
@@ -88,6 +97,36 @@ export const CINCH_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
       gpu_compute_active: false,
       status: 200,
     },
+    traceSpans: [
+      {
+        stageId: "breaker",
+        durationMs: 0.18,
+        status: "PASS",
+        metricDelta: "+0.18 ms",
+        logLine: "FSM CLOSED (0/3 panics); downstream vLLM socket healthy",
+      },
+      {
+        stageId: "finops",
+        durationMs: 0.41,
+        status: "PASS",
+        metricDelta: "$0.000",
+        logLine: "Tenant spend ledger verified below $25.00 hard cutoff",
+      },
+      {
+        stageId: "pii",
+        durationMs: 0.94,
+        status: "PASS",
+        metricDelta: "masked",
+        logLine: "Ingress redactor scrubbed secrets prior to vector key encoding",
+      },
+      {
+        stageId: "cache",
+        durationMs: 2.59,
+        status: "HIT",
+        metricDelta: "cos 0.946",
+        logLine: "In-process CPU MiniLM ONNX cache matched at 4.12 ms total (0 GPU)",
+      },
+    ],
   },
   {
     id: "cold-vllm",
@@ -108,6 +147,50 @@ export const CINCH_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
       speedup_vs_8gb_fp16_offload: "10.86x",
       status: 200,
     },
+    traceSpans: [
+      {
+        stageId: "breaker",
+        durationMs: 0.21,
+        status: "PASS",
+        metricDelta: "CLOSED",
+        logLine: "Worker FSM CLOSED; 8 GB CUDA pool initialized",
+      },
+      {
+        stageId: "finops",
+        durationMs: 0.44,
+        status: "PASS",
+        metricDelta: "authorized",
+        logLine: "Pre-flight tenant balance approved for 512 output tokens",
+      },
+      {
+        stageId: "pii",
+        durationMs: 1.05,
+        status: "PASS",
+        metricDelta: "masked",
+        logLine: "Ingress PII filter cleared prompt before semantic cache check",
+      },
+      {
+        stageId: "cache",
+        durationMs: 2.8,
+        status: "MISS",
+        metricDelta: "cos 0.61",
+        logLine: "Semantic lookup missed (< 0.92); forwarding to admission queue",
+      },
+      {
+        stageId: "limiter",
+        durationMs: 4.5,
+        status: "PASS",
+        metricDelta: "60 RPM ok",
+        logLine: "Sliding-window rate governor granted immediate inference slot",
+      },
+      {
+        stageId: "vllm",
+        durationMs: 133.0,
+        status: "PASS",
+        metricDelta: "331.0 tok/s",
+        logLine: "Marlin W4A16 INT4 streamed tokens with EBNF grammar enforcement",
+      },
+    ],
   },
   {
     id: "breaker-open",
@@ -128,6 +211,15 @@ export const CINCH_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
       canary_in_flight: false,
       status: 503,
     },
+    traceSpans: [
+      {
+        stageId: "breaker",
+        durationMs: 45.56,
+        status: "TRIP",
+        metricDelta: "HTTP 503",
+        logLine: "3 worker panics tripped FSM OPEN; failed fast in 45.56 ms with 10s canary timer",
+      },
+    ],
   },
   {
     id: "budget-cutoff",
@@ -148,6 +240,22 @@ export const CINCH_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
       action: "HTTP_402_HARD_CUTOFF",
       status: 402,
     },
+    traceSpans: [
+      {
+        stageId: "breaker",
+        durationMs: 0.19,
+        status: "PASS",
+        metricDelta: "CLOSED",
+        logLine: "Ingress socket healthy ahead of tenant accounting lookup",
+      },
+      {
+        stageId: "finops",
+        durationMs: 1.61,
+        status: "DENY",
+        metricDelta: "HTTP 402",
+        logLine: "spent $25.004 >= $25.00 cap; returned 402 with 0 GPU tokens burned",
+      },
+    ],
   },
 ];
 
@@ -217,6 +325,50 @@ export const RAG_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
       citations_attached: 4,
       decision: "SYNTHESIZE_WITH_CITATIONS",
     },
+    traceSpans: [
+      {
+        stageId: "bm25",
+        durationMs: 18.4,
+        status: "PASS",
+        metricDelta: "sparse k=24",
+        logLine: "BM25 index matched API symbols and error tokens across parent chunks",
+      },
+      {
+        stageId: "dense",
+        durationMs: 42.6,
+        status: "PASS",
+        metricDelta: "dense k=24",
+        logLine: "ChromaDB 128-token child embeddings returned semantic candidates",
+      },
+      {
+        stageId: "rrf",
+        durationMs: 4.2,
+        status: "PASS",
+        metricDelta: "RRF k=60",
+        logLine: "Reciprocal Rank Fusion deduplicated parent IDs without brittle weights",
+      },
+      {
+        stageId: "rerank",
+        durationMs: 96.8,
+        status: "PASS",
+        metricDelta: "top-6 ranked",
+        logLine: "Cross-Encoder rescored merged parent passages by query entailment fit",
+      },
+      {
+        stageId: "nli",
+        durationMs: 118.0,
+        status: "PASS",
+        metricDelta: "entail 0.91",
+        logLine: "NLI verification cleared >= 0.70 floor (0.91); unlocked SSE synth",
+      },
+      {
+        stageId: "synth",
+        durationMs: 340.0,
+        status: "PASS",
+        metricDelta: "95% grounded",
+        logLine: "Resumable Last-Event-ID SSE streamed 4 inline-cited claims",
+      },
+    ],
   },
   {
     id: "nli-refusal",
@@ -236,6 +388,43 @@ export const RAG_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
       threshold_required: 0.7,
       decision: "CALIBRATED_REFUSAL",
     },
+    traceSpans: [
+      {
+        stageId: "bm25",
+        durationMs: 19.2,
+        status: "PASS",
+        metricDelta: "sparse k=12",
+        logLine: "Lexical retrieval surfaced mismatched version symbols",
+      },
+      {
+        stageId: "dense",
+        durationMs: 44.8,
+        status: "PASS",
+        metricDelta: "cos 0.81",
+        logLine: "Vector cosine matched topic vocabulary yet missed evidentiary link",
+      },
+      {
+        stageId: "rrf",
+        durationMs: 4.5,
+        status: "PASS",
+        metricDelta: "RRF k=60",
+        logLine: "Merged sparse + dense rankings ahead of contradiction scoring",
+      },
+      {
+        stageId: "rerank",
+        durationMs: 104.5,
+        status: "PASS",
+        metricDelta: "conflict flagged",
+        logLine: "Cross-Encoder ranked competing assertions side-by-side",
+      },
+      {
+        stageId: "nli",
+        durationMs: 237.0,
+        status: "TRIP",
+        metricDelta: "0.41 < 0.70",
+        logLine: "NLI classifier caught entailment < 0.70 and refused without synthesis (10/15)",
+      },
+    ],
   },
   {
     id: "hitl-replan",
@@ -255,5 +444,73 @@ export const RAG_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
       sse_replay_supported: true,
       decision: "REPLAN_SUBQUERIES",
     },
+    traceSpans: [
+      {
+        stageId: "bm25",
+        durationMs: 24.5,
+        status: "PASS",
+        metricDelta: "sparse coverage",
+        logLine: "Sparse scan flagged low term coverage across target sub-collections",
+      },
+      {
+        stageId: "dense",
+        durationMs: 52.5,
+        status: "PASS",
+        metricDelta: "8.05 req/s",
+        logLine: "Dense chunks retrieved under 8.05 req/s steady evaluation load",
+      },
+      {
+        stageId: "rrf",
+        durationMs: 233.0,
+        status: "PAUSE",
+        metricDelta: "HITL saved",
+        logLine: "AsyncPostgresSaver saved graph state and paused stream via Last-Event-ID",
+      },
+    ],
   },
 ];
+
+export interface TraceTimelineRow extends TraceSpanSpec {
+  startMs: number;
+  offsetPct: number;
+  widthPct: number;
+}
+
+/**
+ * Projects sequential execution spans onto [0..100%] timeline coordinates,
+ * clamping zero-duration bypassed spans and micro-bars inside [0, 100 - widthPct]
+ * so terminal SKIP/micro bars never clip past the right edge of overflow-hidden tracks.
+ */
+export function computeTraceSpanTimeline(spans: ReadonlyArray<TraceSpanSpec>): {
+  recordedTotalMs: number;
+  spanTimeline: TraceTimelineRow[];
+} {
+  let cursor = 0;
+  const rawTotal = spans.reduce((acc, s) => acc + Math.max(0, s.durationMs), 0);
+  const total = Math.max(0.01, rawTotal);
+  const spanTimeline: TraceTimelineRow[] = [];
+
+  for (const span of spans) {
+    const dur = Math.max(0, span.durationMs);
+    const startMs = cursor;
+    cursor += dur;
+    const widthPct =
+      dur <= 0 ? 4 : Math.max(6, Math.min(100, (dur / total) * 100));
+    const offsetPct = Math.max(
+      0,
+      Math.min(100 - widthPct, (startMs / total) * 100)
+    );
+    spanTimeline.push({
+      ...span,
+      durationMs: dur,
+      startMs,
+      offsetPct,
+      widthPct,
+    });
+  }
+
+  return {
+    recordedTotalMs: rawTotal,
+    spanTimeline,
+  };
+}

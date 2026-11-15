@@ -25,7 +25,7 @@ const LazyHeroOrbitalCore3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <HeroOrbitalBootSilhouette className="h-[280px] w-full sm:h-[380px] lg:h-[420px]" />
+      <HeroOrbitalBootSilhouette className="h-[280px] w-full sm:h-[360px] lg:h-[400px] xl:h-[420px]" />
     ),
   }
 );
@@ -99,7 +99,7 @@ export function HeroEditorial() {
               end: "+=70%",
               pin: true,
               pinSpacing: false,
-              scrub: 0.45,
+              scrub: MOTION.scrollTrigger.scrub,
               invalidateOnRefresh: true,
               onUpdate: (self) => {
                 setPortfolioScrollState({ heroProgress: self.progress });
@@ -113,8 +113,8 @@ export function HeroEditorial() {
           pinTl
             .fromTo(
               "[data-hero-copy]",
-              { y: 0, scale: 1, opacity: 1, filter: "blur(0px)" },
-              { y: -60, scale: 0.96, opacity: 0.16, filter: "blur(6px)", ease: "power1.in" },
+              { y: 0, scale: 1, opacity: 1 },
+              { y: -60, scale: 0.96, opacity: 0.16, ease: "power1.in" },
               0
             )
             .fromTo(
@@ -138,7 +138,7 @@ export function HeroEditorial() {
             trigger: hero,
             start: "top top",
             end: "bottom 28%",
-            scrub: 0.45,
+            scrub: MOTION.scrollTrigger.scrub,
             invalidateOnRefresh: true,
             onUpdate: (self) => {
               setPortfolioScrollState({ heroProgress: self.progress });
@@ -180,7 +180,7 @@ export function HeroEditorial() {
       ref={heroRef}
       id="hero"
       data-cursor-hero
-      className="relative z-[2] flex min-h-[100dvh] items-center overflow-hidden bg-[#0D1117] pt-20 pb-20 sm:pt-24 sm:pb-20 lg:pt-20 lg:pb-14"
+      className="relative z-[2] flex min-h-[100dvh] items-center overflow-hidden bg-[#0D1117] pt-24 pb-14 sm:pt-24 sm:pb-16 lg:pt-20 lg:pb-12"
     >
       {/* Interactive Cursor-Reactive Precision Lattice Field */}
       <HeroCursorField containerRef={heroRef} />

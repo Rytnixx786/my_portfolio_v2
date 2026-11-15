@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import gsap from "gsap";
 import { Flip } from "gsap/Flip";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -13,6 +13,11 @@ import {
 } from "@/data/projects";
 import { getCategoryHue } from "@/lib/palette";
 import { createAppMatchMedia, MOTION, shouldReduceAppMotion } from "@/lib/motion";
+import {
+  handleSpotlightEnter,
+  handleSpotlightLeave,
+  handleSpotlightMove,
+} from "@/hooks/usePortfolioUtils";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
@@ -121,9 +126,9 @@ export function SelectedWorkSection() {
       if (appReduced) {
         gsap.set(items, { clearProps: "transform,opacity" });
         items.forEach((item) => {
-          const card = item.querySelector("article");
+          const stackScale = item.querySelector("[data-stack-scale]");
           const dimmer = item.querySelector("[data-stack-dimmer]");
-          if (card) gsap.set(card, { clearProps: "transform" });
+          if (stackScale) gsap.set(stackScale, { clearProps: "transform" });
           if (dimmer) gsap.set(dimmer, { opacity: 0 });
         });
         return;
@@ -149,13 +154,13 @@ export function SelectedWorkSection() {
             });
 
             for (let i = 0; i < items.length - 1; i++) {
-              const currentCard = items[i].querySelector<HTMLElement>("article");
+              const stackScale = items[i].querySelector<HTMLElement>("[data-stack-scale]");
               const dimmer = items[i].querySelector<HTMLElement>("[data-stack-dimmer]");
               const nextWrapper = items[i + 1];
 
-              if (currentCard) {
+              if (stackScale) {
                 gsap.fromTo(
-                  currentCard,
+                  stackScale,
                   { scale: 1, yPercent: 0 },
                   {
                     scale: 0.94,
@@ -200,9 +205,9 @@ export function SelectedWorkSection() {
           }
 
           items.forEach((item) => {
-            const card = item.querySelector("article");
+            const stackScale = item.querySelector("[data-stack-scale]");
             const dimmer = item.querySelector("[data-stack-dimmer]");
-            if (card) gsap.set(card, { clearProps: "transform" });
+            if (stackScale) gsap.set(stackScale, { clearProps: "transform" });
             if (dimmer) gsap.set(dimmer, { opacity: 0 });
             attachBidirectionalScrollEnvelope(item, {
               enterOpacity: 0.14,
@@ -308,19 +313,19 @@ export function SelectedWorkSection() {
   const hiddenCount = byCategory.length - visibleProjects.length;
 
   function getCardSpanClass(position: number, total: number): string {
-    if (isStackMode) return "lg:col-span-12 lg:sticky lg:top-[calc(84px+var(--stack-i)*18px)]";
-    if (position === 0) return "lg:col-span-12";
+    if (isStackMode) return "md:col-span-2 lg:col-span-12 lg:sticky lg:top-[calc(84px+var(--stack-i)*18px)]";
+    if (position === 0) return "md:col-span-2 lg:col-span-12";
     const remaining = total - 1;
     const remIndex = position - 1;
-    if (remaining % 2 === 1 && remIndex === remaining - 1) return "lg:col-span-12";
-    return remIndex % 2 === 0 ? "lg:col-span-6" : "lg:col-span-6";
+    if (remaining % 2 === 1 && remIndex === remaining - 1) return "md:col-span-2 lg:col-span-12";
+    return remIndex % 2 === 0 ? "md:col-span-1 lg:col-span-6" : "md:col-span-1 lg:col-span-6";
   }
 
   return (
     <section
       ref={sectionRef}
       id="work"
-      className="relative z-[3] -mt-6 overflow-x-clip rounded-t-[1.75rem] border-t border-t-[rgba(56,189,248,0.22)] border-b border-b-[rgba(240,246,252,0.08)] bg-[linear-gradient(180deg,#111722_0%,#0D1117_140px)] py-28 shadow-[0_-32px_84px_rgba(2,8,23,0.94)] sm:-mt-8 sm:rounded-t-[2.25rem] sm:py-36 lg:py-40"
+      className="relative z-[3] -mt-6 overflow-x-clip rounded-t-[1.75rem] border-t border-t-[rgba(56,189,248,0.22)] border-b border-b-[rgba(240,246,252,0.08)] bg-[linear-gradient(180deg,#111722_0%,#0D1117_140px)] py-24 shadow-[0_-32px_84px_rgba(2,8,23,0.94)] sm:-mt-8 sm:rounded-t-[2.25rem] md:py-28 lg:py-40"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
@@ -442,44 +447,14 @@ export function SelectedWorkSection() {
 
           <div
             ref={gridRef}
-            className={`mt-10 grid grid-flow-dense grid-cols-1 lg:grid-cols-12 ${
+            className={`mt-10 grid grid-flow-dense grid-cols-1 md:grid-cols-2 lg:grid-cols-12 ${
               isStackMode ? "gap-8 pb-6" : "gap-6"
             }`}
           >
             {visibleProjects.map(({ project, num }, position) => {
               const spanClass = getCardSpanClass(position, visibleProjects.length);
-              const isWideCard = isStackMode || spanClass === "lg:col-span-12";
+              const isWideCard = isStackMode || spanClass.includes("lg:col-span-12");
               const hue = getCategoryHue(project.category);
-
-              const handleCardPointerMove = (event: PointerEvent<HTMLElement>) => {
-                if (event.pointerType === "touch") return;
-                const el = event.currentTarget;
-                const rect = el.getBoundingClientRect();
-                const relX = event.clientX - rect.left;
-                const relY = event.clientY - rect.top;
-                el.style.setProperty("--mouse-x", `${relX}px`);
-                el.style.setProperty("--mouse-y", `${relY}px`);
-
-                const canTilt =
-                  (window.matchMedia?.("(hover: hover) and (pointer: fine)")?.matches ?? true) &&
-                  !shouldReduceAppMotion();
-                if (!canTilt || rect.width <= 0 || rect.height <= 0) return;
-
-                const nx = relX / rect.width - 0.5;
-                const ny = relY / rect.height - 0.5;
-                el.style.setProperty("--card-rx", `${(-ny * 3.2).toFixed(2)}deg`);
-                el.style.setProperty("--card-ry", `${(nx * 3.2).toFixed(2)}deg`);
-                el.style.setProperty("--plate-px", `${(nx * 8).toFixed(2)}px`);
-                el.style.setProperty("--plate-py", `${(ny * 8).toFixed(2)}px`);
-              };
-
-              const handleCardPointerLeave = (event: PointerEvent<HTMLElement>) => {
-                const el = event.currentTarget;
-                el.style.setProperty("--card-rx", "0deg");
-                el.style.setProperty("--card-ry", "0deg");
-                el.style.setProperty("--plate-px", "0px");
-                el.style.setProperty("--plate-py", "0px");
-              };
 
               return (
                 <div
@@ -496,10 +471,19 @@ export function SelectedWorkSection() {
                   }
                   className={spanClass}
                 >
+                  <div data-stack-scale className="h-full">
                   <article
                     data-cursor="VIEW CASE ↗"
-                    onPointerMove={handleCardPointerMove}
-                    onPointerLeave={handleCardPointerLeave}
+                    onPointerEnter={handleSpotlightEnter}
+                    onPointerMove={(event) => {
+                      const canParallax =
+                        (window.matchMedia?.("(hover: hover) and (any-pointer: fine)")
+                          ?.matches ??
+                          true) &&
+                        !shouldReduceAppMotion();
+                      handleSpotlightMove(event, canParallax);
+                    }}
+                    onPointerLeave={(event) => handleSpotlightLeave(event, true)}
                     className="bento-tilt-card double-bezel-outer group relative h-full hover:border-[rgba(240,246,252,0.22)]"
                   >
                     <div
@@ -592,6 +576,7 @@ export function SelectedWorkSection() {
                       </div>
                     </div>
                   </article>
+                  </div>
                 </div>
               );
             })}

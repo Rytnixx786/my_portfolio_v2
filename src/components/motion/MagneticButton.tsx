@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { getCachedElementRect, primeElementRect } from "@/hooks/usePortfolioUtils";
 import { shouldReduceAppMotion } from "@/lib/motion";
 
 interface MagneticButtonProps {
@@ -27,7 +28,7 @@ export function MagneticButton({
   useEffect(() => {
     const syncMotion = () => {
       const finePointer =
-        window.matchMedia?.("(pointer: fine)")?.matches ?? true;
+        window.matchMedia?.("(any-pointer: fine)")?.matches ?? true;
       enabledRef.current = !shouldReduceAppMotion() && finePointer;
     };
     syncMotion();
@@ -82,6 +83,16 @@ export function MagneticButton({
     rafRef.current = window.requestAnimationFrame(step);
   }, []);
 
+  const handlePointerEnter = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!enabledRef.current || e.pointerType === "touch") return;
+      const el = wrapRef.current;
+      if (!el) return;
+      primeElementRect(el);
+    },
+    []
+  );
+
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!enabledRef.current || e.pointerType === "touch") return;
@@ -89,7 +100,7 @@ export function MagneticButton({
       if (!el) return;
 
       el.style.willChange = "transform";
-      const rect = el.getBoundingClientRect();
+      const rect = getCachedElementRect(el);
       const dx = e.clientX - (rect.left + rect.width * 0.5);
       const dy = e.clientY - (rect.top + rect.height * 0.5);
 
@@ -126,6 +137,7 @@ export function MagneticButton({
   return (
     <div
       ref={wrapRef}
+      onPointerEnter={handlePointerEnter}
       onPointerMove={handlePointerMove}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}

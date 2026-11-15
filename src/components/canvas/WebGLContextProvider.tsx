@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -138,6 +139,205 @@ function updateStoredPreference(next: QualityPreference) {
   }
 }
 
+export interface WebGLSlotStore {
+  getSlotMaskSnapshot: (id: string) => number;
+  subscribeSlot: (id: string, listener: () => void) => () => void;
+  setMaxSlots: (nextMax: number) => void;
+  requestSlot: (id: string, pinned?: boolean) => void;
+  releaseSlot: (id: string) => void;
+  setSlotInView: (id: string, inView: boolean) => void;
+  focusSlotLoop: (id: string) => void;
+  markScrolling: (settleMs?: number) => void;
+  getActiveSlotCount: () => number;
+  dispose: () => void;
+}
+
+export function createWebGLSlotStore(initialMaxSlots = 0): WebGLSlotStore {
+  let maxSlots = Math.max(0, initialMaxSlots);
+  let slotOrder: Array<{ id: string; pinned: boolean }> = [];
+  let activeIds = new Set<string>();
+  let inViewOrder: string[] = [];
+  let activeLoopIds = new Set<string>();
+  let isScrolling = false;
+  let scrollSettleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const listenersById = new Map<string, Set<() => void>>();
+  const lastNotifiedMask = new Map<string, number>();
+
+  const computeMask = (id: string): number => {
+    const hasSlot = maxSlots > 0 && activeIds.has(id);
+    if (hasSlot) {
+      const loopAllowed = activeLoopIds.has(id);
+      return 2 | (loopAllowed ? 4 : 0);
+    }
+    const isSaturated = maxSlots > 0 && activeIds.size >= maxSlots;
+    return isSaturated ? 1 : 0;
+  };
+
+  const recomputeAndNotify = () => {
+    if (maxSlots <= 0 || slotOrder.length === 0) {
+      activeIds = new Set();
+    } else {
+      const pinned = slotOrder.filter((item) => item.pinned).slice(-maxSlots);
+      const remaining = maxSlots - pinned.length;
+      const preloads =
+        remaining > 0
+          ? slotOrder.filter((item) => !item.pinned).slice(-remaining)
+          : [];
+      activeIds = new Set([...pinned, ...preloads].map((item) => item.id));
+    }
+
+    const maxActiveLoops = isScrolling ? 1 : 2;
+    const eligibleLoops = inViewOrder.filter((id) => activeIds.has(id));
+    activeLoopIds = new Set(eligibleLoops.slice(-maxActiveLoops));
+
+    for (const [id, subs] of listenersById.entries()) {
+      if (subs.size === 0) continue;
+      const nextMask = computeMask(id);
+      if (lastNotifiedMask.get(id) !== nextMask) {
+        lastNotifiedMask.set(id, nextMask);
+        for (const cb of subs) {
+          cb();
+        }
+      }
+    }
+  };
+
+  return {
+    getSlotMaskSnapshot: (id: string) => computeMask(id),
+
+    subscribeSlot: (id: string, listener: () => void) => {
+      let subs = listenersById.get(id);
+      if (!subs) {
+        subs = new Set();
+        listenersById.set(id, subs);
+      }
+      subs.add(listener);
+      if (!lastNotifiedMask.has(id)) {
+        lastNotifiedMask.set(id, computeMask(id));
+      }
+      return () => {
+        const set = listenersById.get(id);
+        if (!set) return;
+        set.delete(listener);
+        if (set.size === 0) {
+          listenersById.delete(id);
+          lastNotifiedMask.delete(id);
+        }
+      };
+    },
+
+    setMaxSlots: (nextMax: number) => {
+      const normalized = Math.max(0, nextMax);
+      if (normalized === maxSlots) return;
+      maxSlots = normalized;
+      recomputeAndNotify();
+    },
+
+    requestSlot: (id: string, pinned = false) => {
+      const existing = slotOrder.find((item) => item.id === id);
+      if (
+        existing &&
+        existing.pinned === pinned &&
+        slotOrder[slotOrder.length - 1]?.id === id
+      ) {
+        return;
+      }
+      slotOrder = [...slotOrder.filter((item) => item.id !== id), { id, pinned }];
+      recomputeAndNotify();
+    },
+
+    releaseSlot: (id: string) => {
+      let changed = false;
+      if (slotOrder.some((item) => item.id === id)) {
+        slotOrder = slotOrder.filter((item) => item.id !== id);
+        changed = true;
+      }
+      if (inViewOrder.includes(id)) {
+        inViewOrder = inViewOrder.filter((entry) => entry !== id);
+        changed = true;
+      }
+      if (changed) {
+        recomputeAndNotify();
+      }
+    },
+
+    setSlotInView: (id: string, inView: boolean) => {
+      const has = inViewOrder.includes(id);
+      if (inView) {
+        if (has && inViewOrder[inViewOrder.length - 1] === id) return;
+        inViewOrder = [...inViewOrder.filter((entry) => entry !== id), id];
+      } else {
+        if (!has) return;
+        inViewOrder = inViewOrder.filter((entry) => entry !== id);
+      }
+      recomputeAndNotify();
+    },
+
+    focusSlotLoop: (id: string) => {
+      if (!inViewOrder.includes(id)) return;
+      if (inViewOrder[inViewOrder.length - 1] === id) return;
+      inViewOrder = [...inViewOrder.filter((entry) => entry !== id), id];
+      recomputeAndNotify();
+    },
+
+    markScrolling: (settleMs = 140) => {
+      const wasScrolling = isScrolling;
+      isScrolling = true;
+      if (!wasScrolling) {
+        recomputeAndNotify();
+      }
+      if (scrollSettleTimer !== null) {
+        clearTimeout(scrollSettleTimer);
+      }
+      scrollSettleTimer = setTimeout(() => {
+        scrollSettleTimer = null;
+        isScrolling = false;
+        recomputeAndNotify();
+      }, settleMs);
+    },
+
+    getActiveSlotCount: () => activeIds.size,
+
+    dispose: () => {
+      if (scrollSettleTimer !== null) {
+        clearTimeout(scrollSettleTimer);
+        scrollSettleTimer = null;
+      }
+    },
+  };
+}
+
+const defaultSlotStore = createWebGLSlotStore(0);
+
+export function subscribeSlotStore(id: string, listener: () => void): () => void {
+  return defaultSlotStore.subscribeSlot(id, listener);
+}
+
+export function getSlotStoreSnapshot(id: string): number {
+  return defaultSlotStore.getSlotMaskSnapshot(id);
+}
+
+export function requestWebGLSlot(id: string, pinned = false) {
+  defaultSlotStore.requestSlot(id, pinned);
+}
+
+export function releaseWebGLSlot(id: string) {
+  defaultSlotStore.releaseSlot(id);
+}
+
+export function setWebGLSlotInView(id: string, inView: boolean) {
+  defaultSlotStore.setSlotInView(id, inView);
+}
+
+export function focusWebGLSlotLoop(id: string) {
+  defaultSlotStore.focusSlotLoop(id);
+}
+
+export function markWebGLScrollBurst() {
+  defaultSlotStore.markScrolling();
+}
+
 interface WebGLContextValue {
   hasMounted: boolean;
   hardwareTier: DeviceTier;
@@ -149,9 +349,6 @@ interface WebGLContextValue {
   qualityReason: string;
   maxSlots: number;
   eventSourceRef: React.RefObject<HTMLDivElement | null>;
-  activeSlotIds: ReadonlySet<string>;
-  requestSlot: (id: string, pinned?: boolean) => void;
-  releaseSlot: (id: string) => void;
   setPreference: (next: QualityPreference) => void;
   setContextLost: (lost: boolean) => void;
 }
@@ -167,18 +364,14 @@ const WebGLContext = createContext<WebGLContextValue>({
   qualityReason: "Initializing",
   maxSlots: 0,
   eventSourceRef: { current: null },
-  activeSlotIds: new Set(),
-  requestSlot: () => {},
-  releaseSlot: () => {},
   setPreference: () => {},
   setContextLost: () => {},
 });
 
 /**
- * Global WebGL quality, reduced-motion, and LRU WebGL context slot-pool provider.
- * Caps active container-scoped <Canvas> instances (max 4 on high so 3 sticky-stacked
- * work cards + preloaded simulator coexist smoothly, 2 on mid) so WebGL scenes stay
- * 100% locked to their DOM containers on scroll without hitting browser context limits.
+ * Global WebGL quality, reduced-motion, and zero-churn LRU WebGL context slot-pool provider.
+ * Slot membership lives in an external store (`subscribeSlotStore`) so only the specific
+ * `ViewportCanvas` whose slot allocation or loop budget changes re-renders during scroll.
  */
 export function WebGLContextProvider({ children }: { children: ReactNode }) {
   const {
@@ -194,7 +387,6 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
     getServerEnvSnapshot
   );
   const [contextLost, setContextLost] = useState(false);
-  const [slotOrder, setSlotOrder] = useState<Array<{ id: string; pinned: boolean }>>([]);
 
   const eventSourceRef = useRef<HTMLDivElement | null>(null);
 
@@ -219,36 +411,9 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
 
   const maxSlots = resolveMaxWebGLSlots(effectiveTier);
 
-  const activeSlotIds = useMemo<ReadonlySet<string>>(() => {
-    if (maxSlots <= 0 || slotOrder.length === 0) {
-      return new Set();
-    }
-    // Always preserve actively visible (in-view) slots before near-view preload slots
-    const pinned = slotOrder.filter((item) => item.pinned).slice(-maxSlots);
-    const remaining = maxSlots - pinned.length;
-    const preloads =
-      remaining > 0
-        ? slotOrder.filter((item) => !item.pinned).slice(-remaining)
-        : [];
-    return new Set([...pinned, ...preloads].map((item) => item.id));
-  }, [maxSlots, slotOrder]);
-
-  const requestSlot = useCallback((id: string, pinned = false) => {
-    setSlotOrder((prev) => {
-      const existing = prev.find((item) => item.id === id);
-      if (existing && existing.pinned === pinned && prev[prev.length - 1]?.id === id) {
-        return prev;
-      }
-      return [...prev.filter((item) => item.id !== id), { id, pinned }];
-    });
-  }, []);
-
-  const releaseSlot = useCallback((id: string) => {
-    setSlotOrder((prev) => {
-      if (!prev.some((item) => item.id === id)) return prev;
-      return prev.filter((item) => item.id !== id);
-    });
-  }, []);
+  useLayoutEffect(() => {
+    defaultSlotStore.setMaxSlots(maxSlots);
+  }, [maxSlots]);
 
   const qualityReason = useMemo(
     () => resolveQualityReason(preference, hardwareReason, reducedMotion, contextLost),
@@ -267,9 +432,6 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
       qualityReason,
       maxSlots,
       eventSourceRef,
-      activeSlotIds,
-      requestSlot,
-      releaseSlot,
       setPreference,
       setContextLost,
     }),
@@ -283,9 +445,6 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
       contextLost,
       qualityReason,
       maxSlots,
-      activeSlotIds,
-      requestSlot,
-      releaseSlot,
       setPreference,
     ]
   );

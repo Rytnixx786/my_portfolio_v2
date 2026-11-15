@@ -28,12 +28,18 @@ import {
   splitNumericMetricTokens,
 } from "@/lib/motion";
 import { deriveRender3DState } from "@/hooks/usePortfolioUtils";
+import { createWebGLSlotStore } from "@/components/canvas/WebGLContextProvider";
+import {
+  computeReticleCornerPositions,
+  RETICLE_CORNER_SIZE,
+} from "@/components/chrome/CustomCursor";
 import { executePortfolioScroll, NAV_SCROLL_OFFSET } from "@/components/chrome/LenisProvider";
 import { projects } from "@/data/projects";
 import { profile } from "@/data/site";
 import {
   CINCH_SCENARIOS,
   CINCH_STAGES,
+  computeTraceSpanTimeline,
   RAG_SCENARIOS,
   RAG_STAGES,
 } from "@/data/playground";
@@ -634,8 +640,8 @@ describe("motion contract, ScrambleMetric numeric parsing, scroll-to-top, and 3D
   it("prevents scroll-debounce starvation and black #0D1117 underlays across WebGL slots", () => {
     // R3F resize config must disable scroll debounce so ResizeObserver never stalls at 0x0 during slow scroll
     expect(CANVAS_RESIZE_CONFIG).toEqual({ scroll: false, debounce: 0 });
-    expect(resolveMaxWebGLSlots("high")).toBe(4);
-    expect(resolveMaxWebGLSlots("mid")).toBe(2);
+    expect(resolveMaxWebGLSlots("high")).toBe(6);
+    expect(resolveMaxWebGLSlots("mid")).toBe(3);
     expect(resolveMaxWebGLSlots("low")).toBe(0);
 
     // Pre-mount SSR guard keeps hydration deterministic
@@ -765,5 +771,215 @@ describe("motion contract, ScrambleMetric numeric parsing, scroll-to-top, and 3D
     expect(stackRackSrc).toContain("max-w-[calc(100%-184px)]");
     expect(globeSrc).toContain("max-w-[calc(100%-180px)]");
     expect(heroCoreSrc).toContain("max-w-[calc(100%-182px)]");
+  });
+
+  it("isolates WebGL slot notifications per subscriber and budgets continuous render loops during scroll", () => {
+    vi.useFakeTimers();
+    const store = createWebGLSlotStore(6);
+    try {
+      const heroCalls = vi.fn();
+      const work1Calls = vi.fn();
+      const unsubHero = store.subscribeSlot("hero", heroCalls);
+      const unsubWork1 = store.subscribeSlot("work-1", work1Calls);
+
+      store.requestSlot("hero", true);
+      expect(heroCalls).toHaveBeenCalledTimes(1);
+      expect(work1Calls).toHaveBeenCalledTimes(0);
+
+      store.requestSlot("work-1", true);
+      expect(heroCalls).toHaveBeenCalledTimes(1);
+      expect(work1Calls).toHaveBeenCalledTimes(1);
+
+      store.requestSlot("work-2", false);
+      store.requestSlot("work-3", false);
+      store.requestSlot("sim", false);
+      store.requestSlot("stack", false);
+      // Unrelated subscriber still stays completely quiet while pool fills cleanly to 6
+      expect(store.getActiveSlotCount()).toBe(6);
+      expect(heroCalls).toHaveBeenCalledTimes(1);
+      expect(work1Calls).toHaveBeenCalledTimes(1);
+
+      // Pinned slots stay active even if preloads exceed 6
+      store.requestSlot("globe", false);
+      expect((store.getSlotMaskSnapshot("hero") & 2) !== 0).toBe(true);
+      expect((store.getSlotMaskSnapshot("work-1") & 2) !== 0).toBe(true);
+
+      // Frame budgeting allows <= 2 continuous in-view loops at rest, <= 1 during scroll bursts
+      store.setSlotInView("hero", true);
+      store.setSlotInView("work-1", true);
+      store.setSlotInView("work-2", true);
+      const loopCountAtRest = ["hero", "work-1", "work-2"].filter(
+        (id) => (store.getSlotMaskSnapshot(id) & 4) !== 0
+      ).length;
+      expect(loopCountAtRest).toBe(2);
+
+      store.markScrolling(140);
+      const loopCountWhileScrolling = ["hero", "work-1", "work-2"].filter(
+        (id) => (store.getSlotMaskSnapshot(id) & 4) !== 0
+      ).length;
+      expect(loopCountWhileScrolling).toBe(1);
+
+      vi.advanceTimersByTime(150);
+      const loopCountAfterSettle = ["hero", "work-1", "work-2"].filter(
+        (id) => (store.getSlotMaskSnapshot(id) & 4) !== 0
+      ).length;
+      expect(loopCountAfterSettle).toBe(2);
+
+      // Interacting with paused in-view slot immediately promotes its loop budget
+      store.focusSlotLoop("hero");
+      expect((store.getSlotMaskSnapshot("hero") & 4) !== 0).toBe(true);
+
+      unsubHero();
+      unsubWork1();
+    } finally {
+      store.dispose();
+      vi.useRealTimers();
+    }
+  });
+
+  it("enforces traceSpans integrity and recorded timing sums across all simulator scenarios", () => {
+    for (const s of [...CINCH_SCENARIOS, ...RAG_SCENARIOS]) {
+      expect(s.traceSpans.length).toBe(s.activeStages.length);
+      expect(s.traceSpans.map((sp) => sp.stageId)).toEqual(s.activeStages);
+      const sumMs = s.traceSpans.reduce((acc, sp) => acc + sp.durationMs, 0);
+      expect(sumMs).toBeCloseTo(s.baseLatencyMs, 2);
+      for (const sp of s.traceSpans) {
+        expect(sp.durationMs).toBeGreaterThan(0);
+        expect(sp.metricDelta.length).toBeGreaterThan(0);
+        expect(sp.logLine.length).toBeGreaterThan(10);
+        expect(sp.logLine).not.toMatch(/[\u2013\u2014]/);
+        expect(sp.metricDelta).not.toMatch(/[\u2013\u2014]/);
+      }
+    }
+
+    const cacheHit = CINCH_SCENARIOS.find((s) => s.id === "cache-hit");
+    expect(cacheHit?.traceSpans.map((sp) => sp.durationMs)).toEqual([0.18, 0.41, 0.94, 2.59]);
+
+    // Terminal bypassed/micro spans must clamp offsetPct inside [0, 100 - widthPct] so SKIP bars never clip past track edges
+    const bypassedLast = computeTraceSpanTimeline([
+      { stageId: "breaker", durationMs: 0.18, status: "PASS", metricDelta: "ok", logLine: "ok log line here" },
+      { stageId: "finops", durationMs: 0.41, status: "PASS", metricDelta: "ok", logLine: "ok log line here" },
+      { stageId: "pii", durationMs: 0.94, status: "PASS", metricDelta: "ok", logLine: "ok log line here" },
+      { stageId: "onnx", durationMs: 0, status: "SKIP", metricDelta: "Cache off", logLine: "bypassed onnx cache" },
+    ]);
+    expect(bypassedLast.recordedTotalMs).toBeCloseTo(1.53, 4);
+    const skipRow = bypassedLast.spanTimeline[3];
+    expect(skipRow.widthPct).toBe(4);
+    expect(skipRow.offsetPct).toBe(96);
+    expect(skipRow.offsetPct + skipRow.widthPct).toBeLessThanOrEqual(100);
+
+    for (const s of [...CINCH_SCENARIOS, ...RAG_SCENARIOS]) {
+      const { spanTimeline } = computeTraceSpanTimeline(s.traceSpans);
+      for (const row of spanTimeline) {
+        expect(row.offsetPct).toBeGreaterThanOrEqual(0);
+        expect(row.widthPct).toBeGreaterThanOrEqual(4);
+        expect(row.offsetPct + row.widthPct).toBeLessThanOrEqual(100.001);
+      }
+    }
+  });
+
+  it("guards scroll compositor fast-path, GPU cursor transforms, batched Hero lattice, and Safari backdrop parity", () => {
+    const lenisSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/chrome/LenisProvider.tsx"),
+      "utf8"
+    );
+    const cssSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/app/globals.css"),
+      "utf8"
+    );
+    const heroSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/hero/HeroEditorial.tsx"),
+      "utf8"
+    );
+    const cursorSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/chrome/CustomCursor.tsx"),
+      "utf8"
+    );
+    const latticeSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/hero/HeroCursorField.tsx"),
+      "utf8"
+    );
+    const simSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/sections/SystemsPlayground.tsx"),
+      "utf8"
+    );
+    const viewportCanvasSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/canvas/ViewportCanvas.tsx"),
+      "utf8"
+    );
+    const motionSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/motion.ts"),
+      "utf8"
+    );
+
+    expect(lenisSrc).not.toContain("--scroll-velocity-abs");
+    expect(lenisSrc).not.toContain("--scroll-velocity-signed");
+    expect(lenisSrc).toContain("subscribeScrollRatio");
+    expect(heroSrc).not.toContain('filter: "blur(');
+    expect(cssSrc).toContain("-webkit-backdrop-filter: blur(12px)");
+    expect(cssSrc).not.toContain("rotateX(var(--card-rx");
+    expect(cursorSrc).not.toContain("scale3d(");
+    expect(cursorSrc).toContain("translate3d(");
+    expect(cursorSrc).toContain("tlRef");
+    expect(cursorSrc).toContain("trRef");
+    expect(cursorSrc).toContain("blRef");
+    expect(cursorSrc).toContain("brRef");
+    expect(cursorSrc).toContain("h-[9px] w-[9px]");
+    expect(cursorSrc).toContain("border-t-[1.5px]");
+    expect(cursorSrc).toContain("border-l-[1.5px]");
+    expect(cursorSrc).toContain("border-r-[1.5px]");
+    expect(cursorSrc).toContain("border-b-[1.5px]");
+    expect(cursorSrc).not.toContain(".style.width =");
+    expect(cursorSrc).not.toContain(".style.height =");
+    expect(cursorSrc).not.toMatch(/\.style\.(width|height)\s*=/);
+    expect(cursorSrc).toContain("cachedSnapEl");
+    expect(cursorSrc).toContain("isConnected");
+    expect(cursorSrc).toContain('"pointercancel"');
+    expect(cursorSrc).toContain('"blur"');
+    expect(cursorSrc).toContain("isDialogOpen");
+    expect(cursorSrc).toContain("pointerUpTimers");
+    expect(cursorSrc).toContain('"touchstart"');
+    expect(latticeSrc).toContain("Path2D");
+    expect(latticeSrc).toContain('clip("evenodd")');
+    expect(latticeSrc).toContain('"touchstart"');
+    expect(simSrc).toContain("Replay Trace");
+    expect(simSrc).toContain("Live Step");
+    expect(simSrc).not.toContain("pin: true");
+    expect(viewportCanvasSrc).toContain("rootMargin: \"900px 0px\"");
+    expect(motionSrc).toContain("(any-pointer: fine)");
+  });
+
+  it("positions 4 independent 9x9 cursor corner brackets symmetrically without non-uniform scaling", () => {
+    expect(RETICLE_CORNER_SIZE).toBe(9);
+
+    // Wide pill snap (e.g. "Explore Work" 168x48 + 10x8 reticle padding = 178x56)
+    const wide = computeReticleCornerPositions(500, 300, 178, 56);
+    expect(wide.left).toBe(411);
+    expect(wide.right + RETICLE_CORNER_SIZE).toBe(589);
+    expect(wide.right + RETICLE_CORNER_SIZE - wide.left).toBe(178);
+    expect(wide.top).toBe(272);
+    expect(wide.bottom + RETICLE_CORNER_SIZE).toBe(328);
+    expect(wide.bottom + RETICLE_CORNER_SIZE - wide.top).toBe(56);
+
+    // Press compression narrows corner offsets symmetrically
+    const pressedWide = computeReticleCornerPositions(500, 300, 178 * 0.84, 56 * 0.84);
+    expect(pressedWide.left).toBeGreaterThan(wide.left);
+    expect(pressedWide.right).toBeLessThan(wide.right);
+    expect(pressedWide.top).toBeGreaterThan(wide.top);
+    expect(pressedWide.bottom).toBeLessThan(wide.bottom);
+    expect((pressedWide.left + pressedWide.right + RETICLE_CORNER_SIZE) * 0.5).toBeCloseTo(500, 4);
+    expect((pressedWide.top + pressedWide.bottom + RETICLE_CORNER_SIZE) * 0.5).toBeCloseTo(300, 4);
+
+    // Compact hero state (14x14) and tiny/zero degenerate dimensions never invert corners
+    const hero = computeReticleCornerPositions(240, 180, 14, 14);
+    expect(hero.right).toBeGreaterThanOrEqual(hero.left);
+    expect(hero.bottom).toBeGreaterThanOrEqual(hero.top);
+    expect(hero.right + RETICLE_CORNER_SIZE - hero.left).toBe(14);
+
+    const tiny = computeReticleCornerPositions(100, 100, 0, -5);
+    expect(tiny.left).toBe(95.5);
+    expect(tiny.right).toBe(95.5);
+    expect(tiny.top).toBe(95.5);
+    expect(tiny.bottom).toBe(95.5);
   });
 });

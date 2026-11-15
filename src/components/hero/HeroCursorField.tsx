@@ -53,9 +53,26 @@ export function HeroCursorField({
     const LINK_RADIUS = 116;
 
     let points: Array<{ bx: number; by: number; isAnchor: boolean }> = [];
+    let cols = 0;
+    let rows = 0;
+    let offsetX = 0;
+    let offsetY = 0;
+    let staticAnchorPath: Path2D | null = null;
+    let staticDotPath: Path2D | null = null;
+    let containerLeft = 0;
+    let containerTop = 0;
+    let rectDirty = true;
+
+    const refreshContainerRect = () => {
+      const rect = container.getBoundingClientRect();
+      containerLeft = rect.left;
+      containerTop = rect.top;
+      rectDirty = false;
+      return rect;
+    };
 
     const rebuildGrid = () => {
-      const rect = container.getBoundingClientRect();
+      const rect = refreshContainerRect();
       width = Math.max(1, Math.floor(rect.width));
       height = Math.max(1, Math.floor(rect.height));
       dpr = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -66,25 +83,50 @@ export function HeroCursorField({
       canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const cols = Math.ceil(width / SPACING) + 1;
-      const rows = Math.ceil(height / SPACING) + 1;
-      const offsetX = (width - (cols - 1) * SPACING) * 0.5;
-      const offsetY = (height - (rows - 1) * SPACING) * 0.5;
+      cols = Math.ceil(width / SPACING) + 1;
+      rows = Math.ceil(height / SPACING) + 1;
+      offsetX = (width - (cols - 1) * SPACING) * 0.5;
+      offsetY = (height - (rows - 1) * SPACING) * 0.5;
 
       points = [];
+      const canUsePath2D = typeof Path2D !== "undefined";
+      const anchorPath = canUsePath2D ? new Path2D() : null;
+      const dotPath = canUsePath2D ? new Path2D() : null;
+
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          points.push({
-            bx: offsetX + c * SPACING,
-            by: offsetY + r * SPACING,
-            isAnchor: r % 2 === 0 && c % 2 === 0,
-          });
+          const bx = offsetX + c * SPACING;
+          const by = offsetY + r * SPACING;
+          const isAnchor = r % 2 === 0 && c % 2 === 0;
+          points.push({ bx, by, isAnchor });
+          if (anchorPath && dotPath) {
+            if (isAnchor) {
+              anchorPath.moveTo(bx - 2.5, by);
+              anchorPath.lineTo(bx + 2.5, by);
+              anchorPath.moveTo(bx, by - 2.5);
+              anchorPath.lineTo(bx, by + 2.5);
+            } else {
+              dotPath.moveTo(bx + 0.9, by);
+              dotPath.arc(bx, by, 0.9, 0, Math.PI * 2);
+            }
+          }
         }
       }
+
+      staticAnchorPath = anchorPath;
+      staticDotPath = dotPath;
     };
 
     const drawStaticGrid = () => {
       ctx.clearRect(0, 0, width, height);
+      if (staticAnchorPath && staticDotPath) {
+        ctx.strokeStyle = "rgba(157, 167, 179, 0.14)";
+        ctx.lineWidth = 0.8;
+        ctx.stroke(staticAnchorPath);
+        ctx.fillStyle = "rgba(157, 167, 179, 0.12)";
+        ctx.fill(staticDotPath);
+        return;
+      }
       for (let i = 0; i < points.length; i++) {
         const p = points[i];
         if (p.isAnchor) {
@@ -152,7 +194,12 @@ export function HeroCursorField({
         grad.addColorStop(0.4, `rgba(${rAcc}, ${gAcc}, ${bAcc}, ${(0.036 * lensStrength).toFixed(3)})`);
         grad.addColorStop(1, "rgba(13, 17, 23, 0)");
         ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, width, height);
+        ctx.fillRect(
+          Math.max(0, smoothPtr.x - 290),
+          Math.max(0, smoothPtr.y - 290),
+          580,
+          580
+        );
 
         // Subtle optical reticle ring & clipped crosshairs around pointer (surface effect, native cursor kept)
         ctx.save();
@@ -191,70 +238,129 @@ export function HeroCursorField({
       const activeNodes: Array<{ x: number; y: number; energy: number }> = [];
       const pushScale = reducedMotion ? 2.8 : 7.5;
 
-      for (let i = 0; i < points.length; i++) {
-        const pt = points[i];
-        let x = pt.bx;
-        let y = pt.by;
-        let energy = 0;
+      // Collect combined grid bounds of cursor + pulses so static grid renders in 2 batched Path2D calls
+      let hasDynamicBox = false;
+      let cMin = cols;
+      let cMax = -1;
+      let rMin = rows;
+      let rMax = -1;
 
-        if (hasCursor) {
-          const dx = x - smoothPtr.x;
-          const dy = y - smoothPtr.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist < INFLUENCE_RADIUS && dist > 0.01) {
-            const falloff = 1 - dist / INFLUENCE_RADIUS;
-            const eased = falloff * falloff * lensStrength;
-            const push = eased * pushScale;
-            x += (dx / dist) * push;
-            y += (dy / dist) * push;
-            energy = Math.max(energy, eased);
-          }
+      const expandGridRange = (cx: number, cy: number, rad: number) => {
+        hasDynamicBox = true;
+        cMin = Math.min(cMin, Math.max(0, Math.floor((cx - rad - offsetX) / SPACING)));
+        cMax = Math.max(cMax, Math.min(cols - 1, Math.ceil((cx + rad - offsetX) / SPACING)));
+        rMin = Math.min(rMin, Math.max(0, Math.floor((cy - rad - offsetY) / SPACING)));
+        rMax = Math.max(rMax, Math.min(rows - 1, Math.ceil((cy + rad - offsetY) / SPACING)));
+      };
+
+      if (hasCursor) {
+        expandGridRange(smoothPtr.x, smoothPtr.y, INFLUENCE_RADIUS);
+      }
+      if (!reducedMotion) {
+        for (let k = 0; k < pulses.length; k++) {
+          const pulse = pulses[k];
+          const age = (now - pulse.start) / 1250;
+          const waveR = 14 + age * 250;
+          expandGridRange(pulse.x, pulse.y, waveR + 40);
         }
+      }
 
-        if (!reducedMotion) {
-          for (let k = 0; k < pulses.length; k++) {
-            const pulse = pulses[k];
-            const age = (now - pulse.start) / 1250;
-            const waveR = 14 + age * 250;
-            const dx = x - pulse.x;
-            const dy = y - pulse.y;
-            const dist = Math.hypot(dx, dy);
-            const band = Math.abs(dist - waveR);
-            if (band < 40 && dist > 0.01) {
-              const waveE = (1 - band / 40) * (1 - age);
-              x += (dx / dist) * waveE * 5.2;
-              y += (dy / dist) * waveE * 5.2;
-              energy = Math.max(energy, waveE * 0.9);
-            }
-          }
-        }
-
-        if (energy > 0.07 && hasCursor) {
-          const d = Math.hypot(x - smoothPtr.x, y - smoothPtr.y);
-          if (d < LINK_RADIUS) {
-            activeNodes.push({ x, y, energy });
-          }
-        }
-
-        if (pt.isAnchor && energy <= 0.06) {
+      if (staticAnchorPath && staticDotPath && cols > 0 && rows > 0) {
+        if (hasDynamicBox && cMin <= cMax && rMin <= rMax) {
+          const exLeft = offsetX + cMin * SPACING - SPACING * 0.5;
+          const exTop = offsetY + rMin * SPACING - SPACING * 0.5;
+          const exRight = offsetX + cMax * SPACING + SPACING * 0.5;
+          const exBottom = offsetY + rMax * SPACING + SPACING * 0.5;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, 0, width, height);
+          ctx.rect(exLeft, exTop, exRight - exLeft, exBottom - exTop);
+          ctx.clip("evenodd");
           ctx.strokeStyle = "rgba(157, 167, 179, 0.14)";
           ctx.lineWidth = 0.8;
-          ctx.beginPath();
-          ctx.moveTo(x - 2.5, y);
-          ctx.lineTo(x + 2.5, y);
-          ctx.moveTo(x, y - 2.5);
-          ctx.lineTo(x, y + 2.5);
-          ctx.stroke();
+          ctx.stroke(staticAnchorPath);
+          ctx.fillStyle = "rgba(157, 167, 179, 0.12)";
+          ctx.fill(staticDotPath);
+          ctx.restore();
         } else {
-          const radius = (pt.isAnchor ? 1.15 : 0.9) + energy * 1.25;
-          const alpha = 0.13 + energy * 0.65;
-          ctx.fillStyle =
-            energy > 0.05
-              ? `rgba(${rAcc}, ${gAcc}, ${bAcc}, ${alpha.toFixed(3)})`
-              : "rgba(157, 167, 179, 0.12)";
-          ctx.beginPath();
-          ctx.arc(x, y, radius, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.strokeStyle = "rgba(157, 167, 179, 0.14)";
+          ctx.lineWidth = 0.8;
+          ctx.stroke(staticAnchorPath);
+          ctx.fillStyle = "rgba(157, 167, 179, 0.12)";
+          ctx.fill(staticDotPath);
+        }
+      }
+
+      if (hasDynamicBox && cMin <= cMax && rMin <= rMax) {
+        for (let r = rMin; r <= rMax; r++) {
+          const rowBase = r * cols;
+          for (let c = cMin; c <= cMax; c++) {
+            const pt = points[rowBase + c];
+            if (!pt) continue;
+            let x = pt.bx;
+            let y = pt.by;
+            let energy = 0;
+
+            if (hasCursor) {
+              const dx = x - smoothPtr.x;
+              const dy = y - smoothPtr.y;
+              const dist = Math.hypot(dx, dy);
+              if (dist < INFLUENCE_RADIUS && dist > 0.01) {
+                const falloff = 1 - dist / INFLUENCE_RADIUS;
+                const eased = falloff * falloff * lensStrength;
+                const push = eased * pushScale;
+                x += (dx / dist) * push;
+                y += (dy / dist) * push;
+                energy = Math.max(energy, eased);
+              }
+            }
+
+            if (!reducedMotion) {
+              for (let k = 0; k < pulses.length; k++) {
+                const pulse = pulses[k];
+                const age = (now - pulse.start) / 1250;
+                const waveR = 14 + age * 250;
+                const dx = x - pulse.x;
+                const dy = y - pulse.y;
+                const dist = Math.hypot(dx, dy);
+                const band = Math.abs(dist - waveR);
+                if (band < 40 && dist > 0.01) {
+                  const waveE = (1 - band / 40) * (1 - age);
+                  x += (dx / dist) * waveE * 5.2;
+                  y += (dy / dist) * waveE * 5.2;
+                  energy = Math.max(energy, waveE * 0.9);
+                }
+              }
+            }
+
+            if (energy > 0.07 && hasCursor) {
+              const d = Math.hypot(x - smoothPtr.x, y - smoothPtr.y);
+              if (d < LINK_RADIUS) {
+                activeNodes.push({ x, y, energy });
+              }
+            }
+
+            if (pt.isAnchor && energy <= 0.06) {
+              ctx.strokeStyle = "rgba(157, 167, 179, 0.14)";
+              ctx.lineWidth = 0.8;
+              ctx.beginPath();
+              ctx.moveTo(x - 2.5, y);
+              ctx.lineTo(x + 2.5, y);
+              ctx.moveTo(x, y - 2.5);
+              ctx.lineTo(x, y + 2.5);
+              ctx.stroke();
+            } else {
+              const radius = (pt.isAnchor ? 1.15 : 0.9) + energy * 1.25;
+              const alpha = 0.13 + energy * 0.65;
+              ctx.fillStyle =
+                energy > 0.05
+                  ? `rgba(${rAcc}, ${gAcc}, ${bAcc}, ${alpha.toFixed(3)})`
+                  : "rgba(157, 167, 179, 0.12)";
+              ctx.beginPath();
+              ctx.arc(x, y, radius, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
         }
       }
 
@@ -284,10 +390,9 @@ export function HeroCursorField({
         Math.abs(targetStrength - smoothPtr.strength) > 0.015;
 
       if (
-        pointer.active ||
         pulses.length > 0 ||
         strengthSettling ||
-        (smoothPtr.x > -500 && (dxSettle > 0.4 || dySettle > 0.4))
+        (pointer.active && (dxSettle > 0.25 || dySettle > 0.25))
       ) {
         rafId = window.requestAnimationFrame(renderFrame);
       } else if (!pointer.active && smoothPtr.strength <= 0.015) {
@@ -316,11 +421,27 @@ export function HeroCursorField({
       return () => window.removeEventListener("resize", onResizeStatic);
     }
 
+    const onTouchDeactivate = () => {
+      if (pointer.active) {
+        pointer.active = false;
+        scheduleFrame();
+      }
+    };
+
+    const onPointerEnter = () => {
+      refreshContainerRect();
+    };
+
     const onPointerMove = (e: PointerEvent) => {
-      if (e.pointerType === "touch") return;
-      const rect = container.getBoundingClientRect();
-      pointer.x = e.clientX - rect.left;
-      pointer.y = e.clientY - rect.top;
+      if (e.pointerType === "touch") {
+        onTouchDeactivate();
+        return;
+      }
+      if (rectDirty) {
+        refreshContainerRect();
+      }
+      pointer.x = e.clientX - containerLeft;
+      pointer.y = e.clientY - containerTop;
       pointer.active = true;
       scheduleFrame();
     };
@@ -331,17 +452,26 @@ export function HeroCursorField({
     };
 
     const onPointerDown = (e: PointerEvent) => {
-      if (e.pointerType === "touch") return;
+      if (e.pointerType === "touch") {
+        onTouchDeactivate();
+        return;
+      }
       const target = e.target as HTMLElement | null;
       if (target?.closest("a, button, .r3f-local-canvas")) return;
-      const rect = container.getBoundingClientRect();
+      if (rectDirty) {
+        refreshContainerRect();
+      }
       pulses.push({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        x: e.clientX - containerLeft,
+        y: e.clientY - containerTop,
         start: performance.now(),
       });
       if (pulses.length > 4) pulses.shift();
       scheduleFrame();
+    };
+
+    const onScrollMarkDirty = () => {
+      rectDirty = true;
     };
 
     const onResize = () => {
@@ -372,17 +502,23 @@ export function HeroCursorField({
         : null;
 
     observer?.observe(container);
+    container.addEventListener("pointerenter", onPointerEnter, { passive: true });
     container.addEventListener("pointermove", onPointerMove, { passive: true });
     container.addEventListener("pointerleave", onPointerLeave, { passive: true });
     container.addEventListener("pointerdown", onPointerDown, { passive: true });
+    container.addEventListener("touchstart", onTouchDeactivate, { passive: true });
+    window.addEventListener("scroll", onScrollMarkDirty, { passive: true });
     window.addEventListener("resize", onResize, { passive: true });
 
     return () => {
       if (rafId !== null) window.cancelAnimationFrame(rafId);
       observer?.disconnect();
+      container.removeEventListener("pointerenter", onPointerEnter);
       container.removeEventListener("pointermove", onPointerMove);
       container.removeEventListener("pointerleave", onPointerLeave);
       container.removeEventListener("pointerdown", onPointerDown);
+      container.removeEventListener("touchstart", onTouchDeactivate);
+      window.removeEventListener("scroll", onScrollMarkDirty);
       window.removeEventListener("resize", onResize);
     };
   }, [containerRef, accentColor]);

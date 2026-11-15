@@ -15,7 +15,7 @@ export const CHOREO = {
     exitOpacity: 0.28,
     exitBlurPx: 4,
   },
-  pinDesktopQuery: "(min-width: 1024px) and (pointer: fine)",
+  pinDesktopQuery: "(min-width: 1024px) and (any-pointer: fine)",
 } as const;
 
 export interface EnvelopePhaseTimings {
@@ -135,7 +135,7 @@ export const MOTION = {
     revealStart: "top 92%",
     bentoStart: "top 88%",
     metricStart: "top 92%",
-    scrub: 0.45,
+    scrub: 0.28,
   },
   damp: {
     camera: 4.5,

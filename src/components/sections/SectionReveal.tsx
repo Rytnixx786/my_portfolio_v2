@@ -52,15 +52,13 @@ export function attachBidirectionalScrollEnvelope(
     exitOpacity = CHOREO.envelope.exitOpacity,
     exitY = -38,
     exitScale = 0.945,
-    exitBlurPx = CHOREO.envelope.exitBlurPx,
+    exitBlurPx: _exitBlurPx = 0,
     disableExitFade = false,
     settleAtBottom = false,
   } = options;
+  void _exitBlurPx;
 
   const triggerEl = trigger ?? el;
-  // Guardrail: never apply CSS filter: blur onto any wrapper hosting a WebGL <canvas>
-  const allowExitBlur =
-    exitBlurPx > 0 && !el.querySelector("canvas") && el.offsetHeight <= 420;
 
   if (settleAtBottom) {
     return gsap.fromTo(
@@ -118,24 +116,22 @@ export function attachBidirectionalScrollEnvelope(
 
   tl.fromTo(
     el,
-    { opacity: enterOpacity, y: enterY, scale: enterScale, filter: "blur(0px)" },
+    { opacity: enterOpacity, y: enterY, scale: enterScale },
     {
       opacity: 1,
       y: 0,
       scale: 1,
-      filter: "blur(0px)",
       duration: enterDur,
       ease: EASE.gsapOut,
     },
     0
   ).fromTo(
     el,
-    { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", immediateRender: false },
+    { opacity: 1, y: 0, scale: 1, immediateRender: false },
     {
       opacity: exitOpacity,
       y: exitY,
       scale: exitScale,
-      ...(allowExitBlur ? { filter: `blur(${exitBlurPx}px)` } : {}),
       duration: exitDur,
       ease: "sine.inOut",
       immediateRender: false,
@@ -206,7 +202,6 @@ export function SectionReveal({
         }
 
         const isMobile = conditions.mobile;
-        const allowBlur = conditions.desktopFine && !el.querySelector("canvas");
 
         if (parallaxY !== 0 && conditions.desktopFine) {
           gsap.fromTo(
@@ -274,7 +269,7 @@ export function SectionReveal({
               exitOpacity: CHOREO.envelope.exitOpacity,
               exitY: -22,
               exitScale: 0.98,
-              exitBlurPx: allowBlur ? 3 : 0,
+              exitBlurPx: 0,
             });
           }
           return;
@@ -338,7 +333,7 @@ export function SectionReveal({
           exitOpacity: CHOREO.envelope.exitOpacity,
           exitY: isMobile ? -18 : isScrubDepth ? -38 : -28,
           exitScale: isScrubDepth ? 0.955 : 0.972,
-          exitBlurPx: allowBlur ? CHOREO.envelope.exitBlurPx : 0,
+          exitBlurPx: 0,
           disableExitFade: disableExitFade || isSettle,
           settleAtBottom: isSettle,
         });

@@ -137,11 +137,11 @@ export function resolveQualityReason(
 
 /**
  * Resolves the concurrent WebGL canvas slot cap per active rendering tier.
- * `high` allows 4 active slots so 3 sticky-stacked work cards + a preloading simulator coexist.
+ * `high` allows 6 active slots so Hero + 3 stacked work cards + Simulator + buffer coexist with zero churn.
  */
 export function resolveMaxWebGLSlots(tier: DeviceTier): number {
-  if (tier === "high") return 4;
-  if (tier === "mid") return 2;
+  if (tier === "high") return 6;
+  if (tier === "mid") return 3;
   return 0;
 }
 

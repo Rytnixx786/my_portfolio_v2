@@ -6,8 +6,17 @@ import {
   useId,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
+import {
+  focusWebGLSlotLoop,
+  getSlotStoreSnapshot,
+  releaseWebGLSlot,
+  requestWebGLSlot,
+  setWebGLSlotInView,
+  subscribeSlotStore,
+} from "@/components/canvas/WebGLContextProvider";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { shouldShowViewport2DFallback } from "@/lib/device-tier";
 import { MOTION } from "@/lib/motion";
@@ -51,12 +60,21 @@ export function ViewportCanvas({
     canRender3D,
     effectiveTier,
     isStaticPose,
-    maxSlots,
-    activeSlotIds,
-    requestSlot,
-    releaseSlot,
     setContextLost,
   } = useCanRender3D();
+
+  const subscribeSlot = useCallback(
+    (listener: () => void) => subscribeSlotStore(slotId, listener),
+    [slotId]
+  );
+  const slotMask = useSyncExternalStore(
+    subscribeSlot,
+    () => getSlotStoreSnapshot(slotId),
+    () => 0
+  );
+  const rawHasSlot = (slotMask & 2) !== 0;
+  const isPoolSaturated = !rawHasSlot && (slotMask & 1) !== 0;
+  const loopAllowed = (slotMask & 4) !== 0;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(eager);
@@ -73,20 +91,34 @@ export function ViewportCanvas({
 
     const rect = el.getBoundingClientRect();
     const vh = window.innerHeight || document.documentElement.clientHeight;
-    if (rect.bottom >= -360 && rect.top <= vh + 360) {
+    if (rect.bottom >= -240 && rect.top <= vh + 240) {
       setNearView(true);
     }
     if (rect.bottom >= 0 && rect.top <= vh) {
       setInView(true);
     }
 
-    const nearObserver = new IntersectionObserver(
+    // Asymmetric hysteresis: acquire within 240px of entry, retain until 900px outside viewport
+    const enterObserver = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          setNearView(entry.isIntersecting);
+          if (entry.isIntersecting) {
+            setNearView(true);
+          }
         }
       },
-      { rootMargin: "360px 0px" }
+      { rootMargin: "240px 0px" }
+    );
+
+    const exitObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) {
+            setNearView(false);
+          }
+        }
+      },
+      { rootMargin: "900px 0px" }
     );
 
     const activeObserver = new IntersectionObserver(
@@ -98,35 +130,40 @@ export function ViewportCanvas({
       { rootMargin: "0px" }
     );
 
-    nearObserver.observe(el);
+    enterObserver.observe(el);
+    exitObserver.observe(el);
     activeObserver.observe(el);
 
     return () => {
-      nearObserver.disconnect();
+      enterObserver.disconnect();
+      exitObserver.disconnect();
       activeObserver.disconnect();
     };
   }, []);
 
   useEffect(() => {
     if (!canRender3D) {
-      releaseSlot(slotId);
+      releaseWebGLSlot(slotId);
       return;
     }
-    if (nearView) {
-      requestSlot(slotId, eager || inView);
+    if (eager || nearView) {
+      requestWebGLSlot(slotId, eager || inView);
     } else {
-      releaseSlot(slotId);
+      releaseWebGLSlot(slotId);
     }
-  }, [canRender3D, nearView, inView, eager, slotId, requestSlot, releaseSlot]);
+  }, [canRender3D, nearView, inView, eager, slotId]);
+
+  useEffect(() => {
+    setWebGLSlotInView(slotId, canRender3D && inView);
+  }, [canRender3D, inView, slotId]);
 
   useEffect(() => {
     return () => {
-      releaseSlot(slotId);
+      releaseWebGLSlot(slotId);
     };
-  }, [slotId, releaseSlot]);
+  }, [slotId]);
 
-  const hasSlot = canRender3D && nearView && activeSlotIds.has(slotId);
-  const isPoolSaturated = maxSlots > 0 && activeSlotIds.size >= maxSlots;
+  const hasSlot = canRender3D && (eager || nearView) && rawHasSlot;
   const canvasReady = hasSlot && glReady && readyGate;
   const dpr: [number, number] =
     maxDpr ?? (effectiveTier === "high" ? [1, 1.5] : [1, 1.25]);
@@ -185,18 +222,18 @@ export function ViewportCanvas({
     setGlReady(true);
   }, []);
 
-  // Only suppress the 2D fallback when a dedicated loadingFallback is explicitly provided
-  // (e.g., HeroOrbitalCore3D avoiding duplicate portrait <img> fetches). All lightweight vector
-  // 2D schematics stay mounted in the underlay until WebGL paints its first frame so scrolling never
-  // reveals an empty #0D1117 void.
-  const shouldRender2DFallback = shouldShowViewport2DFallback({
-    hasMounted,
-    canRender3D,
-    hasLoadingFallback: Boolean(loadingFallback),
-    hasSlot,
-    isPoolSaturated,
-    slotWaitElapsed,
-  });
+  // Gate offscreen 2D fallbacks so off-screen SVG/SMIL/RAF layers stay unmounted until within 240px
+  const isNearOrActive = eager || nearView || inView;
+  const shouldRender2DFallback =
+    isNearOrActive &&
+    shouldShowViewport2DFallback({
+      hasMounted,
+      canRender3D,
+      hasLoadingFallback: Boolean(loadingFallback),
+      hasSlot,
+      isPoolSaturated,
+      slotWaitElapsed,
+    });
   const showUnderlay = !hasSlot || !fallbackDismissed;
   const crossfadeDuration = isStaticPose
     ? "0ms"
@@ -205,6 +242,8 @@ export function ViewportCanvas({
   return (
     <div
       ref={containerRef}
+      onPointerEnter={() => focusWebGLSlotLoop(slotId)}
+      onPointerDown={() => focusWebGLSlotLoop(slotId)}
       data-cursor={hasSlot && canRender3D && !isStaticPose ? "DRAG · ORBIT" : undefined}
       data-slot-state={
         hasSlot
@@ -250,7 +289,7 @@ export function ViewportCanvas({
             fov={fov}
             dpr={dpr}
             antialias={effectiveTier !== "low"}
-            activeLoop={!isStaticPose && inView}
+            activeLoop={!isStaticPose && inView && (loopAllowed || !glReady)}
             isStaticPose={isStaticPose}
             onCanvasReady={handleCanvasReady}
             onDecline={() => {

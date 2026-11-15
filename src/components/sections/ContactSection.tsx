@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef, type CSSProperties, type PointerEvent } from "react";
+import { useRef, type CSSProperties } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
@@ -14,7 +14,12 @@ import {
 } from "@phosphor-icons/react";
 import { profile } from "@/data/site";
 import { createAppMatchMedia, EASE, MOTION } from "@/lib/motion";
-import { useCopy } from "@/hooks/usePortfolioUtils";
+import {
+  handleSpotlightEnter,
+  handleSpotlightLeave,
+  handleSpotlightMove,
+  useCopy,
+} from "@/hooks/usePortfolioUtils";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
 import {
   KineticHeading,
@@ -171,7 +176,7 @@ export function ContactSection() {
     <section
       ref={sectionRef}
       id="contact"
-      className="overflow-x-clip bg-[#0D1117] pt-28 pb-16 sm:pt-36 sm:pb-20 lg:pt-40 lg:pb-24"
+      className="overflow-x-clip bg-[#0D1117] pt-24 pb-16 sm:pt-28 sm:pb-20 lg:pt-40 lg:pb-24"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <div className="grid grid-cols-1 items-center gap-10 border-b border-[rgba(240,246,252,0.08)] pb-12 lg:grid-cols-12">
@@ -181,11 +186,11 @@ export function ContactSection() {
               <span>{profile.status}</span>
             </div>
 
-            <h2 className="velocity-skew-heading mt-5 max-w-4xl font-display text-[clamp(2.7rem,6.5vw,5.4rem)] font-bold uppercase leading-[0.9] tracking-[-0.02em] text-[#E6EDF3]">
+            <h2 className="velocity-skew-heading mt-5 max-w-4xl font-display text-[clamp(2.7rem,6.5vw,5.4rem)] font-bold uppercase leading-[1.02] tracking-[-0.02em] text-[#E6EDF3] sm:leading-[0.94]">
               <KineticHeading as="span" reveal="mask-lines" className="block">
                 LET&apos;S BUILD SOMETHING
               </KineticHeading>
-              <OutlineFillText className="mt-1 block">DETERMINISTIC.</OutlineFillText>
+              <OutlineFillText className="mt-1.5 block sm:mt-1">DETERMINISTIC.</OutlineFillText>
             </h2>
 
             <ScrollScrubText className="mt-5 max-w-[46ch] font-sans text-base leading-relaxed text-[#9DA7B3] sm:text-lg">
@@ -266,12 +271,9 @@ export function ContactSection() {
 
           <div ref={globeWrapRef} className="lg:col-span-5">
             <div
-              onPointerMove={(e: PointerEvent<HTMLDivElement>) => {
-                if (e.pointerType === "touch") return;
-                const rect = e.currentTarget.getBoundingClientRect();
-                e.currentTarget.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
-                e.currentTarget.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
-              }}
+              onPointerEnter={handleSpotlightEnter}
+              onPointerMove={(e) => handleSpotlightMove(e, false)}
+              onPointerLeave={(e) => handleSpotlightLeave(e, false)}
               style={{ "--spotlight-color": "rgba(56, 189, 248, 0.12)" } as CSSProperties}
               className="double-bezel-outer spotlight-card"
             >

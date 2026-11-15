@@ -604,7 +604,8 @@ function HeroOrbital2DFallback({
     if (!stage) return;
 
     const finePointer =
-      window.matchMedia?.("(hover: hover) and (pointer: fine)").matches ?? false;
+      window.matchMedia?.("(hover: hover) and (any-pointer: fine)")?.matches ??
+      false;
 
     const tiltDeg = (-10 * Math.PI) / 180;
     const cosTilt = Math.cos(tiltDeg);
@@ -615,10 +616,24 @@ function HeroOrbital2DFallback({
     let rafId: number | null = null;
     let inView = true;
 
-    const positionBeacons = (baseAngle: number) => {
+    let stageWidth = stage.clientWidth || 440;
+    let stageHeight = stage.clientHeight || 360;
+    let stageRectLeft = 0;
+    let stageRectTop = 0;
+    let stageRectDirty = true;
+
+    const syncStageSize = () => {
       const rect = stage.getBoundingClientRect();
-      const w = rect.width || 440;
-      const h = rect.height || 360;
+      stageWidth = rect.width || stage.clientWidth || 440;
+      stageHeight = rect.height || stage.clientHeight || 360;
+      stageRectLeft = rect.left;
+      stageRectTop = rect.top;
+      stageRectDirty = false;
+    };
+
+    const positionBeacons = (baseAngle: number) => {
+      const w = stageWidth;
+      const h = stageHeight;
       const svgScale = Math.min(w / 440, h / 360);
       const cxOffset = 0;
       const cyOffset = 18 * svgScale;
@@ -653,7 +668,22 @@ function HeroOrbital2DFallback({
       }
     };
 
+    syncStageSize();
     positionBeacons(theta);
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver((entries) => {
+            const entry = entries[0];
+            if (entry) {
+              stageWidth = entry.contentRect.width || stageWidth;
+              stageHeight = entry.contentRect.height || stageHeight;
+              stageRectDirty = true;
+              positionBeacons(theta);
+            }
+          })
+        : null;
+    resizeObserver?.observe(stage);
 
     const tick = (now: number) => {
       const dt = Math.min((now - lastTs) / 1000, 0.05);
@@ -688,11 +718,21 @@ function HeroOrbital2DFallback({
     observer?.observe(stage);
     rafId = window.requestAnimationFrame(tick);
 
+    const onPointerEnter = () => {
+      syncStageSize();
+    };
+
+    const onScrollMarkDirty = () => {
+      stageRectDirty = true;
+    };
+
     const onPointerMove = (e: PointerEvent) => {
       if (!finePointer || e.pointerType === "touch" || !portraitRef.current) return;
-      const rect = stage.getBoundingClientRect();
-      const nx = ((e.clientX - rect.left) / Math.max(1, rect.width) - 0.5) * 2;
-      const ny = ((e.clientY - rect.top) / Math.max(1, rect.height) - 0.5) * 2;
+      if (stageRectDirty) {
+        syncStageSize();
+      }
+      const nx = ((e.clientX - stageRectLeft) / Math.max(1, stageWidth) - 0.5) * 2;
+      const ny = ((e.clientY - stageRectTop) / Math.max(1, stageHeight) - 0.5) * 2;
       portraitRef.current.style.transform = `perspective(900px) rotateY(${(nx * 5).toFixed(2)}deg) rotateX(${(-ny * 4).toFixed(2)}deg)`;
     };
 
@@ -701,14 +741,21 @@ function HeroOrbital2DFallback({
       portraitRef.current.style.transform = "perspective(900px) rotateY(0deg) rotateX(0deg)";
     };
 
+    stage.addEventListener("pointerenter", onPointerEnter, { passive: true });
     stage.addEventListener("pointermove", onPointerMove, { passive: true });
     stage.addEventListener("pointerleave", onPointerLeave, { passive: true });
+    window.addEventListener("scroll", onScrollMarkDirty, { passive: true });
+    window.addEventListener("resize", onScrollMarkDirty, { passive: true });
 
     return () => {
       if (rafId !== null) window.cancelAnimationFrame(rafId);
+      resizeObserver?.disconnect();
       observer?.disconnect();
+      stage.removeEventListener("pointerenter", onPointerEnter);
       stage.removeEventListener("pointermove", onPointerMove);
       stage.removeEventListener("pointerleave", onPointerLeave);
+      window.removeEventListener("scroll", onScrollMarkDirty);
+      window.removeEventListener("resize", onScrollMarkDirty);
     };
   }, []);
 
@@ -918,7 +965,7 @@ export function HeroOrbitalCore3D({
         if (e.button === 0 && canRender3D) setWheelEngaged(true);
       }}
       onPointerLeave={() => setWheelEngaged(false)}
-      className="relative h-[280px] w-full overflow-hidden rounded-2xl sm:h-[380px] lg:h-[420px]"
+      className="relative h-[280px] w-full overflow-hidden rounded-2xl sm:h-[360px] lg:h-[400px] xl:h-[420px]"
     >
       {(!canRender3D || stageReady) && (
         <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex max-w-[calc(100%-182px)] items-center gap-1.5 truncate rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/95 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] sm:max-w-none sm:gap-2 sm:px-3">

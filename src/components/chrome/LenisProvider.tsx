@@ -11,11 +11,27 @@ import {
   setPortfolioScrollState,
   shouldReduceAppMotion,
 } from "@/lib/motion";
+import { markWebGLScrollBurst } from "@/components/canvas/WebGLContextProvider";
 
 gsap.registerPlugin(ScrollTrigger);
 ScrollTrigger.config({ ignoreMobileResize: true });
 
 export const NAV_SCROLL_OFFSET = -84;
+
+const scrollRatioListeners = new Set<(ratio: number) => void>();
+
+export function subscribeScrollRatio(listener: (ratio: number) => void): () => void {
+  scrollRatioListeners.add(listener);
+  return () => {
+    scrollRatioListeners.delete(listener);
+  };
+}
+
+function notifyScrollRatio(ratio: number) {
+  for (const listener of scrollRatioListeners) {
+    listener(ratio);
+  }
+}
 
 export type PortfolioScrollTarget = string | HTMLElement | number;
 
@@ -89,42 +105,51 @@ export function LenisProvider({ children }: { children: ReactNode }) {
   const lenisRef = useRef<Lenis | null>(null);
   const reducedRef = useRef(false);
   const progressBarRef = useRef<HTMLDivElement | null>(null);
+  const maxScrollRef = useRef(1);
+  const lastPercentRef = useRef(-1);
 
   useEffect(() => {
     pathnameRef.current = pathname;
+    lastPercentRef.current = -1;
   }, [pathname]);
 
   useEffect(() => {
-    const updateProgress = (velocity = 0, direction: 1 | -1 | 0 = 0, explicitScrollY?: number) => {
-      const scrollY = explicitScrollY ?? window.scrollY;
-      const maxScroll = Math.max(
+    const refreshMaxScroll = () => {
+      maxScrollRef.current = Math.max(
         1,
         document.documentElement.scrollHeight - window.innerHeight
       );
-      const ratio = Math.min(1, Math.max(0, scrollY / maxScroll));
+    };
+
+    const updateProgress = (velocity = 0, direction: 1 | -1 | 0 = 0, explicitScrollY?: number) => {
+      if (Math.abs(velocity) > 0.35) {
+        markWebGLScrollBurst();
+      }
+      const scrollY = explicitScrollY ?? window.scrollY;
+      const ratio = Math.min(1, Math.max(0, scrollY / maxScrollRef.current));
       setPortfolioScrollState({
         scrollY,
         progress: ratio,
         velocity,
         direction,
       });
-      document.documentElement.style.setProperty(
-        "--scroll-velocity-abs",
-        Math.min(1, Math.abs(velocity) / 40).toFixed(3)
-      );
-      const signed = Math.max(-1, Math.min(1, velocity / 36));
-      document.documentElement.style.setProperty(
-        "--scroll-velocity-signed",
-        Math.abs(signed) < 0.01 ? "0" : signed.toFixed(3)
-      );
       const bar = progressBarRef.current;
       if (bar) {
         bar.style.transform = `scaleX(${ratio.toFixed(4)})`;
       }
-      window.dispatchEvent(
-        new CustomEvent("portfolio:scroll-progress", { detail: { ratio, velocity } })
-      );
+      notifyScrollRatio(ratio);
+      const pct = Math.round(ratio * 100);
+      if (pct !== lastPercentRef.current) {
+        lastPercentRef.current = pct;
+        window.dispatchEvent(
+          new CustomEvent("portfolio:scroll-progress", {
+            detail: { ratio, velocity, percent: pct },
+          })
+        );
+      }
     };
+
+    refreshMaxScroll();
 
     let lenis: Lenis | null = null;
     let tickFn: ((time: number) => void) | null = null;
@@ -151,8 +176,6 @@ export function LenisProvider({ children }: { children: ReactNode }) {
     const setupScrollDriver = (reduced: boolean) => {
       reducedRef.current = reduced;
       if (reduced) {
-        document.documentElement.style.setProperty("--scroll-velocity-abs", "0");
-        document.documentElement.style.setProperty("--scroll-velocity-signed", "0");
         teardownLenis();
         if (!nativeListening) {
           window.addEventListener("scroll", onNativeScroll, { passive: true });
@@ -170,8 +193,8 @@ export function LenisProvider({ children }: { children: ReactNode }) {
 
       lenis = new Lenis({
         autoRaf: false,
-        lerp: 0.072,
-        wheelMultiplier: 0.95,
+        lerp: 0.095,
+        wheelMultiplier: 1.0,
         touchMultiplier: 1.45,
         smoothWheel: true,
         syncTouch: false,
@@ -262,10 +285,16 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       }, 120);
     };
 
+    const onTriggerRefresh = () => {
+      refreshMaxScroll();
+    };
+    ScrollTrigger.addEventListener("refresh", onTriggerRefresh);
+
     const mainEl = document.getElementById("main-content");
     const resizeObserver =
       typeof ResizeObserver !== "undefined" && mainEl
         ? new ResizeObserver(() => {
+            refreshMaxScroll();
             scheduleRefresh();
           })
         : null;
@@ -275,6 +304,7 @@ export function LenisProvider({ children }: { children: ReactNode }) {
 
     let lastWidth = window.innerWidth;
     const onResize = () => {
+      refreshMaxScroll();
       if (window.innerWidth !== lastWidth) {
         lastWidth = window.innerWidth;
         lenisRef.current?.resize();
@@ -284,6 +314,7 @@ export function LenisProvider({ children }: { children: ReactNode }) {
     window.addEventListener("resize", onResize, { passive: true });
 
     const refreshId = window.requestAnimationFrame(() => {
+      refreshMaxScroll();
       lenisRef.current?.resize();
       ScrollTrigger.refresh();
       if (window.location.hash) {
@@ -296,6 +327,7 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       if (resizeTimer !== null) {
         window.clearTimeout(resizeTimer);
       }
+      ScrollTrigger.removeEventListener("refresh", onTriggerRefresh);
       resizeObserver?.disconnect();
       window.removeEventListener("portfolio:motion-mode", onMotionMode);
       window.removeEventListener("portfolio:scroll-lock", onScrollLock);

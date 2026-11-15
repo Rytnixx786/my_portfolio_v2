@@ -132,7 +132,7 @@ export function CommandPalette() {
       onClick={(e) => {
         if (e.target === dialogRef.current) closeModal();
       }}
-      className="palette-dialog m-auto w-[min(740px,94vw)] rounded-3xl border border-[rgba(240,246,252,0.14)] bg-[#161B22] p-0 text-[#E6EDF3] shadow-2xl"
+      className="palette-dialog m-auto max-h-[90dvh] w-[min(740px,94vw)] rounded-3xl border border-[rgba(240,246,252,0.14)] bg-[#161B22] p-0 text-[#E6EDF3] shadow-2xl"
     >
       <div className="flex flex-col overflow-hidden rounded-3xl">
         <div className="flex items-center justify-between gap-3 border-b border-[rgba(240,246,252,0.08)] bg-[#1C222B] px-4 py-3 sm:px-5 sm:py-3.5">

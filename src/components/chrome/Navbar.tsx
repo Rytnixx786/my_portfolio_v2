@@ -6,6 +6,7 @@ import { ArrowUpRight, FilePdf, TerminalWindow } from "@phosphor-icons/react";
 import { nav, profile } from "@/data/site";
 import { useBodyScrollLock } from "@/hooks/usePortfolioUtils";
 import { QualityToggleHUD } from "@/components/canvas/QualityToggleHUD";
+import { subscribeScrollRatio } from "@/components/chrome/LenisProvider";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
 
 const emptySubscribe = () => () => {};
@@ -104,6 +105,9 @@ export function Navbar() {
   }, []);
 
   useEffect(() => {
+    let lastPct = -1;
+    let lastRatioStr = "";
+
     const syncScrollTelemetry = (ratioValue?: number) => {
       const ratio =
         typeof ratioValue === "number"
@@ -116,16 +120,25 @@ export function Navbar() {
                   Math.max(1, document.documentElement.scrollHeight - window.innerHeight)
               )
             );
-      const pct = String(Math.round(ratio * 100)).padStart(2, "0");
-      if (scrollPctRef.current) {
-        scrollPctRef.current.textContent = `${pct}%`;
+      const nextRatioStr = ratio.toFixed(4);
+      if (nextRatioStr !== lastRatioStr && headerBarRef.current) {
+        lastRatioStr = nextRatioStr;
+        headerBarRef.current.style.transform = `scaleX(${nextRatioStr})`;
       }
-      if (headerBarRef.current) {
-        headerBarRef.current.style.transform = `scaleX(${ratio.toFixed(4)})`;
+      const nextPct = Math.round(ratio * 100);
+      if (nextPct !== lastPct) {
+        lastPct = nextPct;
+        if (scrollPctRef.current) {
+          scrollPctRef.current.textContent = `${String(nextPct).padStart(2, "0")}%`;
+        }
       }
     };
 
     syncScrollTelemetry();
+
+    const unsubRatio = subscribeScrollRatio((ratio) => {
+      syncScrollTelemetry(ratio);
+    });
 
     const onScrollProgress = (event: Event) => {
       const ratio = (event as CustomEvent<{ ratio?: number }>).detail?.ratio;
@@ -134,6 +147,7 @@ export function Navbar() {
 
     window.addEventListener("portfolio:scroll-progress", onScrollProgress);
     return () => {
+      unsubRatio();
       window.removeEventListener("portfolio:scroll-progress", onScrollProgress);
     };
   }, [pathname]);
@@ -201,10 +215,10 @@ export function Navbar() {
       >
         <nav
           aria-label="Primary navigation"
-          className={`mx-auto flex items-center justify-between gap-2 transition-[height,padding] duration-500 ease-[var(--ease-editorial)] ${
+          className={`mx-auto flex items-center justify-between gap-1.5 transition-[height,padding] duration-500 ease-[var(--ease-editorial)] ${
             isScrolled && !mobileOpen
-              ? "h-14 max-w-full px-4 sm:gap-2.5 sm:px-5 xl:px-6"
-              : "h-16 max-w-[1400px] px-4 sm:gap-3 sm:px-6 xl:gap-6 xl:px-8"
+              ? "h-14 max-w-full px-3 sm:gap-2.5 sm:px-5 xl:px-6"
+              : "h-16 max-w-[1400px] px-3 sm:gap-3 sm:px-6 xl:gap-6 xl:px-8"
           }`}
         >
           {/* Left: Clean Editorial Wordmark + Live Scroll Telemetry Pill */}

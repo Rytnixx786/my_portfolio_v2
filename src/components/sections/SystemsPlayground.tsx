@@ -1,15 +1,26 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { ArrowUpRight, Cpu, GitBranch, Lightning, Sliders } from "@phosphor-icons/react";
+import {
+  ArrowCounterClockwise,
+  ArrowUpRight,
+  Cpu,
+  GitBranch,
+  Lightning,
+  Pause,
+  Play,
+  SkipForward,
+  Sliders,
+} from "@phosphor-icons/react";
 import { useGSAP } from "@gsap/react";
 import type { PlaygroundCameraPreset } from "@/components/canvas/PlaygroundPipeline3D";
 import {
   CINCH_SCENARIOS,
   CINCH_STAGES,
+  computeTraceSpanTimeline,
   RAG_SCENARIOS,
   RAG_STAGES,
   type SimulatorTab,
@@ -19,7 +30,12 @@ import { TransitionLink } from "@/components/chrome/TransitionLink";
 import { KineticHeading, ScrambleMetric } from "@/components/motion/KineticText";
 import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
 import { useSlidingIndicator } from "@/components/motion/useSlidingIndicator";
-import { useCanRender3D } from "@/hooks/usePortfolioUtils";
+import {
+  handleSpotlightEnter,
+  handleSpotlightLeave,
+  handleSpotlightMove,
+  useCanRender3D,
+} from "@/hooks/usePortfolioUtils";
 import { PlaygroundPipeline2D } from "./PlaygroundPipeline2D";
 import { attachBidirectionalScrollEnvelope, SectionReveal } from "./SectionReveal";
 
@@ -57,6 +73,8 @@ export function SystemsPlayground() {
   const [semanticCacheEnabled, setSemanticCacheEnabled] = useState<boolean>(true);
   const [focusedStageId, setFocusedStageId] = useState<string | null>(null);
   const [lastStageId, setLastStageId] = useState<string | null>(null);
+  const [replayPlaying, setReplayPlaying] = useState(false);
+  const [replayStepIdx, setReplayStepIdx] = useState<number>(-1);
   const didToggleInspectorRef = useRef(false);
   const sectionRef = useRef<HTMLElement>(null);
   const simPinStageRef = useRef<HTMLDivElement>(null);
@@ -160,15 +178,14 @@ export function SystemsPlayground() {
             }
           );
 
+          // Smooth unpinned boot choreography: keeps all interactive workbench panels
+          // (3D pipeline, Trace Replay waterfall, Telemetry JSON) reachable without viewport clipping on 768px-900px displays.
           const bootTl = gsap.timeline({
             scrollTrigger: {
               trigger: pinStage,
-              start: "top 96px",
-              end: "+=55%",
-              pin: true,
-              pinSpacing: true,
-              anticipatePin: 1,
-              scrub: 0.45,
+              start: "top 82%",
+              end: "top 28%",
+              scrub: MOTION.scrollTrigger.scrub,
               invalidateOnRefresh: true,
               onLeave: () => {
                 gsap.set(simShell, { clearProps: "clipPath,transform,opacity" });
@@ -252,6 +269,7 @@ export function SystemsPlayground() {
   }, [focusedStageId, tab]);
 
   const toggleStageFocus = (stageId: string) => {
+    setReplayPlaying(false);
     setFocusedStageId((prev) => {
       const next = prev === stageId ? null : stageId;
       if (next !== null) setLastStageId(next);
@@ -265,10 +283,119 @@ export function SystemsPlayground() {
     return true;
   });
 
+  const effectiveSpans = useMemo(() => {
+    return activeScenario.traceSpans.map((span) => {
+      const piiBypassed = tab === "cinch" && !piiGuardEnabled && span.stageId === "pii";
+      const cacheBypassed =
+        tab === "cinch" && !semanticCacheEnabled && span.stageId === "cache";
+      if (piiBypassed) {
+        return {
+          ...span,
+          durationMs: 0,
+          status: "SKIP" as const,
+          metricDelta: "Bypassed",
+          logLine: "PII Guard disabled in simulator; payload passes unredacted",
+        };
+      }
+      if (cacheBypassed) {
+        return {
+          ...span,
+          durationMs: 0,
+          status: "SKIP" as const,
+          metricDelta: "Bypassed",
+          logLine: "ONNX Cache disabled in simulator; bypassing vector lookup",
+        };
+      }
+      return span;
+    });
+  }, [activeScenario.traceSpans, piiGuardEnabled, semanticCacheEnabled, tab]);
+
+  const { recordedTotalMs, spanTimeline } = useMemo(
+    () => computeTraceSpanTimeline(effectiveSpans),
+    [effectiveSpans]
+  );
+
+  const activeStepSpan =
+    replayStepIdx >= 0 && replayStepIdx < spanTimeline.length
+      ? spanTimeline[replayStepIdx]
+      : null;
+
+  useEffect(() => {
+    if (!replayPlaying || spanTimeline.length === 0) return;
+    const stepMs = appReduced ? 550 : 950;
+    const timer = window.setTimeout(() => {
+      const nextIdx = replayStepIdx + 1;
+      if (nextIdx >= spanTimeline.length) {
+        setReplayPlaying(false);
+        return;
+      }
+      const nextSpan = spanTimeline[nextIdx];
+      setReplayStepIdx(nextIdx);
+      if (nextSpan) {
+        setFocusedStageId(nextSpan.stageId);
+        setLastStageId(nextSpan.stageId);
+      }
+    }, stepMs);
+    return () => window.clearTimeout(timer);
+  }, [replayPlaying, replayStepIdx, spanTimeline, appReduced]);
+
+  const selectTab = (nextTab: SimulatorTab) => {
+    setReplayPlaying(false);
+    setReplayStepIdx(-1);
+    setFocusedStageId(null);
+    setTab(nextTab);
+  };
+
+  const selectScenario = (id: string) => {
+    setReplayPlaying(false);
+    setReplayStepIdx(-1);
+    setFocusedStageId(null);
+    if (tab === "cinch") {
+      setCinchId(id);
+    } else {
+      setRagId(id);
+    }
+  };
+
+  const handleToggleReplay = () => {
+    if (spanTimeline.length === 0) return;
+    if (replayPlaying) {
+      setReplayPlaying(false);
+      return;
+    }
+    const startIdx =
+      replayStepIdx >= 0 && replayStepIdx < spanTimeline.length - 1 ? replayStepIdx : 0;
+    const startSpan = spanTimeline[startIdx];
+    setReplayStepIdx(startIdx);
+    if (startSpan) {
+      setFocusedStageId(startSpan.stageId);
+      setLastStageId(startSpan.stageId);
+    }
+    setReplayPlaying(true);
+  };
+
+  const handleLiveStep = () => {
+    if (spanTimeline.length === 0) return;
+    setReplayPlaying(false);
+    const nextIdx = (replayStepIdx + 1) % spanTimeline.length;
+    const nextSpan = spanTimeline[nextIdx];
+    setReplayStepIdx(nextIdx);
+    if (nextSpan) {
+      setFocusedStageId(nextSpan.stageId);
+      setLastStageId(nextSpan.stageId);
+    }
+  };
+
+  const handleResetReplay = () => {
+    setReplayPlaying(false);
+    setReplayStepIdx(-1);
+    setFocusedStageId(null);
+  };
+
   const handleTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
       e.preventDefault();
-      setTab((prev) => (prev === "cinch" ? "rag" : "cinch"));
+      selectTab(tab === "cinch" ? "rag" : "cinch");
     }
   };
 
@@ -276,7 +403,7 @@ export function SystemsPlayground() {
     <section
       ref={sectionRef}
       id="simulator"
-      className="relative z-[2] overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-28 sm:py-36 lg:py-40"
+      className="relative z-[2] overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-24 sm:py-28 lg:py-40"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
@@ -329,7 +456,7 @@ export function SystemsPlayground() {
                 id="tab-cinch"
                 aria-selected={tab === "cinch"}
                 aria-controls="panel-simulator"
-                onClick={() => setTab("cinch")}
+                onClick={() => selectTab("cinch")}
                 className={`relative z-10 inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] transition-colors ${
                   tab === "cinch"
                     ? tabPillReady
@@ -348,7 +475,7 @@ export function SystemsPlayground() {
                 id="tab-rag"
                 aria-selected={tab === "rag"}
                 aria-controls="panel-simulator"
-                onClick={() => setTab("rag")}
+                onClick={() => selectTab("rag")}
                 className={`relative z-10 inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] transition-colors ${
                   tab === "rag"
                     ? tabPillReady
@@ -382,12 +509,9 @@ export function SystemsPlayground() {
                 }
               }
             }}
-            onPointerMove={(e: PointerEvent<HTMLDivElement>) => {
-              if (e.pointerType === "touch") return;
-              const rect = e.currentTarget.getBoundingClientRect();
-              e.currentTarget.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
-              e.currentTarget.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
-            }}
+            onPointerEnter={handleSpotlightEnter}
+            onPointerMove={(e) => handleSpotlightMove(e, false)}
+            onPointerLeave={(e) => handleSpotlightLeave(e, false)}
             style={{ "--spotlight-color": "rgba(56, 189, 248, 0.1)" } as CSSProperties}
             className="double-bezel-outer spotlight-card"
           >
@@ -423,9 +547,7 @@ export function SystemsPlayground() {
                         key={scenario.id}
                         ref={registerScenarioItem(scenario.id)}
                         type="button"
-                        onClick={() =>
-                          tab === "cinch" ? setCinchId(scenario.id) : setRagId(scenario.id)
-                        }
+                        onClick={() => selectScenario(scenario.id)}
                         className={`relative z-10 inline-flex min-h-[44px] items-center gap-2 rounded-full border px-3.5 py-2 font-mono text-xs transition-colors ${
                           selected
                             ? scenarioPillReady
@@ -591,6 +713,167 @@ export function SystemsPlayground() {
                 })}
               </ol>
 
+              {/* Recorded Live-Trace Replay Player & Waterfall Spans */}
+              <div
+                data-trace-replay-panel
+                className="rounded-2xl border border-[rgba(240,246,252,0.09)] bg-[#0D1117]/95 p-4 sm:p-5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[rgba(240,246,252,0.08)] pb-3.5">
+                  <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+                    <span className="inline-flex items-center gap-1.5 font-semibold uppercase tracking-[0.12em] text-[#E6EDF3]">
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          replayPlaying ? "animate-pulse bg-[#38BDF8]" : "bg-[#10B981]"
+                        }`}
+                        aria-hidden="true"
+                      />
+                      <span>Recorded Trace</span>
+                    </span>
+                    <span className="rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-2.5 py-0.5 text-[#7DD3FC] tabular-nums">
+                      {recordedTotalMs.toFixed(2)} ms
+                    </span>
+                    {activeStepSpan && (
+                      <span className="rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22] px-2.5 py-0.5 text-[#9DA7B3] tabular-nums">
+                        Step {replayStepIdx + 1}/{spanTimeline.length}
+                      </span>
+                    )}
+                    <span className="hidden text-[#8B949E] tabular-nums xl:inline">
+                      {spanTimeline
+                        .map((s) => `${s.durationMs.toFixed(2)}ms`)
+                        .join(" -> ")}{" "}
+                      = {recordedTotalMs.toFixed(2)}ms
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleToggleReplay}
+                      aria-pressed={replayPlaying}
+                      className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-4 py-2 font-mono text-xs font-semibold uppercase tracking-[0.1em] transition-colors ${
+                        replayPlaying
+                          ? "border-[#38BDF8] bg-[#38BDF8] text-[#0D1117]"
+                          : "border-[#38BDF8]/50 bg-[#38BDF8]/12 text-[#7DD3FC] hover:bg-[#38BDF8] hover:text-[#0D1117]"
+                      }`}
+                    >
+                      {replayPlaying ? (
+                        <Pause className="h-3.5 w-3.5" weight="fill" aria-hidden="true" />
+                      ) : (
+                        <Play className="h-3.5 w-3.5" weight="fill" aria-hidden="true" />
+                      )}
+                      <span>{replayPlaying ? "Pause Replay" : "Replay Trace"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleLiveStep}
+                      className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22] px-3.5 py-2 font-mono text-xs uppercase tracking-[0.1em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#7DD3FC]"
+                    >
+                      <SkipForward className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
+                      <span>Live Step</span>
+                    </button>
+
+                    {replayStepIdx >= 0 && (
+                      <button
+                        type="button"
+                        onClick={handleResetReplay}
+                        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#0D1117] px-3 py-2 font-mono text-xs uppercase tracking-[0.1em] text-[#9DA7B3] transition-colors hover:border-[rgba(240,246,252,0.28)] hover:text-[#E6EDF3]"
+                      >
+                        <ArrowCounterClockwise
+                          className="h-3.5 w-3.5"
+                          weight="regular"
+                          aria-hidden="true"
+                        />
+                        <span>Reset</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {spanTimeline.map((span, idx) => {
+                    const stageMeta = stages.find((s) => s.id === span.stageId);
+                    const isCurrent = replayStepIdx === idx || focusedStageId === span.stageId;
+                    const barColor =
+                      span.status === "SKIP"
+                        ? "#6E7681"
+                        : span.status === "TRIP" || span.status === "DENY"
+                          ? "#EF4444"
+                          : span.status === "PAUSE"
+                            ? "#F59E0B"
+                            : activeScenario.statusColor;
+
+                    return (
+                      <button
+                        key={span.stageId}
+                        type="button"
+                        data-trace-span={span.stageId}
+                        aria-pressed={isCurrent}
+                        onClick={() => {
+                          setReplayPlaying(false);
+                          setReplayStepIdx(idx);
+                          setFocusedStageId(span.stageId);
+                          setLastStageId(span.stageId);
+                        }}
+                        className={`grid w-full grid-cols-1 gap-2 rounded-xl border px-3 py-2.5 text-left font-mono text-xs transition-colors sm:grid-cols-[130px_56px_1fr_auto] sm:items-center sm:gap-3 ${
+                          isCurrent
+                            ? "border-[#38BDF8]/65 bg-[#38BDF8]/[0.09] text-[#F0F6FC]"
+                            : "border-[rgba(240,246,252,0.06)] bg-[#161B22]/65 text-[#9DA7B3] hover:border-[rgba(240,246,252,0.18)] hover:text-[#E6EDF3]"
+                        }`}
+                      >
+                        <span className="truncate font-semibold text-[#E6EDF3]">
+                          {stageMeta?.label ?? span.stageId}
+                        </span>
+
+                        <span
+                          className="inline-flex w-fit items-center justify-center rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wider"
+                          style={{
+                            color: barColor,
+                            backgroundColor: `${barColor}1E`,
+                          }}
+                        >
+                          {span.status}
+                        </span>
+
+                        <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-[#0D1117]">
+                          <div
+                            className={`absolute top-0 bottom-0 rounded-full ${
+                              appReduced ? "" : "transition-[left,width,opacity] duration-300"
+                            }`}
+                            style={{
+                              left: `${span.offsetPct.toFixed(2)}%`,
+                              width: `${span.widthPct.toFixed(2)}%`,
+                              backgroundColor: barColor,
+                              opacity:
+                                replayStepIdx === -1 || replayStepIdx >= idx ? 0.92 : 0.28,
+                            }}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 tabular-nums sm:justify-end">
+                          <span className="text-[#8B949E]">{span.metricDelta}</span>
+                          <span className="min-w-[6ch] text-right font-semibold text-[#7DD3FC]">
+                            {span.durationMs.toFixed(2)}ms
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div
+                  aria-live="polite"
+                  className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-[rgba(240,246,252,0.06)] bg-[#161B22]/90 px-3 py-2 font-mono text-xs text-[#9DA7B3]"
+                >
+                  <span className="font-semibold text-[#38BDF8]">TRACE LOG:</span>
+                  <span className="text-[#E6EDF3]">
+                    {activeStepSpan
+                      ? `[${activeStepSpan.stageId}] ${activeStepSpan.logLine}`
+                      : `Click Replay Trace or Live Step to step through ${activeScenario.label} (${recordedTotalMs.toFixed(2)} ms across ${spanTimeline.length} spans).`}
+                  </span>
+                </div>
+              </div>
+
               {/* Focused Stage Inspector (live feedback on stage selection) */}
               {(() => {
                 const activeInspectorStage = stages.find(
@@ -690,6 +973,20 @@ export function SystemsPlayground() {
                     {JSON.stringify(
                       {
                         ...activeScenario.payload,
+                        recorded_total_ms: Number(recordedTotalMs.toFixed(2)),
+                        replay_state: replayPlaying
+                          ? "PLAYING"
+                          : activeStepSpan
+                            ? "STEPPED"
+                            : "IDLE",
+                        active_trace_span: activeStepSpan
+                          ? {
+                              stage: activeStepSpan.stageId,
+                              status: activeStepSpan.status,
+                              duration_ms: activeStepSpan.durationMs,
+                              metric_delta: activeStepSpan.metricDelta,
+                            }
+                          : null,
                         stream_rate_multiplier: Number(rpsMultiplier.toFixed(1)),
                         pii_guard: piiGuardEnabled,
                         semantic_cache: semanticCacheEnabled,

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
+import { useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
@@ -9,6 +9,11 @@ import { Cpu, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
 import { stack } from "@/data/site";
 import { createAppMatchMedia, EASE } from "@/lib/motion";
 import { STACK_LAYER_HUES } from "@/lib/palette";
+import {
+  handleSpotlightEnter,
+  handleSpotlightLeave,
+  handleSpotlightMove,
+} from "@/hooks/usePortfolioUtils";
 import { KineticHeading, ScrambleMetric } from "@/components/motion/KineticText";
 import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
 import { useSlidingIndicator } from "@/components/motion/useSlidingIndicator";
@@ -250,7 +255,7 @@ export function ExpertiseSection() {
     <section
       ref={sectionRef}
       id="expertise"
-      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-28 sm:py-36 lg:py-40"
+      className="overflow-x-clip border-b border-[rgba(240,246,252,0.08)] bg-[#161B22]/35 py-24 sm:py-28 lg:py-40"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
@@ -373,12 +378,9 @@ export function ExpertiseSection() {
                 id={`stack-panel-${activeLayer.code}`}
                 role="tabpanel"
                 aria-labelledby={`stack-tab-${activeLayer.code}`}
-                onPointerMove={(e: PointerEvent<HTMLDivElement>) => {
-                  if (e.pointerType === "touch") return;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  e.currentTarget.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
-                  e.currentTarget.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
-                }}
+                onPointerEnter={handleSpotlightEnter}
+                onPointerMove={(e) => handleSpotlightMove(e, false)}
+                onPointerLeave={(e) => handleSpotlightLeave(e, false)}
                 style={{ "--spotlight-color": `${layerHue}1E` } as CSSProperties}
                 className="double-bezel-outer spotlight-card"
               >

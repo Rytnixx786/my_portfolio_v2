@@ -1,8 +1,109 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useWebGLContext } from "@/components/canvas/WebGLContextProvider";
 import type { DeviceTier } from "@/lib/device-tier";
+
+let spotlightEpoch = 0;
+let spotlightListenersBound = false;
+const cachedRectMap = new WeakMap<HTMLElement, { rect: DOMRect; epoch: number }>();
+const pendingSpotlightMap = new WeakMap<
+  HTMLElement,
+  {
+    rafId: number | null;
+    clientX: number;
+    clientY: number;
+    parallax: boolean;
+  }
+>();
+
+function ensureSpotlightEpochListeners() {
+  if (spotlightListenersBound || typeof window === "undefined") return;
+  spotlightListenersBound = true;
+  const bump = () => {
+    spotlightEpoch += 1;
+  };
+  window.addEventListener("scroll", bump, { passive: true });
+  window.addEventListener("resize", bump, { passive: true });
+}
+
+export function primeElementRect(el: HTMLElement): DOMRect {
+  ensureSpotlightEpochListeners();
+  const rect = el.getBoundingClientRect();
+  cachedRectMap.set(el, { rect, epoch: spotlightEpoch });
+  return rect;
+}
+
+export function getCachedElementRect(el: HTMLElement): DOMRect {
+  ensureSpotlightEpochListeners();
+  const cached = cachedRectMap.get(el);
+  if (cached && cached.epoch === spotlightEpoch) {
+    return cached.rect;
+  }
+  return primeElementRect(el);
+}
+
+export function handleSpotlightEnter(event: ReactPointerEvent<HTMLElement>) {
+  if (event.pointerType === "touch") return;
+  primeElementRect(event.currentTarget);
+}
+
+export function handleSpotlightMove(
+  event: ReactPointerEvent<HTMLElement>,
+  parallax = false
+) {
+  if (event.pointerType === "touch") return;
+  const el = event.currentTarget;
+  let pending = pendingSpotlightMap.get(el);
+  if (!pending) {
+    pending = {
+      rafId: null,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      parallax,
+    };
+    pendingSpotlightMap.set(el, pending);
+  } else {
+    pending.clientX = event.clientX;
+    pending.clientY = event.clientY;
+    pending.parallax = parallax;
+  }
+
+  if (pending.rafId !== null) return;
+  pending.rafId = window.requestAnimationFrame(() => {
+    const state = pendingSpotlightMap.get(el);
+    if (!state) return;
+    state.rafId = null;
+    const rect = getCachedElementRect(el);
+    const relX = state.clientX - rect.left;
+    const relY = state.clientY - rect.top;
+    el.style.setProperty("--mouse-x", `${relX.toFixed(1)}px`);
+    el.style.setProperty("--mouse-y", `${relY.toFixed(1)}px`);
+
+    if (state.parallax && rect.width > 0 && rect.height > 0) {
+      const nx = relX / rect.width - 0.5;
+      const ny = relY / rect.height - 0.5;
+      el.style.setProperty("--plate-px", `${(nx * 8).toFixed(2)}px`);
+      el.style.setProperty("--plate-py", `${(ny * 8).toFixed(2)}px`);
+    }
+  });
+}
+
+export function handleSpotlightLeave(
+  event: ReactPointerEvent<HTMLElement>,
+  resetParallax = false
+) {
+  const el = event.currentTarget;
+  const pending = pendingSpotlightMap.get(el);
+  if (pending && pending.rafId !== null) {
+    window.cancelAnimationFrame(pending.rafId);
+    pending.rafId = null;
+  }
+  if (resetParallax) {
+    el.style.setProperty("--plate-px", "0px");
+    el.style.setProperty("--plate-py", "0px");
+  }
+}
 
 /**
  * Shared clipboard copy hook with auto-reset feedback.
