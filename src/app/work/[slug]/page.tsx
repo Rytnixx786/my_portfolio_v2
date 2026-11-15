@@ -234,10 +234,11 @@ export default async function CaseStudyPage({
                 href={project.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group inline-flex min-h-[44px] items-center gap-3 rounded-full bg-[#38BDF8] py-2 pl-5 pr-2 text-sm font-semibold text-[#0D1117] transition-all duration-300 hover:bg-[#7DD3FC]"
+                data-cursor="OPEN ↗"
+                className="group inline-flex min-h-[44px] items-center gap-3 rounded-full bg-[#38BDF8] py-2 pl-5 pr-2 text-sm font-semibold text-[#0D1117] transition-[background-color,color,transform] duration-500 ease-[var(--ease-editorial)] hover:bg-[#7DD3FC] active:scale-[0.98]"
               >
                 <span>Source repository</span>
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15 transition-transform duration-500 ease-[var(--ease-editorial)] group-hover:translate-x-[3px] group-hover:-translate-y-[2px] group-hover:scale-105">
                   <ArrowUpRight className="h-4 w-4" weight="regular" aria-hidden="true" />
                 </span>
               </a>

@@ -13,7 +13,12 @@ import {
   Terminal,
 } from "@phosphor-icons/react";
 import { experience, lab, principles, profile } from "@/data/site";
-import { KineticHeading, ScrollScrubText } from "@/components/motion/KineticText";
+import { CHOREO, createAppMatchMedia, EASE, MOTION } from "@/lib/motion";
+import {
+  KineticHeading,
+  ScrambleMetric,
+  ScrollScrubText,
+} from "@/components/motion/KineticText";
 import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
 import { attachBidirectionalScrollEnvelope, SectionReveal } from "./SectionReveal";
 
@@ -88,7 +93,7 @@ export function AboutSection() {
           strokeDashoffset: 0,
         });
         applySpineProgress(1);
-        gsap.set(milestones, { clearProps: "transform,opacity" });
+        gsap.set(milestones, { clearProps: "transform,opacity,clipPath,filter" });
         if (stickyInner) gsap.set(stickyInner, { clearProps: "transform,opacity" });
         return;
       }
@@ -113,36 +118,69 @@ export function AboutSection() {
         },
       });
 
-      milestones.forEach((card) => {
-        attachBidirectionalScrollEnvelope(card, {
-          enterOpacity: 0.08,
-          enterY: 42,
-          enterScale: 0.94,
-          exitOpacity: 0.06,
-          exitY: -40,
-          exitScale: 0.94,
+      const mm = createAppMatchMedia().register(({ conditions }) => {
+        if (conditions.appReduced) {
+          gsap.set(milestones, { clearProps: "transform,opacity,clipPath,filter" });
+          if (stickyInner) gsap.set(stickyInner, { clearProps: "transform,opacity" });
+          return;
+        }
+
+        milestones.forEach((card) => {
+          gsap.fromTo(
+            card,
+            {
+              clipPath: conditions.desktopFine
+                ? "inset(0 100% 0 0 round 1rem)"
+                : "inset(0 16% 0 0 round 1rem)",
+              opacity: 0.25,
+            },
+            {
+              clipPath: "inset(0 0% 0 0 round 1rem)",
+              opacity: 1,
+              ease: EASE.gsapOut,
+              scrollTrigger: {
+                trigger: card,
+                start: "top 90%",
+                end: "top 62%",
+                scrub: MOTION.scrollTrigger.scrub,
+                invalidateOnRefresh: true,
+              },
+            }
+          );
+
+          attachBidirectionalScrollEnvelope(card, {
+            enterOpacity: 1,
+            enterY: 0,
+            enterScale: 1,
+            exitOpacity: CHOREO.envelope.exitOpacity,
+            exitY: -32,
+            exitScale: 0.96,
+            exitBlurPx: 0,
+          });
         });
+
+        if (stickyInner && conditions.desktopFine) {
+          gsap.fromTo(
+            stickyInner,
+            { opacity: 1, scale: 1, y: 0 },
+            {
+              opacity: 0.34,
+              scale: 0.96,
+              y: -22,
+              ease: "power2.in",
+              scrollTrigger: {
+                trigger: el,
+                start: "bottom 42%",
+                end: "bottom 8%",
+                scrub: 0.5,
+                invalidateOnRefresh: true,
+              },
+            }
+          );
+        }
       });
 
-      if (stickyInner) {
-        gsap.fromTo(
-          stickyInner,
-          { opacity: 1, scale: 1, y: 0 },
-          {
-            opacity: 0.12,
-            scale: 0.95,
-            y: -28,
-            ease: "power2.in",
-            scrollTrigger: {
-              trigger: el,
-              start: "bottom 54%",
-              end: "bottom 6%",
-              scrub: 0.6,
-              invalidateOnRefresh: true,
-            },
-          }
-        );
-      }
+      return () => mm.revert();
     },
     { scope: sectionRef, dependencies: [appReduced] }
   );
@@ -162,12 +200,15 @@ export function AboutSection() {
             <div className="lg:sticky lg:top-24">
               <div data-about-sticky-inner>
               <p className="font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#38BDF8]">
-                03 / Background &amp; Track
+                <ScrambleMetric value="03" />{" "}
+                <span className="text-[#8B949E]">/</span>{" "}
+                <span>Background &amp; Track</span>
               </p>
 
               <KineticHeading
                 as="h2"
-                className="mt-4 font-display text-[clamp(2.35rem,4.6vw,3.9rem)] font-bold uppercase leading-[0.94] tracking-[-0.02em] text-[#E6EDF3]"
+                reveal="mask-lines"
+                className="velocity-skew-heading mt-4 font-display text-[clamp(2.35rem,4.6vw,3.9rem)] font-bold uppercase leading-[0.94] tracking-[-0.02em] text-[#E6EDF3]"
               >
                 SYSTEMS BUILT ON{" "}
                 <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
@@ -309,7 +350,7 @@ export function AboutSection() {
                     >
                       <span
                         aria-hidden="true"
-                        className={`absolute -left-[31px] top-7 h-3 w-3 rounded-full border-2 border-[#38BDF8] transition-all duration-300 sm:-left-[39px] ${
+                        className={`absolute -left-[31px] top-7 h-3 w-3 rounded-full border-2 border-[#38BDF8] transition-[background-color,box-shadow,transform] duration-300 ease-[var(--ease-editorial)] sm:-left-[39px] ${
                           isMilestoneActive
                             ? "bg-[#38BDF8]/30 shadow-[0_0_0_4px_rgba(56,189,248,0.16)]"
                             : "bg-[#0D1117]"
@@ -320,8 +361,8 @@ export function AboutSection() {
                       <span className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-[#38BDF8]">
                         {item.org}
                       </span>
-                      <span className="rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117] px-3 py-1 font-mono text-xs text-[#8B949E]">
-                        {item.period}
+                      <span className="rounded-full border border-[rgba(240,246,252,0.1)] bg-[#0D1117] px-3 py-1 font-mono text-xs text-[#8B949E] tabular-nums">
+                        <ScrambleMetric value={item.period} />
                       </span>
                     </div>
 

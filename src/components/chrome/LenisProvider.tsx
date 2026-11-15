@@ -112,6 +112,11 @@ export function LenisProvider({ children }: { children: ReactNode }) {
         "--scroll-velocity-abs",
         Math.min(1, Math.abs(velocity) / 40).toFixed(3)
       );
+      const signed = Math.max(-1, Math.min(1, velocity / 36));
+      document.documentElement.style.setProperty(
+        "--scroll-velocity-signed",
+        Math.abs(signed) < 0.01 ? "0" : signed.toFixed(3)
+      );
       const bar = progressBarRef.current;
       if (bar) {
         bar.style.transform = `scaleX(${ratio.toFixed(4)})`;
@@ -146,6 +151,8 @@ export function LenisProvider({ children }: { children: ReactNode }) {
     const setupScrollDriver = (reduced: boolean) => {
       reducedRef.current = reduced;
       if (reduced) {
+        document.documentElement.style.setProperty("--scroll-velocity-abs", "0");
+        document.documentElement.style.setProperty("--scroll-velocity-signed", "0");
         teardownLenis();
         if (!nativeListening) {
           window.addEventListener("scroll", onNativeScroll, { passive: true });

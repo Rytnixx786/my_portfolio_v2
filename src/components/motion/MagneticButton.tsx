@@ -20,8 +20,8 @@ export function MagneticButton({
 }: MagneticButtonProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
-  const targetRef = useRef({ x: 0, y: 0 });
-  const currentRef = useRef({ x: 0, y: 0 });
+  const targetRef = useRef({ x: 0, y: 0, scale: 1 });
+  const currentRef = useRef({ x: 0, y: 0, scale: 1 });
   const enabledRef = useRef(false);
 
   useEffect(() => {
@@ -58,16 +58,19 @@ export function MagneticButton({
       const tgt = targetRef.current;
       cur.x += (tgt.x - cur.x) * 0.16;
       cur.y += (tgt.y - cur.y) * 0.16;
+      cur.scale += (tgt.scale - cur.scale) * 0.28;
 
-      el.style.transform = `translate3d(${cur.x.toFixed(2)}px, ${cur.y.toFixed(2)}px, 0)`;
+      el.style.transform = `translate3d(${cur.x.toFixed(2)}px, ${cur.y.toFixed(2)}px, 0) scale(${cur.scale.toFixed(4)})`;
 
       if (
         Math.abs(tgt.x - cur.x) < 0.08 &&
         Math.abs(tgt.y - cur.y) < 0.08 &&
+        Math.abs(tgt.scale - cur.scale) < 0.002 &&
         tgt.x === 0 &&
-        tgt.y === 0
+        tgt.y === 0 &&
+        tgt.scale === 1
       ) {
-        el.style.transform = "translate3d(0px, 0px, 0)";
+        el.style.transform = "translate3d(0px, 0px, 0) scale(1)";
         el.style.willChange = "auto";
         rafRef.current = null;
         return;
@@ -91,6 +94,7 @@ export function MagneticButton({
       const dy = e.clientY - (rect.top + rect.height * 0.5);
 
       targetRef.current = {
+        ...targetRef.current,
         x: Math.max(-14, Math.min(14, dx * strength)),
         y: Math.max(-10, Math.min(10, dy * strength)),
       };
@@ -100,8 +104,20 @@ export function MagneticButton({
     [strength, scheduleTick]
   );
 
+  const handlePointerDown = useCallback(() => {
+    if (!enabledRef.current) return;
+    targetRef.current.scale = 0.97;
+    scheduleTick();
+  }, [scheduleTick]);
+
+  const handlePointerUp = useCallback(() => {
+    if (!enabledRef.current) return;
+    targetRef.current.scale = 1;
+    scheduleTick();
+  }, [scheduleTick]);
+
   const handlePointerLeave = useCallback(() => {
-    targetRef.current = { x: 0, y: 0 };
+    targetRef.current = { x: 0, y: 0, scale: 1 };
     if (enabledRef.current) {
       scheduleTick();
     }
@@ -111,6 +127,9 @@ export function MagneticButton({
     <div
       ref={wrapRef}
       onPointerMove={handlePointerMove}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerLeave}
       onPointerLeave={handlePointerLeave}
       className={`inline-block ${className}`}
     >

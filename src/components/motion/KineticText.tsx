@@ -1,26 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SplitText } from "gsap/SplitText";
 import { ScrambleTextPlugin } from "gsap/ScrambleTextPlugin";
 import { useGSAP } from "@gsap/react";
-import { MOTION, splitNumericMetricTokens } from "@/lib/motion";
+import { EASE, MOTION, splitNumericMetricTokens } from "@/lib/motion";
 import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
 
 gsap.registerPlugin(ScrollTrigger, SplitText, ScrambleTextPlugin, useGSAP);
 
 interface KineticHeadingProps {
-  as?: "h1" | "h2" | "h3";
+  as?: "h1" | "h2" | "h3" | "span";
   className?: string;
   children: ReactNode;
   immediate?: boolean;
   delay?: number;
+  reveal?: "words" | "mask-lines";
 }
 
 /**
- * Editorial masked-line typographic reveal using GSAP 3.15 SplitText (`mask: "lines"`).
+ * Editorial masked-line or masked-word typographic reveal using GSAP 3.15 SplitText (`mask: "lines"`).
  * Leaves LCP copy visible at paint and plays bidirectionally on scroll unless reduced motion is active.
  */
 export function KineticHeading({
@@ -29,6 +30,7 @@ export function KineticHeading({
   children,
   immediate = false,
   delay = 0,
+  reveal = "words",
 }: KineticHeadingProps) {
   const ref = useRef<HTMLHeadingElement>(null);
   const [fontsReady, setFontsReady] = useState(false);
@@ -74,30 +76,33 @@ export function KineticHeading({
       const rect = el.getBoundingClientRect();
       const alreadyNearTop = immediate || rect.top < window.innerHeight * 0.94;
       let activeTween: gsap.core.Tween | null = null;
+      const isLineReveal = reveal === "mask-lines";
 
       const split = SplitText.create(el, {
-        type: "lines,words",
+        type: isLineReveal ? "lines" : "lines,words",
         mask: "lines",
         autoSplit: true,
         onSplit: (self) => {
           activeTween?.kill();
+          const targets = isLineReveal ? self.lines : self.words;
+          const staggerVal = isLineReveal ? 0.09 : MOTION.stagger.splitWords;
           activeTween = alreadyNearTop
-            ? gsap.from(self.words, {
+            ? gsap.from(targets, {
                 yPercent: 112,
                 duration: immediate
                   ? MOTION.durations.kinetic
                   : MOTION.durations.kineticScroll,
                 delay,
-                stagger: MOTION.stagger.splitWords,
-                ease: MOTION.gsapHeadingEase,
+                stagger: staggerVal,
+                ease: EASE.gsapOut,
                 clearProps: "transform",
               })
-            : gsap.from(self.words, {
+            : gsap.from(targets, {
                 yPercent: 112,
                 duration: MOTION.durations.kineticScroll,
                 delay,
-                stagger: MOTION.stagger.splitWords,
-                ease: MOTION.gsapHeadingEase,
+                stagger: staggerVal,
+                ease: EASE.gsapOut,
                 scrollTrigger: {
                   trigger: el,
                   start: "top 90%",
@@ -114,7 +119,7 @@ export function KineticHeading({
         split.revert();
       };
     },
-    { scope: ref, dependencies: [fontsReady, immediate, delay, appReduced] }
+    { scope: ref, dependencies: [fontsReady, immediate, delay, reveal, appReduced] }
   );
 
   return (
@@ -171,7 +176,7 @@ export function ScrollScrubText({
 
       if (split.words.length === 0) return;
 
-      gsap.set(split.words, { opacity: 0.24, y: 5 });
+      gsap.set(split.words, { opacity: 0.16, y: 6 });
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: el,
@@ -201,6 +206,75 @@ export function ScrollScrubText({
     <Tag ref={ref as React.RefObject<HTMLParagraphElement>} className={className}>
       {children}
     </Tag>
+  );
+}
+
+interface OutlineFillTextProps {
+  children: ReactNode;
+  className?: string;
+}
+
+/**
+ * Scroll-scrubbed outline-to-fill display highlight: renders a precision cyan stroke
+ * that fills horizontally with sky-blue gradient ink as the finale enters reading focus.
+ */
+export function OutlineFillText({ children, className = "" }: OutlineFillTextProps) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const appReduced = useAppReducedMotion();
+
+  useGSAP(
+    () => {
+      const el = ref.current;
+      if (!el) return;
+      if (appReduced) {
+        gsap.set(el, { clearProps: "backgroundSize" });
+        return;
+      }
+
+      gsap.fromTo(
+        el,
+        { "--outline-fill": "0%" },
+        {
+          "--outline-fill": "100%",
+          ease: "none",
+          scrollTrigger: {
+            trigger: el,
+            start: "top 95%",
+            end: "top 58%",
+            scrub: MOTION.scrollTrigger.scrub,
+            invalidateOnRefresh: true,
+          },
+        }
+      );
+    },
+    { scope: ref, dependencies: [appReduced] }
+  );
+
+  if (appReduced) {
+    return <span className={`text-[#38BDF8] ${className}`}>{children}</span>;
+  }
+
+  return (
+    <span
+      ref={ref}
+      data-outline-fill
+      style={
+        {
+          "--outline-fill": "100%",
+          WebkitTextStroke: "1px rgba(56, 189, 248, 0.78)",
+          backgroundImage: "linear-gradient(90deg, #38BDF8 0%, #7DD3FC 100%)",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "0 0",
+          backgroundSize: "var(--outline-fill, 100%) 100%",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
+          color: "transparent",
+        } as CSSProperties
+      }
+      className={`inline-block ${className}`}
+    >
+      {children}
+    </span>
   );
 }
 

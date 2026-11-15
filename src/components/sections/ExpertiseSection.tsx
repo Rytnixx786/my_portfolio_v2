@@ -1,15 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { Cpu, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
 import { stack } from "@/data/site";
-import { MOTION } from "@/lib/motion";
+import { createAppMatchMedia, EASE } from "@/lib/motion";
 import { STACK_LAYER_HUES } from "@/lib/palette";
-import { KineticHeading } from "@/components/motion/KineticText";
+import { KineticHeading, ScrambleMetric } from "@/components/motion/KineticText";
 import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
 import { useSlidingIndicator } from "@/components/motion/useSlidingIndicator";
 import { SectionReveal } from "./SectionReveal";
@@ -21,8 +21,22 @@ const LazyStackRack3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[225px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] font-mono text-xs text-[#8B949E] sm:h-[255px]">
-        Loading interactive keycap rack...
+      <div className="flex h-[225px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[255px]">
+        <svg viewBox="0 0 260 110" className="h-20 w-52 opacity-50" aria-hidden="true">
+          {[0, 1, 2, 3].map((row) => (
+            <rect
+              key={row}
+              x={22 + row * 8}
+              y={14 + row * 22}
+              width={200 - row * 16}
+              height={14}
+              rx="5"
+              fill="#161B22"
+              stroke="rgba(56,189,248,0.3)"
+              strokeWidth="1"
+            />
+          ))}
+        </svg>
       </div>
     ),
   }
@@ -68,6 +82,7 @@ export function ExpertiseSection() {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const sectionRef = useRef<HTMLElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const prevLayerIdxRef = useRef<number>(0);
   const hasSwitchedLayerRef = useRef(false);
   const appReduced = useAppReducedMotion();
 
@@ -84,26 +99,67 @@ export function ExpertiseSection() {
   useGSAP(
     () => {
       const section = sectionRef.current;
-      if (!section || appReduced) return;
-      const rule = section.querySelector<HTMLElement>("[data-section-rule]");
-      if (!rule) return;
+      if (!section) return;
 
-      gsap.fromTo(
-        rule,
-        { scaleX: 0 },
-        {
-          scaleX: 1,
-          ease: "power2.out",
-          transformOrigin: "left center",
-          scrollTrigger: {
-            trigger: section,
-            start: "top 86%",
-            end: "top 44%",
-            scrub: 0.55,
-            invalidateOnRefresh: true,
+      const rows = section.querySelectorAll<HTMLElement>("[data-layer-row]");
+      const rule = section.querySelector<HTMLElement>("[data-section-rule]");
+
+      if (appReduced) {
+        if (rows.length > 0) gsap.set(rows, { clearProps: "transform,opacity" });
+        if (rule) gsap.set(rule, { clearProps: "transform" });
+        return;
+      }
+
+      if (rule) {
+        gsap.fromTo(
+          rule,
+          { scaleX: 0 },
+          {
+            scaleX: 1,
+            ease: "power2.out",
+            transformOrigin: "left center",
+            scrollTrigger: {
+              trigger: section,
+              start: "top 86%",
+              end: "top 44%",
+              scrub: 0.55,
+              invalidateOnRefresh: true,
+            },
+          }
+        );
+      }
+
+      const mm = createAppMatchMedia().register(({ conditions }) => {
+        if (conditions.appReduced || rows.length === 0) return;
+
+        gsap.fromTo(
+          rows,
+          {
+            rotateX: conditions.desktopFine ? 18 : 6,
+            y: conditions.desktopFine ? 20 : 12,
+            opacity: 0.12,
+            transformPerspective: 1200,
+            transformOrigin: "center top",
           },
-        }
-      );
+          {
+            rotateX: 0,
+            y: 0,
+            opacity: 1,
+            duration: 0.58,
+            stagger: 0.08,
+            ease: EASE.gsapOut,
+            clearProps: "transform,opacity",
+            scrollTrigger: {
+              trigger: section,
+              start: "top 80%",
+              end: "bottom 18%",
+              toggleActions: "play reverse play reverse",
+            },
+          }
+        );
+      });
+
+      return () => mm.revert();
     },
     { scope: sectionRef, dependencies: [appReduced] }
   );
@@ -112,27 +168,46 @@ export function ExpertiseSection() {
     () => {
       if (!hasSwitchedLayerRef.current) {
         hasSwitchedLayerRef.current = true;
+        prevLayerIdxRef.current = activeLayerIdx;
         return;
       }
       const panel = panelRef.current;
       if (!panel || appReduced) return;
 
+      const direction = activeLayerIdx >= prevLayerIdxRef.current ? 1 : -1;
+      prevLayerIdxRef.current = activeLayerIdx;
+
+      const innerCore = panel.querySelector<HTMLElement>("[data-layer-panel-core]");
+      if (innerCore) {
+        gsap.fromTo(
+          innerCore,
+          { x: direction * 16, opacity: 0.65 },
+          {
+            x: 0,
+            opacity: 1,
+            duration: 0.34,
+            ease: EASE.gsapOut,
+            clearProps: "transform,opacity",
+          }
+        );
+      }
+
       const pills = panel.querySelectorAll("[data-stack-tool]");
       if (pills.length === 0) return;
       gsap.fromTo(
         pills,
-        { y: 8, opacity: 0 },
+        { y: 12, opacity: 0 },
         {
           y: 0,
           opacity: 1,
-          duration: 0.28,
-          stagger: 0.028,
-          ease: MOTION.gsapEase,
+          duration: 0.32,
+          stagger: 0.04,
+          ease: EASE.gsapOut,
           clearProps: "transform,opacity",
         }
       );
     },
-    { scope: panelRef, dependencies: [activeLayer.code, appReduced] }
+    { scope: panelRef, dependencies: [activeLayer.code, activeLayerIdx, appReduced] }
   );
 
   const handleSelectTool = (tool: string) => {
@@ -187,11 +262,14 @@ export function ExpertiseSection() {
             />
             <div>
               <p className="font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#38BDF8]">
-                04 / Capabilities
+                <ScrambleMetric value="04" />{" "}
+                <span className="text-[#8B949E]">/</span>{" "}
+                <span>Capabilities</span>
               </p>
               <KineticHeading
                 as="h2"
-                className="mt-4 font-display text-[clamp(2.4rem,5vw,4.3rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
+                reveal="mask-lines"
+                className="velocity-skew-heading mt-4 font-display text-[clamp(2.4rem,5vw,4.3rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
               >
                 STACK BY{" "}
                 <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
@@ -247,6 +325,7 @@ export function ExpertiseSection() {
                 return (
                   <button
                     key={row.layer}
+                    data-layer-row
                     ref={(el) => {
                       tabRefs.current[idx] = el;
                       registerTab(el);
@@ -288,17 +367,25 @@ export function ExpertiseSection() {
             </div>
             </SectionReveal>
 
-            <SectionReveal variant="scrub-depth" className="lg:col-span-7">
+            <SectionReveal variant="tilt-rise" className="lg:col-span-7">
               <div
                 ref={panelRef}
                 id={`stack-panel-${activeLayer.code}`}
                 role="tabpanel"
                 aria-labelledby={`stack-tab-${activeLayer.code}`}
-                className="double-bezel-outer"
+                onPointerMove={(e: PointerEvent<HTMLDivElement>) => {
+                  if (e.pointerType === "touch") return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  e.currentTarget.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
+                  e.currentTarget.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
+                }}
+                style={{ "--spotlight-color": `${layerHue}1E` } as CSSProperties}
+                className="double-bezel-outer spotlight-card"
               >
                 <div
                   key={activeLayer.code}
-                  className="panel-enter double-bezel-core space-y-5 p-5 sm:p-6"
+                  data-layer-panel-core
+                  className="double-bezel-core space-y-5 p-5 sm:p-6"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div

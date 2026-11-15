@@ -32,6 +32,11 @@ function CinchGpuSculpture({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const pulseRef = useRef<THREE.Mesh>(null);
+  const packetStreamRef = useRef<THREE.InstancedMesh>(null);
+  const slabMatsRef = useRef<Array<THREE.MeshStandardMaterial | null>>([]);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const packetPt = useMemo(() => new THREE.Vector3(), []);
+  const packetTan = useMemo(() => new THREE.Vector3(), []);
   const elapsedRef = useRef(0);
   const hue = CATEGORY_HUES["Inference & Serving"].hex;
   const { frameloop, gl, invalidate } = useThree();
@@ -56,6 +61,8 @@ function CinchGpuSculpture({
     ]);
   }, []);
 
+  const STREAM_COUNT = 5;
+
   useFrame((_, delta) => {
     const isStatic = frameloop === "demand";
     const dt = Math.min(delta, 0.05);
@@ -65,11 +72,38 @@ function CinchGpuSculpture({
         groupRef.current.rotation.y += dt * 0.22;
       }
     }
+    const speed = mode === "cache" ? 0.62 : mode === "marlin" ? 0.42 : 0.85;
+    const leadT = isStatic ? 0.42 : (elapsedRef.current * speed) % 1;
+
     if (pulseRef.current) {
-      const speed = mode === "cache" ? 0.62 : mode === "marlin" ? 0.42 : 0.85;
-      const t = isStatic ? 0.42 : (elapsedRef.current * speed) % 1;
-      bypassCurve.getPointAt(t, pulseRef.current.position);
+      bypassCurve.getPointAt(leadT, pulseRef.current.position);
+      const scale = isStatic ? 1 : 0.95 + Math.sin(elapsedRef.current * 8) * 0.14;
+      pulseRef.current.scale.setScalar(scale);
     }
+
+    if (packetStreamRef.current) {
+      for (let i = 0; i < STREAM_COUNT; i++) {
+        const t = (leadT + (i + 1) / (STREAM_COUNT + 1)) % 1;
+        bypassCurve.getPointAt(t, packetPt);
+        bypassCurve.getTangentAt(t, packetTan);
+        dummy.position.copy(packetPt);
+        dummy.lookAt(packetPt.clone().add(packetTan));
+        const taper = 0.45 + 0.55 * Math.sin(t * Math.PI);
+        dummy.scale.set(taper * 0.8, taper * 0.8, taper * 1.45);
+        dummy.updateMatrix();
+        packetStreamRef.current.setMatrixAt(i, dummy.matrix);
+      }
+      packetStreamRef.current.instanceMatrix.needsUpdate = true;
+    }
+
+    // Pulse top cache-bypass slab when stream crosses apex (~t=0.35)
+    const apexProx = Math.max(0, 1 - Math.abs(leadT - 0.35) * 4.5);
+    slabMatsRef.current.forEach((mat, idx) => {
+      if (!mat) return;
+      const base = mode === "marlin" ? 0.34 : 0.1;
+      const boost = idx === 2 ? apexProx * 0.48 : idx === 3 && mode === "breaker" ? apexProx * 0.32 : 0;
+      mat.emissiveIntensity = isStatic ? base : base + boost;
+    });
   });
 
   const pulseColor =
@@ -77,17 +111,26 @@ function CinchGpuSculpture({
 
   return (
     <group ref={groupRef}>
+      <pointLight position={[0, 1.35, 0.9]} intensity={1.15} distance={3.8} color={pulseColor} />
+
       {[-0.48, -0.16, 0.16, 0.48].map((y, idx) => (
         <group key={y} position={[0, y, 0]}>
           <RoundedBox args={[1.38, 0.12, 0.92]} radius={0.03} smoothness={3}>
             <meshStandardMaterial
+              ref={(el) => {
+                slabMatsRef.current[idx] = el;
+              }}
               color={idx === 2 ? "#283447" : "#1E2736"}
-              emissive={hue}
-              emissiveIntensity={mode === "marlin" ? 0.34 : 0.08}
-              roughness={0.38}
-              metalness={0.32}
+              emissive={idx === 2 ? pulseColor : hue}
+              emissiveIntensity={mode === "marlin" ? 0.34 : 0.1}
+              roughness={0.34}
+              metalness={0.38}
             />
           </RoundedBox>
+          <mesh position={[0, 0.062, 0.458]}>
+            <boxGeometry args={[1.28, 0.016, 0.012]} />
+            <meshBasicMaterial color={idx === 2 ? pulseColor : hue} transparent opacity={idx === 2 ? 0.65 : 0.25} />
+          </mesh>
           <mesh position={[0.66, 0, 0.42]}>
             <sphereGeometry args={[0.045, 14, 14]} />
             <meshBasicMaterial
@@ -102,6 +145,11 @@ function CinchGpuSculpture({
         <tubeGeometry args={[bypassCurve, 48, 0.025, 10, false]} />
         <meshBasicMaterial color={pulseColor} transparent opacity={0.44} />
       </mesh>
+
+      <instancedMesh ref={packetStreamRef} args={[undefined, undefined, STREAM_COUNT]}>
+        <sphereGeometry args={[0.042, 10, 10]} />
+        <meshBasicMaterial color={pulseColor} toneMapped={false} />
+      </instancedMesh>
 
       <mesh ref={pulseRef}>
         <sphereGeometry args={[0.075, 16, 16]} />

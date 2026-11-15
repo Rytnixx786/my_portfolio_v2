@@ -10,10 +10,13 @@ import { CATEGORY_HUES } from "@/lib/palette";
 import { resolveEffectiveTier, resolveQualityReason, detectMotionPreference } from "@/lib/device-tier";
 import { classifyNodeKind } from "@/lib/architecture";
 import {
+  CHOREO,
   MOTION,
   completePendingViewTransition,
+  computeEnvelopePhases,
   normalizeRoutePath,
   prefersReducedMotion,
+  resolveMatchMediaConditions,
   runViewTransition,
   splitNumericMetricTokens,
 } from "@/lib/motion";
@@ -591,5 +594,33 @@ describe("motion contract, ScrambleMetric numeric parsing, scroll-to-top, and 3D
     expect(resolveEffectiveTier("2d", "high", true)).toBe("low");
     expect(resolveEffectiveTier("auto", "low", true)).toBe("low");
     expect(resolveEffectiveTier("high", "high", false)).toBe("low");
+  });
+
+  it("CHOREO envelope phases keep reading zone opaque (>= 35% vh exit threshold, floor >= 0.25) and matchMedia conditions map deterministically", () => {
+    expect(CHOREO.envelope.exitOpacity).toBeGreaterThanOrEqual(0.25);
+
+    const vh = 900;
+    for (const h of [90, 280, 480, 760]) {
+      const { enterDur, holdDur, exitDur, exitStart } = computeEnvelopePhases(vh, h);
+      expect(enterDur + holdDur + exitDur).toBeCloseTo(1, 5);
+      expect(exitStart).toBeGreaterThanOrEqual(CHOREO.envelope.exitFrom);
+      // Verify bottom y coordinate when exit begins is never above 35% viewport height
+      const totalTravel = 0.84 * vh + h;
+      const bottomAtExitStart = 0.08 * vh + (1 - exitStart) * totalTravel;
+      expect(bottomAtExitStart).toBeLessThanOrEqual(0.355 * vh);
+    }
+
+    expect(
+      resolveMatchMediaConditions({ width: 1440, finePointer: true, appReduced: false })
+    ).toEqual({ desktopFine: true, mobile: false, appReduced: false });
+    expect(
+      resolveMatchMediaConditions({ width: 1440, finePointer: false, appReduced: false })
+    ).toEqual({ desktopFine: false, mobile: true, appReduced: false });
+    expect(
+      resolveMatchMediaConditions({ width: 375, finePointer: true, appReduced: false })
+    ).toEqual({ desktopFine: false, mobile: true, appReduced: false });
+    expect(
+      resolveMatchMediaConditions({ width: 1440, finePointer: true, appReduced: true })
+    ).toEqual({ desktopFine: false, mobile: false, appReduced: true });
   });
 });

@@ -1,15 +1,58 @@
 "use client";
 
+import { useRef } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
 import { ArrowUp } from "@phosphor-icons/react";
 import { profile } from "@/data/site";
+import { EASE } from "@/lib/motion";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
+import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
 import { SectionReveal } from "@/components/sections/SectionReveal";
 
+gsap.registerPlugin(ScrollTrigger, useGSAP);
+
 export function Footer() {
+  const footerRef = useRef<HTMLElement>(null);
+  const wordmarkRef = useRef<HTMLDivElement>(null);
+  const appReduced = useAppReducedMotion();
+
+  useGSAP(
+    () => {
+      const footer = footerRef.current;
+      const wordmark = wordmarkRef.current;
+      if (!footer || !wordmark) return;
+      if (appReduced) {
+        gsap.set(wordmark, { clearProps: "transform,opacity" });
+        return;
+      }
+
+      gsap.fromTo(
+        wordmark,
+        { yPercent: 55, opacity: 0.15 },
+        {
+          yPercent: 0,
+          opacity: 1,
+          ease: EASE.gsapOut,
+          scrollTrigger: {
+            trigger: footer,
+            start: "top 95%",
+            end: "bottom bottom",
+            scrub: 0.4,
+            invalidateOnRefresh: true,
+          },
+        }
+      );
+    },
+    { scope: footerRef, dependencies: [appReduced] }
+  );
+
   return (
     <footer
+      ref={footerRef}
       role="contentinfo"
-      className="border-t border-[rgba(240,246,252,0.08)] bg-[#0D1117] py-8 text-[#8B949E] sm:py-10"
+      className="overflow-hidden border-t border-[rgba(240,246,252,0.08)] bg-[#0D1117] pt-8 pb-4 text-[#8B949E] sm:pt-10"
     >
       <SectionReveal
         settleAtBottom
@@ -65,13 +108,28 @@ export function Footer() {
           >
             <span>Return to top</span>
             <ArrowUp
-              className="h-3.5 w-3.5 transition-transform duration-200 group-hover:-translate-y-0.5"
+              className="h-3.5 w-3.5 transition-transform duration-300 ease-[var(--ease-editorial)] group-hover:-translate-y-0.5"
               weight="regular"
               aria-hidden="true"
             />
           </button>
         </nav>
       </SectionReveal>
+
+      <div
+        aria-hidden="true"
+        className="mx-auto mt-6 max-w-[1400px] overflow-hidden px-4 sm:mt-8 sm:px-8"
+      >
+        <div
+          ref={wordmarkRef}
+          style={{
+            WebkitTextStroke: "1px rgba(240, 246, 252, 0.1)",
+          }}
+          className="select-none whitespace-nowrap pt-2 pb-1 font-display text-[clamp(3.6rem,13.5vw,12.5rem)] font-bold uppercase leading-[0.95] tracking-[-0.03em] text-[#161B22]"
+        >
+          {profile.name}
+        </div>
+      </div>
     </footer>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, FilePdf, List, TerminalWindow, X } from "@phosphor-icons/react";
+import { ArrowUpRight, FilePdf, TerminalWindow } from "@phosphor-icons/react";
 import { nav, profile } from "@/data/site";
 import { useBodyScrollLock } from "@/hooks/usePortfolioUtils";
 import { QualityToggleHUD } from "@/components/canvas/QualityToggleHUD";
@@ -193,15 +193,19 @@ export function Navbar() {
         className="pointer-events-none absolute left-0 top-0 h-6 w-px"
       />
       <header
-        className={`site-navbar-shell fixed inset-x-0 top-0 z-40 transition-all duration-300 ${
-          isScrolled
-            ? "border-b border-[rgba(240,246,252,0.1)] bg-[#0D1117]/88 shadow-[0_14px_38px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl"
-            : "border-b border-[rgba(240,246,252,0.06)] bg-[#0D1117]/65 backdrop-blur-md"
+        className={`site-navbar-shell fixed inset-x-0 top-0 z-40 mx-auto transition-[max-width,margin-top,border-radius,border-color,background-color,box-shadow] duration-500 ease-[var(--ease-editorial)] ${
+          isScrolled && !mobileOpen
+            ? "mt-3 max-w-[min(1300px,calc(100vw-1.5rem))] rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/88 shadow-[var(--shadow-deep)] backdrop-blur-xl"
+            : "mt-0 max-w-full rounded-none border-b border-[rgba(240,246,252,0.06)] bg-[#0D1117]/75 backdrop-blur-md"
         }`}
       >
         <nav
           aria-label="Primary navigation"
-          className="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-2 px-4 sm:gap-3 sm:px-6 xl:gap-6 xl:px-8"
+          className={`mx-auto flex items-center justify-between gap-2 transition-[height,padding] duration-500 ease-[var(--ease-editorial)] ${
+            isScrolled && !mobileOpen
+              ? "h-14 max-w-full px-4 sm:gap-2.5 sm:px-5 xl:px-6"
+              : "h-16 max-w-[1400px] px-4 sm:gap-3 sm:px-6 xl:gap-6 xl:px-8"
+          }`}
         >
           {/* Left: Clean Editorial Wordmark + Live Scroll Telemetry Pill */}
           <div className="flex min-w-0 shrink-0 items-center gap-2.5">
@@ -214,7 +218,9 @@ export function Navbar() {
 
             <span
               aria-hidden="true"
-              className="hidden items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-xs tabular-nums text-[#8B949E] sm:inline-flex"
+              className={`hidden items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-xs tabular-nums text-[#8B949E] ${
+                isScrolled && !mobileOpen ? "sm:inline-flex lg:hidden xl:inline-flex" : "sm:inline-flex"
+              }`}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-[#38BDF8]" />
               <span className="text-[#E6EDF3]">{telemetryCode}</span>
@@ -234,7 +240,9 @@ export function Navbar() {
                   <TransitionLink
                     href={item.href}
                     aria-current={isActive ? "page" : undefined}
-                    className={`group/nav relative inline-flex h-16 items-center gap-1.5 whitespace-nowrap px-2 font-mono text-xs uppercase tracking-[0.1em] transition-colors xl:px-3 xl:tracking-[0.12em] ${
+                    className={`group/nav relative inline-flex items-center gap-1.5 whitespace-nowrap px-2 font-mono text-xs uppercase tracking-[0.1em] transition-colors xl:px-3 xl:tracking-[0.12em] ${
+                      isScrolled && !mobileOpen ? "h-14" : "h-16"
+                    } ${
                       isActive
                         ? "font-semibold text-[#E6EDF3]"
                         : "text-[#8B949E] hover:text-[#E6EDF3]"
@@ -243,7 +251,7 @@ export function Navbar() {
                     <span>{item.label}</span>
                     <span
                       aria-hidden="true"
-                      className={`absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-[#38BDF8] transition-all duration-300 xl:inset-x-3 ${
+                      className={`absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-[#38BDF8] transition-[transform,opacity] duration-300 ease-[var(--ease-editorial)] xl:inset-x-3 ${
                         isActive ? "scale-x-100 opacity-100" : "scale-x-0 opacity-0 group-hover/nav:scale-x-50 group-hover/nav:opacity-40"
                       }`}
                     />
@@ -276,8 +284,17 @@ export function Navbar() {
           >
             <TerminalWindow className="h-4 w-4 text-[#38BDF8] sm:h-3.5 sm:w-3.5" weight="regular" aria-hidden="true" />
             <span className="hidden sm:inline">Query</span>
-            <span aria-hidden="true" className="hidden h-3 w-px bg-[rgba(240,246,252,0.12)] xl:inline-block" />
-            <kbd className="hidden font-mono text-xs tracking-wider text-[#8B949E] xl:inline">
+            <span
+              aria-hidden="true"
+              className={`hidden h-3 w-px bg-[rgba(240,246,252,0.12)] ${
+                isScrolled && !mobileOpen ? "" : "xl:inline-block"
+              }`}
+            />
+            <kbd
+              className={`hidden font-mono text-xs tracking-wider text-[#8B949E] ${
+                isScrolled && !mobileOpen ? "" : "xl:inline"
+              }`}
+            >
               {shortcutLabel}
             </kbd>
           </button>
@@ -286,6 +303,7 @@ export function Navbar() {
             href={profile.resume}
             target="_blank"
             rel="noopener noreferrer"
+            data-cursor="OPEN ↗"
             className="hidden min-h-[44px] items-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-xs font-medium uppercase tracking-[0.1em] text-[#9DA7B3] transition-colors hover:bg-[#161B22]/80 hover:text-[#38BDF8] md:inline-flex xl:px-3 xl:tracking-[0.12em]"
           >
             <FilePdf className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
@@ -305,92 +323,113 @@ export function Navbar() {
             aria-expanded={mobileOpen}
             aria-controls="mobile-nav-drawer"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#E6EDF3] transition-colors hover:border-[#38BDF8]/60 lg:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#E6EDF3] transition-colors hover:border-[#38BDF8]/60 active:scale-[0.96] lg:hidden"
           >
-            {mobileOpen ? (
-              <X className="h-4 w-4" weight="regular" aria-hidden="true" />
-            ) : (
-              <List className="h-4 w-4" weight="regular" aria-hidden="true" />
-            )}
+            <span className="relative flex h-4 w-4 items-center justify-center" aria-hidden="true">
+              <span
+                className={`absolute h-[1.5px] w-4 rounded-full bg-current transition-transform duration-300 ease-[var(--ease-editorial)] ${
+                  mobileOpen ? "translate-y-0 rotate-45" : "-translate-y-[3.5px] rotate-0"
+                }`}
+              />
+              <span
+                className={`absolute h-[1.5px] w-4 rounded-full bg-current transition-transform duration-300 ease-[var(--ease-editorial)] ${
+                  mobileOpen ? "translate-y-0 -rotate-45" : "translate-y-[3.5px] rotate-0"
+                }`}
+              />
+            </span>
           </button>
         </div>
       </nav>
 
       {/* Hairline scroll-synced header border gauge */}
-      <div aria-hidden="true" className="pointer-events-none h-px w-full overflow-hidden">
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none h-px overflow-hidden transition-[margin] duration-500 ease-[var(--ease-editorial)] ${
+          isScrolled && !mobileOpen ? "mx-7 sm:mx-8" : "w-full"
+        }`}
+      >
         <div
           ref={headerBarRef}
           className="h-full w-full origin-left bg-gradient-to-r from-[#38BDF8]/75 to-[#7DD3FC]"
           style={{ transform: "scaleX(0)" }}
         />
       </div>
+    </header>
 
-      {/* Mobile Drawer with GPU grid-rows transition + native inert state */}
+      {/* Full-Screen Atmospheric Mobile Navigation Overlay (outside header so blur & rounded pill never trap fixed inset-0) */}
       <div
         ref={drawerRef}
         id="mobile-nav-drawer"
         inert={!mobileOpen ? true : undefined}
-        className={`mx-auto grid max-w-[1400px] bg-[#0D1117]/98 backdrop-blur-xl transition-[grid-template-rows,opacity] duration-300 ease-[var(--ease-editorial)] lg:hidden ${
-          mobileOpen
-            ? "grid-rows-[1fr] border-t border-[rgba(240,246,252,0.08)] opacity-100"
-            : "pointer-events-none grid-rows-[0fr] opacity-0"
+        className={`fixed inset-0 z-30 flex flex-col justify-between overflow-y-auto bg-[#0D1117]/95 px-6 pt-24 pb-8 backdrop-blur-2xl transition-opacity duration-400 ease-[var(--ease-editorial)] lg:hidden ${
+          mobileOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
-        <div className="overflow-hidden">
-          <ul className="flex flex-col gap-1 px-4 py-4 sm:px-8">
-            {nav.map((item, idx) => {
-              const isActive = activeSection === item.sectionId;
-              return (
-                <li
-                  key={item.href}
-                  style={{
-                    transitionDelay: mobileOpen ? `${idx * 35}ms` : "0ms",
-                  }}
-                  className={`transition-[opacity,transform] duration-200 ${
-                    mobileOpen ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0"
+        <ul className="flex flex-col gap-2">
+          {nav.map((item, idx) => {
+            const isActive = activeSection === item.sectionId;
+            return (
+              <li
+                key={item.href}
+                style={{
+                  transitionDelay: mobileOpen ? `${idx * 50}ms` : "0ms",
+                }}
+                className={`transition-[opacity,transform] duration-500 ease-[var(--ease-editorial)] ${
+                  mobileOpen ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
+                }`}
+              >
+                <TransitionLink
+                  href={item.href}
+                  onClick={() => setOpenedPath(null)}
+                  className={`flex min-h-[56px] items-center justify-between rounded-2xl border px-4 py-3 transition-colors ${
+                    isActive
+                      ? "border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#7DD3FC]"
+                      : "border-[rgba(240,246,252,0.08)] bg-[#161B22]/75 text-[#E6EDF3] hover:border-[#38BDF8]/30"
                   }`}
                 >
-                  <TransitionLink
-                    href={item.href}
-                    onClick={() => setOpenedPath(null)}
-                    className={`flex min-h-[44px] items-center justify-between rounded-xl px-4 py-2.5 font-mono text-xs uppercase tracking-[0.14em] transition-colors ${
-                      isActive
-                        ? "border border-[#38BDF8]/30 bg-[#38BDF8]/10 font-semibold text-[#7DD3FC]"
-                        : "text-[#9DA7B3] hover:bg-[#161B22] hover:text-[#E6EDF3]"
-                    }`}
-                  >
-                    <span>{item.label}</span>
-                    <ArrowUpRight className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
-                  </TransitionLink>
-                </li>
-              );
-            })}
-            <li
-              style={{
-                transitionDelay: mobileOpen ? `${nav.length * 35}ms` : "0ms",
-              }}
-              className={`pt-2 transition-[opacity,transform] duration-200 ${
-                mobileOpen ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0"
-              }`}
-            >
-              <a
-                href={profile.resume}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setOpenedPath(null)}
-                className="flex min-h-[44px] items-center justify-between rounded-xl border border-[rgba(240,246,252,0.14)] bg-[#161B22] px-4 py-2.5 font-mono text-xs uppercase tracking-[0.14em] text-[#E6EDF3]"
-              >
-                <span className="inline-flex items-center gap-2">
-                  <FilePdf className="h-4 w-4 text-[#38BDF8]" weight="regular" aria-hidden="true" />
-                  <span>Resume PDF</span>
-                </span>
-                <ArrowUpRight className="h-3.5 w-3.5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
-              </a>
-            </li>
-          </ul>
+                  <span className="flex items-baseline gap-3">
+                    <span className="font-mono text-xs text-[#38BDF8] tabular-nums">
+                      0{idx + 1}
+                    </span>
+                    <span className="font-display text-3xl font-bold uppercase tracking-tight">
+                      {item.label}
+                    </span>
+                  </span>
+                  <ArrowUpRight className="h-5 w-5 text-[#38BDF8]" weight="regular" aria-hidden="true" />
+                </TransitionLink>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div
+          style={{
+            transitionDelay: mobileOpen ? `${nav.length * 50}ms` : "0ms",
+          }}
+          className={`mt-8 flex flex-col gap-4 border-t border-[rgba(240,246,252,0.08)] pt-6 transition-[opacity,transform] duration-500 ease-[var(--ease-editorial)] ${
+            mobileOpen ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
+          }`}
+        >
+          <a
+            href={profile.resume}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setOpenedPath(null)}
+            className="flex min-h-[48px] items-center justify-between rounded-xl border border-[rgba(240,246,252,0.14)] bg-[#161B22] px-4 py-3 font-mono text-xs uppercase tracking-[0.14em] text-[#E6EDF3]"
+          >
+            <span className="inline-flex items-center gap-2">
+              <FilePdf className="h-4 w-4 text-[#38BDF8]" weight="regular" aria-hidden="true" />
+              <span>Resume PDF</span>
+            </span>
+            <ArrowUpRight className="h-4 w-4 text-[#38BDF8]" weight="regular" aria-hidden="true" />
+          </a>
+
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 font-mono text-xs text-[#8B949E]">
+            <span>{profile.location}</span>
+            <span className="text-[#10B981]">{profile.status}</span>
+          </div>
         </div>
       </div>
-    </header>
     </>
   );
 }

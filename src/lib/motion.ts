@@ -1,7 +1,119 @@
+import gsap from "gsap";
+
+export const EASE = {
+  editorial: "cubic-bezier(0.32, 0.72, 0, 1)",
+  gsapOut: "expo.out",
+  gsapInOut: "power3.inOut",
+  spring: "elastic.out(1, 0.75)",
+} as const;
+
+export const CHOREO = {
+  envelope: {
+    start: "top 92%",
+    end: "bottom 8%",
+    exitFrom: 0.72,
+    exitOpacity: 0.28,
+    exitBlurPx: 4,
+  },
+  pinDesktopQuery: "(min-width: 1024px) and (pointer: fine)",
+} as const;
+
+export interface EnvelopePhaseTimings {
+  enterDur: number;
+  holdDur: number;
+  exitDur: number;
+  exitStart: number;
+}
+
+/**
+ * Computes normalized [0..1] enter, reading plateau, and exit phases so content stays
+ * full-contrast (opacity 1) through the upper/mid reading zone (top 15%-65% viewport)
+ * and begins receding only after bottom crosses <= 35% viewport height.
+ */
+export function computeEnvelopePhases(
+  viewportHeight: number,
+  rectHeight: number
+): EnvelopePhaseTimings {
+  const vh = Math.max(320, viewportHeight || 800);
+  const h = Math.max(40, rectHeight || 280);
+  const totalTravel = Math.max(1, 0.84 * vh + h);
+
+  const enterDur = Math.min(0.36, Math.max(0.12, (0.34 * vh) / totalTravel));
+  // Exit runs across bottom 35% -> bottom 8% (0.27*vh) capped for compact headings so
+  // small blocks stay at opacity 1 until top reaches ~14% viewport height.
+  const exitPixels = Math.min(0.27 * vh, Math.max(88, 0.06 * vh + h * 0.88));
+  const rawExitDur = Math.min(0.28, Math.max(0.08, exitPixels / totalTravel));
+  const exitStart = Math.max(CHOREO.envelope.exitFrom, 1 - rawExitDur);
+  const exitDur = Math.max(0.06, 1 - exitStart);
+  const holdDur = Math.max(0.12, exitStart - enterDur);
+
+  return { enterDur, holdDur, exitDur, exitStart };
+}
+
+export interface MatchMediaConditions {
+  desktopFine: boolean;
+  mobile: boolean;
+  appReduced: boolean;
+}
+
+export function resolveMatchMediaConditions(input: {
+  width: number;
+  finePointer: boolean;
+  appReduced: boolean;
+}): MatchMediaConditions {
+  if (input.appReduced) {
+    return { desktopFine: false, mobile: false, appReduced: true };
+  }
+  const desktopFine = input.width >= 1024 && input.finePointer;
+  return {
+    desktopFine,
+    mobile: !desktopFine,
+    appReduced: false,
+  };
+}
+
+/**
+ * Wraps gsap.matchMedia() with standardized desktopFine / mobile / appReduced conditions
+ * synchronized cleanly with HUD 2D SAFE preference.
+ */
+export function createAppMatchMedia() {
+  const mm = gsap.matchMedia();
+  return {
+    mm,
+    register(
+      setup: (context: { conditions: MatchMediaConditions }) => void | (() => void)
+    ) {
+      if (shouldReduceAppMotion()) {
+        setup({
+          conditions: { desktopFine: false, mobile: false, appReduced: true },
+        });
+        return mm;
+      }
+
+      mm.add(
+        {
+          desktopFine: CHOREO.pinDesktopQuery,
+          mobile: "(max-width: 1023px), (pointer: coarse)",
+        },
+        (ctx) => {
+          const desktopFine = Boolean(ctx.conditions?.desktopFine) && !shouldReduceAppMotion();
+          const conditions = resolveMatchMediaConditions({
+            width: typeof window !== "undefined" ? window.innerWidth : 1280,
+            finePointer: desktopFine,
+            appReduced: shouldReduceAppMotion(),
+          });
+          return setup({ conditions });
+        }
+      );
+      return mm;
+    },
+  };
+}
+
 export const MOTION = {
-  easeEditorial: "cubic-bezier(0.32, 0.72, 0, 1)",
+  easeEditorial: EASE.editorial,
   gsapEase: "power3.out",
-  gsapHeadingEase: "power4.out",
+  gsapHeadingEase: EASE.gsapOut,
   gsapMetricEase: "power2.out",
   durations: {
     micro: 0.16,
@@ -80,6 +192,7 @@ export interface PortfolioScrollState {
   progress: number;
   velocity: number;
   direction: 1 | -1 | 0;
+  heroProgress?: number;
 }
 
 declare global {
@@ -90,14 +203,15 @@ declare global {
 
 export function getPortfolioScrollState(): PortfolioScrollState {
   if (typeof window === "undefined" || !window.__portfolioScroll) {
-    return { scrollY: 0, progress: 0, velocity: 0, direction: 0 };
+    return { scrollY: 0, progress: 0, velocity: 0, direction: 0, heroProgress: 0 };
   }
   return window.__portfolioScroll;
 }
 
-export function setPortfolioScrollState(next: PortfolioScrollState): void {
+export function setPortfolioScrollState(next: Partial<PortfolioScrollState>): void {
   if (typeof window === "undefined") return;
-  window.__portfolioScroll = next;
+  const prev = getPortfolioScrollState();
+  window.__portfolioScroll = { ...prev, ...next };
 }
 
 export function prefersReducedMotion(): boolean {

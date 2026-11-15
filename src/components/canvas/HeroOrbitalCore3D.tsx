@@ -371,6 +371,13 @@ function HeroOrbitalScene({
     const dt = Math.min(delta, 0.05);
     const scrollState = getPortfolioScrollState();
     const reduceApp = shouldReduceAppMotion();
+    const heroProgress =
+      !isStatic && !reduceApp
+        ? scrollState.heroProgress ??
+          (typeof window !== "undefined"
+            ? Math.min(1, Math.max(0, scrollState.scrollY / Math.max(520, window.innerHeight || 768)))
+            : 0)
+        : 0;
     const scrollVelocityBoost =
       !isStatic && !reduceApp ? Math.min(2.2, Math.abs(scrollState.velocity) * 0.045) : 0;
 
@@ -390,18 +397,23 @@ function HeroOrbitalScene({
 
     if (ringMatRef.current) {
       ringMatRef.current.color.copy(currentRingColorRef.current);
+      ringMatRef.current.opacity = isStatic
+        ? 0.58
+        : 0.58 - heroProgress * 0.16 + Math.sin(t * 2.1) * 0.04;
     }
 
-    // Gentle vertical float + subtle scroll-coupled pitch tilt without fighting OrbitControls
+    // Gentle vertical float + camera Z dolly & tilt during hero curtain pin without fighting OrbitControls
     if (tiltGroupRef.current) {
       tiltGroupRef.current.position.y = isStatic ? 0 : Math.sin(t * 1.05) * 0.032;
-      const heroScrollRatio =
-        !isStatic && !reduceApp && typeof window !== "undefined"
-          ? Math.min(1, Math.max(0, scrollState.scrollY / Math.max(520, window.innerHeight || 768)))
-          : 0;
+      tiltGroupRef.current.position.z = THREE.MathUtils.damp(
+        tiltGroupRef.current.position.z,
+        -heroProgress * 1.45,
+        6,
+        dt
+      );
       tiltGroupRef.current.rotation.x = THREE.MathUtils.damp(
         tiltGroupRef.current.rotation.x,
-        -heroScrollRatio * 0.24,
+        -heroProgress * 0.35,
         6,
         dt
       );
@@ -829,7 +841,7 @@ function HeroOrbital2DFallback({
             >
               {/* Tilted Outer Gimbal Ring */}
               <span
-                className="absolute inset-0 rounded-full border transition-all duration-200"
+                className="absolute inset-0 rounded-full border transition-[transform,opacity,border-color,box-shadow] duration-200 ease-[var(--ease-editorial)]"
                 style={{
                   borderColor: sys.hue,
                   opacity: isActive ? 0.92 : isHovered ? 0.78 : 0.52,

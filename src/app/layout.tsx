@@ -9,6 +9,8 @@ import { profile } from "@/data/site";
 import { LenisProvider } from "@/components/chrome/LenisProvider";
 import { Navbar } from "@/components/chrome/Navbar";
 import { CommandPalette } from "@/components/chrome/CommandPalette";
+import { CustomCursor } from "@/components/chrome/CustomCursor";
+import { IntroBoot } from "@/components/chrome/IntroBoot";
 import { Footer } from "@/components/chrome/Footer";
 import { WebGLContextProvider } from "@/components/canvas/WebGLContextProvider";
 import "./globals.css";
@@ -157,6 +159,12 @@ export default function RootLayout({
     >
       <head>
         <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){try{if(location.pathname==="/"&&sessionStorage.getItem("portfolio-v2-intro-seen")!=="1"&&(localStorage.getItem("portfolio-v2-3d-quality")||sessionStorage.getItem("portfolio-v2-3d-quality"))!=="2d"){document.documentElement.dataset.intro="pending";}}catch(e){}})();',
+          }}
+        />
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify([personJsonLd, websiteJsonLd]),
@@ -171,10 +179,12 @@ export default function RootLayout({
           Skip to content
         </a>
         <div className="paper-grain" aria-hidden="true" />
+        <IntroBoot />
         <WebGLContextProvider>
           <LenisProvider>
             <Navbar />
             <CommandPalette />
+            <CustomCursor />
             <main id="main-content" className="w-full max-w-full overflow-x-clip">
               {children}
             </main>

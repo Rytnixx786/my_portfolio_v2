@@ -181,6 +181,7 @@ export function ViewportCanvas({
   return (
     <div
       ref={containerRef}
+      data-cursor={hasSlot && canRender3D && !isStaticPose ? "DRAG · ORBIT" : undefined}
       data-slot-state={
         hasSlot
           ? "active"

@@ -12,7 +12,7 @@ import {
   type ProjectCategory,
 } from "@/data/projects";
 import { getCategoryHue } from "@/lib/palette";
-import { MOTION, shouldReduceAppMotion } from "@/lib/motion";
+import { createAppMatchMedia, MOTION, shouldReduceAppMotion } from "@/lib/motion";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
@@ -55,6 +55,8 @@ export function SelectedWorkSection() {
 
   const activeFilterHue =
     activeFilter === "All" ? null : getCategoryHue(activeFilter);
+
+  const isStackMode = activeFilter === "All" && !showAllSystems;
 
   const captureGridFlip = () => {
     const grid = gridRef.current;
@@ -118,26 +120,108 @@ export function SelectedWorkSection() {
 
       if (appReduced) {
         gsap.set(items, { clearProps: "transform,opacity" });
+        items.forEach((item) => {
+          const card = item.querySelector("article");
+          const dimmer = item.querySelector("[data-stack-dimmer]");
+          if (card) gsap.set(card, { clearProps: "transform" });
+          if (dimmer) gsap.set(dimmer, { opacity: 0 });
+        });
         return;
       }
 
-      const setupCardEnvelopes = () => {
-        items.forEach((item) => {
-          attachBidirectionalScrollEnvelope(item, {
-            enterOpacity: 0.05,
-            enterY: 48,
-            enterScale: 0.93,
-            exitOpacity: 0.05,
-            exitY: -46,
-            exitScale: 0.935,
+      const appMm = createAppMatchMedia();
+      let disposed = false;
+
+      const setupCardMotion = () => {
+        if (disposed) return;
+        appMm.register(({ conditions }) => {
+          if (conditions.appReduced) {
+            gsap.set(items, { clearProps: "transform,opacity" });
+            return;
+          }
+
+          if (conditions.desktopFine && isStackMode && items.length > 1) {
+            attachBidirectionalScrollEnvelope(items[0], {
+              disableExitFade: true,
+              enterOpacity: 0.14,
+              enterY: 34,
+              enterScale: 0.965,
+            });
+
+            for (let i = 0; i < items.length - 1; i++) {
+              const currentCard = items[i].querySelector<HTMLElement>("article");
+              const dimmer = items[i].querySelector<HTMLElement>("[data-stack-dimmer]");
+              const nextWrapper = items[i + 1];
+
+              if (currentCard) {
+                gsap.fromTo(
+                  currentCard,
+                  { scale: 1, yPercent: 0 },
+                  {
+                    scale: 0.94,
+                    yPercent: -2,
+                    ease: "none",
+                    scrollTrigger: {
+                      trigger: nextWrapper,
+                      start: "top 86%",
+                      end: "top 24%",
+                      scrub: MOTION.scrollTrigger.scrub,
+                      invalidateOnRefresh: true,
+                    },
+                  }
+                );
+              }
+              if (dimmer) {
+                gsap.fromTo(
+                  dimmer,
+                  { opacity: 0 },
+                  {
+                    opacity: 0.48,
+                    ease: "none",
+                    scrollTrigger: {
+                      trigger: nextWrapper,
+                      start: "top 86%",
+                      end: "top 24%",
+                      scrub: MOTION.scrollTrigger.scrub,
+                      invalidateOnRefresh: true,
+                    },
+                  }
+                );
+              }
+            }
+
+            attachBidirectionalScrollEnvelope(items[items.length - 1], {
+              disableExitFade: true,
+              enterOpacity: 0.2,
+              enterY: 28,
+              enterScale: 0.975,
+            });
+            return;
+          }
+
+          items.forEach((item) => {
+            const card = item.querySelector("article");
+            const dimmer = item.querySelector("[data-stack-dimmer]");
+            if (card) gsap.set(card, { clearProps: "transform" });
+            if (dimmer) gsap.set(dimmer, { opacity: 0 });
+            attachBidirectionalScrollEnvelope(item, {
+              enterOpacity: 0.14,
+              enterY: conditions.mobile ? 22 : 34,
+              enterScale: conditions.mobile ? 0.97 : 0.955,
+            });
           });
         });
       };
 
+      const cleanup = () => {
+        disposed = true;
+        appMm.mm.revert();
+      };
+
       if (!hasInteractedRef.current) {
         hasInteractedRef.current = true;
-        setupCardEnvelopes();
-        return;
+        setupCardMotion();
+        return cleanup;
       }
 
       if (capturedFlip) {
@@ -163,11 +247,12 @@ export function SelectedWorkSection() {
               }
             ),
           onComplete: () => {
-            setupCardEnvelopes();
+            if (disposed) return;
+            setupCardMotion();
             ScrollTrigger.refresh();
           },
         });
-        return;
+        return cleanup;
       }
 
       const staggerStep =
@@ -186,11 +271,14 @@ export function SelectedWorkSection() {
           ease: MOTION.gsapEase,
           clearProps: "transform,opacity",
           onComplete: () => {
-            setupCardEnvelopes();
+            if (disposed) return;
+            setupCardMotion();
             ScrollTrigger.refresh();
           },
         }
       );
+
+      return cleanup;
     },
     { scope: gridRef, dependencies: [activeFilter, showAllSystems, appReduced] }
   );
@@ -198,7 +286,7 @@ export function SelectedWorkSection() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       ScrollTrigger.refresh();
-    }, 480);
+    }, 720);
     return () => window.clearTimeout(timer);
   }, [activeFilter, showAllSystems]);
 
@@ -220,6 +308,7 @@ export function SelectedWorkSection() {
   const hiddenCount = byCategory.length - visibleProjects.length;
 
   function getCardSpanClass(position: number, total: number): string {
+    if (isStackMode) return "lg:col-span-12 lg:sticky lg:top-[calc(84px+var(--stack-i)*18px)]";
     if (position === 0) return "lg:col-span-12";
     const remaining = total - 1;
     const remIndex = position - 1;
@@ -231,18 +320,21 @@ export function SelectedWorkSection() {
     <section
       ref={sectionRef}
       id="work"
-      className="relative z-[3] -mt-6 overflow-x-clip rounded-t-[1.75rem] border-t border-t-[rgba(56,189,248,0.22)] border-b border-b-[rgba(240,246,252,0.08)] bg-[linear-gradient(180deg,#111722_0%,#0D1117_140px)] py-28 shadow-[0_-28px_72px_rgba(0,0,0,0.9)] sm:-mt-8 sm:rounded-t-[2.25rem] sm:py-36 lg:py-40"
+      className="relative z-[3] -mt-6 overflow-x-clip rounded-t-[1.75rem] border-t border-t-[rgba(56,189,248,0.22)] border-b border-b-[rgba(240,246,252,0.08)] bg-[linear-gradient(180deg,#111722_0%,#0D1117_140px)] py-28 shadow-[0_-32px_84px_rgba(2,8,23,0.94)] sm:-mt-8 sm:rounded-t-[2.25rem] sm:py-36 lg:py-40"
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
           <div className="relative flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
             <div>
               <p className="font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#38BDF8]">
-                01 / Selected Work
+                <ScrambleMetric value="01" />{" "}
+                <span className="text-[#8B949E]">/</span>{" "}
+                <span>Selected Work</span>
               </p>
               <KineticHeading
                 as="h2"
-                className="mt-4 font-display text-[clamp(2.4rem,5vw,4.3rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
+                reveal="mask-lines"
+                className="velocity-skew-heading mt-4 font-display text-[clamp(2.4rem,5vw,4.3rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
               >
                 SYSTEM ARCHITECTURES,{" "}
                 <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
@@ -341,20 +433,22 @@ export function SelectedWorkSection() {
 
             <span
               aria-live="polite"
-              className="ml-auto font-mono text-xs text-[#8B949E] tabular-nums"
+              className="ml-auto font-mono text-xs tracking-[0.12em] text-[#8B949E] tabular-nums"
             >
-              Showing {visibleProjects.length} of {projects.length}
+              {String(visibleProjects.length).padStart(2, "0")} / {String(projects.length).padStart(2, "0")}
             </span>
           </div>
         </SectionReveal>
 
           <div
             ref={gridRef}
-            className="mt-10 grid grid-flow-dense grid-cols-1 gap-6 lg:grid-cols-12"
+            className={`mt-10 grid grid-flow-dense grid-cols-1 lg:grid-cols-12 ${
+              isStackMode ? "gap-8 pb-6" : "gap-6"
+            }`}
           >
             {visibleProjects.map(({ project, num }, position) => {
               const spanClass = getCardSpanClass(position, visibleProjects.length);
-              const isWideCard = spanClass === "lg:col-span-12";
+              const isWideCard = isStackMode || spanClass === "lg:col-span-12";
               const hue = getCategoryHue(project.category);
 
               const handleCardPointerMove = (event: PointerEvent<HTMLElement>) => {
@@ -388,12 +482,31 @@ export function SelectedWorkSection() {
               };
 
               return (
-                <div key={project.slug} data-bento-item className={spanClass}>
+                <div
+                  key={project.slug}
+                  data-bento-item
+                  data-stack-card={isStackMode ? "true" : undefined}
+                  style={
+                    isStackMode
+                      ? ({
+                          "--stack-i": position,
+                          zIndex: 10 + position,
+                        } as CSSProperties)
+                      : undefined
+                  }
+                  className={spanClass}
+                >
                   <article
+                    data-cursor="VIEW CASE ↗"
                     onPointerMove={handleCardPointerMove}
                     onPointerLeave={handleCardPointerLeave}
-                    className="bento-tilt-card double-bezel-outer group h-full hover:border-[rgba(240,246,252,0.22)]"
+                    className="bento-tilt-card double-bezel-outer group relative h-full hover:border-[rgba(240,246,252,0.22)]"
                   >
+                    <div
+                      data-stack-dimmer
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-[#06090F] opacity-0"
+                    />
                     <div
                       style={{ "--spotlight-color": hue.softBg } as CSSProperties}
                       className="double-bezel-core spotlight-card flex h-full flex-col justify-between overflow-hidden p-5 sm:p-7"
@@ -448,10 +561,10 @@ export function SelectedWorkSection() {
                             <MagneticButton>
                               <TransitionLink
                                 href={`/work/${project.slug}`}
-                                className="group/cta inline-flex min-h-[44px] items-center gap-3 rounded-full bg-[#38BDF8] py-2 pl-5 pr-2.5 font-sans text-sm font-semibold text-[#0D1117] transition-colors hover:bg-[#7DD3FC]"
+                                className="group/cta inline-flex min-h-[44px] items-center gap-3 rounded-full bg-[#38BDF8] py-2 pl-5 pr-2.5 font-sans text-sm font-semibold text-[#0D1117] transition-[background-color,color,transform] duration-500 ease-[var(--ease-editorial)] hover:bg-[#7DD3FC] active:scale-[0.98]"
                               >
                                 <span>Read case study</span>
-                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15 transition-transform duration-200 group-hover/cta:translate-x-0.5 group-hover/cta:-translate-y-0.5">
+                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15 transition-transform duration-500 ease-[var(--ease-editorial)] group-hover/cta:translate-x-[3px] group-hover/cta:-translate-y-[2px] group-hover/cta:scale-105">
                                   <ArrowUpRight className="h-4 w-4" weight="regular" aria-hidden="true" />
                                 </span>
                               </TransitionLink>
@@ -460,7 +573,8 @@ export function SelectedWorkSection() {
                               href={project.href}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.12)] px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3]"
+                              data-cursor="OPEN ↗"
+                              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.12)] px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3] transition-colors hover:border-[#38BDF8] hover:text-[#E6EDF3] active:scale-[0.98]"
                             >
                               <span>Source</span>
                               <ArrowUpRight className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />

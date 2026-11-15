@@ -7,7 +7,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 import { ArrowDownRight, FilePdf } from "@phosphor-icons/react";
 import { profile } from "@/data/site";
-import { MOTION } from "@/lib/motion";
+import { createAppMatchMedia, MOTION, setPortfolioScrollState } from "@/lib/motion";
 import { MagneticButton } from "@/components/motion/MagneticButton";
 import { KineticHeading } from "@/components/motion/KineticText";
 import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
@@ -45,14 +45,19 @@ export function HeroEditorial() {
       const hero = heroRef.current;
       if (!hero) return;
 
-      if (appReduced) {
+      const clearHeroState = () => {
+        setPortfolioScrollState({ heroProgress: 0 });
         gsap.set(["[data-hero-copy]", "[data-hero-stage]", "[data-hero-exit-veil]"], {
-          clearProps: "transform,opacity",
+          clearProps: "transform,opacity,filter",
         });
+      };
+
+      if (appReduced) {
+        clearHeroState();
         return;
       }
 
-      // 3-beat entrance: Beat 1 eyebrow -> Beat 2 KineticHeading (handled by immediate) -> Beat 3 copy/CTAs + stage settle
+      // 3-beat entrance: Beat 1 eyebrow -> Beat 2 KineticHeading -> Beat 3 copy/CTAs + stage settle
       const tl = gsap.timeline({ defaults: { ease: MOTION.gsapEase } });
       tl.from("[data-hero-beat='1']", {
         y: 12,
@@ -79,36 +84,93 @@ export function HeroEditorial() {
           0.18
         );
 
-      // Cinematic curtain recession & bidirectional fade-out as #work rises over #hero
-      const exitTl = gsap.timeline({
-        scrollTrigger: {
-          trigger: hero,
-          start: "top top",
-          end: "bottom 22%",
-          scrub: 0.45,
-          invalidateOnRefresh: true,
-        },
+      const mm = createAppMatchMedia().register(({ conditions }) => {
+        if (conditions.appReduced) {
+          clearHeroState();
+          return;
+        }
+
+        if (conditions.desktopFine) {
+          // Desktop pinned curtain: hold #hero in place while #work slides over it cleanly
+          const pinTl = gsap.timeline({
+            scrollTrigger: {
+              trigger: hero,
+              start: "top top",
+              end: "+=70%",
+              pin: true,
+              pinSpacing: false,
+              scrub: 0.45,
+              invalidateOnRefresh: true,
+              onUpdate: (self) => {
+                setPortfolioScrollState({ heroProgress: self.progress });
+              },
+              onLeaveBack: () => {
+                setPortfolioScrollState({ heroProgress: 0 });
+              },
+            },
+          });
+
+          pinTl
+            .fromTo(
+              "[data-hero-copy]",
+              { y: 0, scale: 1, opacity: 1, filter: "blur(0px)" },
+              { y: -60, scale: 0.96, opacity: 0.16, filter: "blur(6px)", ease: "power1.in" },
+              0
+            )
+            .fromTo(
+              "[data-hero-stage]",
+              { y: 0, scale: 1, opacity: 1 },
+              { y: -22, scale: 0.9, opacity: 0.34, ease: "power1.in" },
+              0
+            )
+            .fromTo(
+              "[data-hero-exit-veil]",
+              { opacity: 0 },
+              { opacity: 0.8, ease: "none" },
+              0
+            );
+          return;
+        }
+
+        // Mobile fallback: zero pin, smooth unpinned recession
+        const mobileExitTl = gsap.timeline({
+          scrollTrigger: {
+            trigger: hero,
+            start: "top top",
+            end: "bottom 28%",
+            scrub: 0.45,
+            invalidateOnRefresh: true,
+            onUpdate: (self) => {
+              setPortfolioScrollState({ heroProgress: self.progress });
+            },
+          },
+        });
+
+        mobileExitTl
+          .fromTo(
+            "[data-hero-copy]",
+            { y: 0, opacity: 1 },
+            { y: -36, opacity: 0.25, ease: "power1.in" },
+            0
+          )
+          .fromTo(
+            "[data-hero-stage]",
+            { scale: 1, opacity: 1 },
+            { scale: 0.94, opacity: 0.36, ease: "power1.in" },
+            0
+          )
+          .fromTo(
+            "[data-hero-exit-veil]",
+            { opacity: 0 },
+            { opacity: 0.65, ease: "none" },
+            0
+          );
       });
 
-      exitTl
-        .fromTo(
-          "[data-hero-copy]",
-          { y: 0, scale: 1, opacity: 1 },
-          { y: -86, scale: 0.93, opacity: 0.04, ease: "power1.in" },
-          0
-        )
-        .fromTo(
-          "[data-hero-stage]",
-          { y: 0, scale: 1, opacity: 1 },
-          { y: -42, scale: 0.9, opacity: 0.06, ease: "power1.in" },
-          0
-        )
-        .fromTo(
-          "[data-hero-exit-veil]",
-          { opacity: 0 },
-          { opacity: 0.72, ease: "none" },
-          0
-        );
+      return () => {
+        mm.revert();
+        setPortfolioScrollState({ heroProgress: 0 });
+      };
     },
     { scope: heroRef, dependencies: [appReduced] }
   );
@@ -117,6 +179,7 @@ export function HeroEditorial() {
     <section
       ref={heroRef}
       id="hero"
+      data-cursor-hero
       className="relative z-[2] flex min-h-[100dvh] items-center overflow-hidden bg-[#0D1117] pt-20 pb-20 sm:pt-24 sm:pb-20 lg:pt-20 lg:pb-14"
     >
       {/* Interactive Cursor-Reactive Precision Lattice Field */}
@@ -151,7 +214,7 @@ export function HeroEditorial() {
               as="h1"
               immediate
               delay={0.05}
-              className="mt-4 max-w-5xl font-display text-[clamp(2.45rem,6.4vw,5.5rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3] sm:mt-5"
+              className="velocity-skew-heading mt-4 max-w-5xl font-display text-[clamp(2.45rem,6.4vw,5.5rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3] sm:mt-5"
             >
               RELIABLE{" "}
               <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
@@ -170,10 +233,10 @@ export function HeroEditorial() {
               <MagneticButton>
                 <a
                   href="#work"
-                  className="group inline-flex min-h-[44px] items-center gap-3 rounded-full bg-[#38BDF8] py-2 pl-6 pr-2.5 font-sans text-sm font-semibold text-[#0D1117] transition-colors duration-300 hover:bg-[#7DD3FC] active:scale-[0.98]"
+                  className="group inline-flex min-h-[44px] items-center gap-3 rounded-full bg-[#38BDF8] py-2 pl-6 pr-2.5 font-sans text-sm font-semibold text-[#0D1117] transition-[background-color,color,transform] duration-500 ease-[var(--ease-editorial)] hover:bg-[#7DD3FC] active:scale-[0.98]"
                 >
                   <span>Explore Work</span>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:translate-y-0.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15 transition-transform duration-500 ease-[var(--ease-editorial)] group-hover:translate-x-[3px] group-hover:translate-y-[2px] group-hover:scale-105">
                     <ArrowDownRight className="h-4 w-4" weight="regular" aria-hidden="true" />
                   </span>
                 </a>
@@ -183,7 +246,8 @@ export function HeroEditorial() {
                 href={profile.resume}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22]/90 px-5 py-2.5 font-mono text-xs uppercase tracking-[0.14em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8]"
+                data-cursor="OPEN ↗"
+                className="group inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.14)] bg-[#161B22]/90 px-5 py-2.5 font-mono text-xs uppercase tracking-[0.14em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8] active:scale-[0.98]"
               >
                 <FilePdf
                   className="h-4 w-4 text-[#38BDF8] transition-transform duration-200 group-hover:-translate-y-0.5"

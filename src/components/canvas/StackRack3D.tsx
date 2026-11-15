@@ -258,7 +258,7 @@ function StackRack2DFallback({
                   ? `0 0 0 1px ${accentHue}55, inset 0 2px 0 rgba(255,255,255,0.08)`
                   : "0 3px 0 #090C10, inset 0 1px 0 rgba(255,255,255,0.06)",
               }}
-              className={`group flex min-h-[44px] flex-col justify-between rounded-xl border bg-[#161B22] px-2.5 py-1.5 text-left transition-all duration-150 sm:min-h-[50px] sm:px-3 sm:py-2 ${
+              className={`group flex min-h-[44px] flex-col justify-between rounded-xl border bg-[#161B22] px-2.5 py-1.5 text-left transition-[transform,background-color,border-color] duration-150 ease-[var(--ease-editorial)] active:scale-[0.98] sm:min-h-[50px] sm:px-3 sm:py-2 ${
                 isPicked
                   ? "translate-y-[2px] bg-[#1C2634]"
                   : "hover:border-[rgba(240,246,252,0.28)] hover:bg-[#1C222B]"

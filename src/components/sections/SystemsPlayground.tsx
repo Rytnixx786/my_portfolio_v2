@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ArrowUpRight, Cpu, GitBranch, Lightning, Sliders } from "@phosphor-icons/react";
@@ -14,14 +14,14 @@ import {
   RAG_STAGES,
   type SimulatorTab,
 } from "@/data/playground";
-import { MOTION } from "@/lib/motion";
+import { createAppMatchMedia, EASE, MOTION } from "@/lib/motion";
 import { TransitionLink } from "@/components/chrome/TransitionLink";
 import { KineticHeading, ScrambleMetric } from "@/components/motion/KineticText";
 import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
 import { useSlidingIndicator } from "@/components/motion/useSlidingIndicator";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { PlaygroundPipeline2D } from "./PlaygroundPipeline2D";
-import { SectionReveal } from "./SectionReveal";
+import { attachBidirectionalScrollEnvelope, SectionReveal } from "./SectionReveal";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
@@ -33,8 +33,13 @@ const LazyPlaygroundPipeline3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[265px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] font-mono text-xs text-[#8B949E] sm:h-[315px]">
-        Initializing 3D pipeline stage...
+      <div className="flex h-[265px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[315px]">
+        <svg viewBox="0 0 360 90" className="h-16 w-72 opacity-55" aria-hidden="true">
+          <line x1="28" y1="45" x2="332" y2="45" stroke="rgba(56,189,248,0.35)" strokeWidth="1.2" strokeDasharray="4 6" />
+          {[32, 92, 152, 212, 272, 332].map((cx) => (
+            <circle key={cx} cx={cx} cy="45" r="7" fill="#161B22" stroke="#38BDF8" strokeOpacity="0.45" strokeWidth="1.2" />
+          ))}
+        </svg>
       </div>
     ),
   }
@@ -54,7 +59,10 @@ export function SystemsPlayground() {
   const [lastStageId, setLastStageId] = useState<string | null>(null);
   const didToggleInspectorRef = useRef(false);
   const sectionRef = useRef<HTMLElement>(null);
+  const simPinStageRef = useRef<HTMLDivElement>(null);
+  const simShellRef = useRef<HTMLDivElement>(null);
   const telemetryPanelRef = useRef<HTMLDivElement>(null);
+  const bootTlRef = useRef<gsap.core.Timeline | null>(null);
   const hasTelemetryChangedRef = useRef(false);
   const appReduced = useAppReducedMotion();
 
@@ -81,26 +89,119 @@ export function SystemsPlayground() {
   useGSAP(
     () => {
       const section = sectionRef.current;
-      if (!section || appReduced) return;
-      const rule = section.querySelector<HTMLElement>("[data-section-rule]");
-      if (!rule) return;
+      const pinStage = simPinStageRef.current;
+      const simShell = simShellRef.current;
+      if (!section) return;
 
-      gsap.fromTo(
-        rule,
-        { scaleX: 0 },
-        {
-          scaleX: 1,
-          ease: "power2.out",
-          transformOrigin: "left center",
-          scrollTrigger: {
-            trigger: section,
-            start: "top 86%",
-            end: "top 44%",
-            scrub: 0.55,
-            invalidateOnRefresh: true,
-          },
+      const clearSimState = () => {
+        if (simShell) {
+          gsap.set(simShell, { clearProps: "clipPath,transform,opacity" });
         }
-      );
+        const chips = section.querySelectorAll<HTMLElement>("[data-stage-chip]");
+        if (chips.length > 0) {
+          gsap.set(chips, { clearProps: "transform,opacity" });
+        }
+      };
+
+      if (appReduced) {
+        clearSimState();
+        return;
+      }
+
+      const rule = section.querySelector<HTMLElement>("[data-section-rule]");
+      if (rule) {
+        gsap.fromTo(
+          rule,
+          { scaleX: 0 },
+          {
+            scaleX: 1,
+            ease: "power2.out",
+            transformOrigin: "left center",
+            scrollTrigger: {
+              trigger: section,
+              start: "top 86%",
+              end: "top 44%",
+              scrub: 0.55,
+              invalidateOnRefresh: true,
+            },
+          }
+        );
+      }
+
+      if (!pinStage || !simShell) return;
+
+      const mm = createAppMatchMedia().register(({ conditions }) => {
+        if (conditions.appReduced) {
+          clearSimState();
+          return;
+        }
+
+        if (conditions.desktopFine) {
+          const chips = pinStage.querySelectorAll<HTMLElement>("[data-stage-chip]");
+          const simHeaderRule = pinStage.querySelector<HTMLElement>("[data-sim-header-rule]");
+
+          const bootTl = gsap.timeline({
+            scrollTrigger: {
+              trigger: pinStage,
+              start: "top 96px",
+              end: "+=70%",
+              pin: true,
+              pinSpacing: true,
+              anticipatePin: 1,
+              scrub: 0.45,
+              invalidateOnRefresh: true,
+              onLeave: () => {
+                gsap.set(simShell, { clearProps: "clipPath,transform" });
+              },
+            },
+          });
+          bootTlRef.current = bootTl;
+
+          bootTl.fromTo(
+            simShell,
+            { clipPath: "inset(8% 5% round 2rem)", scale: 0.97, opacity: 0.55 },
+            {
+              clipPath: "inset(0% 0% round 1.75rem)",
+              scale: 1,
+              opacity: 1,
+              duration: 0.5,
+              ease: EASE.gsapOut,
+            },
+            0
+          );
+
+          if (simHeaderRule) {
+            bootTl.fromTo(
+              simHeaderRule,
+              { scaleX: 0 },
+              { scaleX: 1, duration: 0.35, ease: EASE.gsapOut },
+              0.12
+            );
+          }
+
+          if (chips.length > 0) {
+            bootTl.fromTo(
+              chips,
+              { y: 10, opacity: 0.35 },
+              { y: 0, opacity: 1, stagger: 0.08, duration: 0.35, ease: EASE.gsapOut },
+              0.32
+            );
+          }
+          return;
+        }
+
+        // Mobile: unpinned gentle scroll envelope
+        attachBidirectionalScrollEnvelope(simShell, {
+          enterOpacity: 0.16,
+          enterY: 24,
+          enterScale: 0.97,
+        });
+      });
+
+      return () => {
+        bootTlRef.current = null;
+        mm.revert();
+      };
     },
     { scope: sectionRef, dependencies: [appReduced] }
   );
@@ -180,11 +281,14 @@ export function SystemsPlayground() {
             />
             <div>
               <p className="font-mono text-xs font-medium uppercase tracking-[0.16em] text-[#38BDF8]">
-                02 / Interactive Pipeline Simulator
+                <ScrambleMetric value="02" />{" "}
+                <span className="text-[#8B949E]">/</span>{" "}
+                <span>Interactive Pipeline Simulator</span>
               </p>
               <KineticHeading
                 as="h2"
-                className="mt-4 font-display text-[clamp(2.4rem,5vw,4.2rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
+                reveal="mask-lines"
+                className="velocity-skew-heading mt-4 font-display text-[clamp(2.4rem,5vw,4.2rem)] font-bold uppercase leading-[0.92] tracking-[-0.02em] text-[#E6EDF3]"
               >
                 TRACE EXECUTION,{" "}
                 <span className="font-serif-detail font-normal italic lowercase text-[#38BDF8]">
@@ -253,16 +357,41 @@ export function SystemsPlayground() {
           </div>
         </SectionReveal>
 
-        <SectionReveal variant="scrub-depth" className="mt-8">
+        <div ref={simPinStageRef} className="mt-8">
           <div
+            ref={simShellRef}
             id="panel-simulator"
             role="tabpanel"
             aria-labelledby={tab === "cinch" ? "tab-cinch" : "tab-rag"}
-            className="double-bezel-outer"
+            onPointerDownCapture={() => {
+              if (bootTlRef.current && bootTlRef.current.progress() < 0.99) {
+                bootTlRef.current.progress(1);
+                if (simShellRef.current) {
+                  gsap.set(simShellRef.current, { clearProps: "clipPath,transform,opacity" });
+                }
+                const chips = sectionRef.current?.querySelectorAll<HTMLElement>("[data-stage-chip]");
+                if (chips && chips.length > 0) {
+                  gsap.set(chips, { clearProps: "transform,opacity" });
+                }
+              }
+            }}
+            onPointerMove={(e: PointerEvent<HTMLDivElement>) => {
+              if (e.pointerType === "touch") return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              e.currentTarget.style.setProperty("--mouse-x", `${e.clientX - rect.left}px`);
+              e.currentTarget.style.setProperty("--mouse-y", `${e.clientY - rect.top}px`);
+            }}
+            style={{ "--spotlight-color": "rgba(56, 189, 248, 0.1)" } as CSSProperties}
+            className="double-bezel-outer spotlight-card"
           >
           <div className="double-bezel-core overflow-hidden">
             {/* Simulator Header Controls */}
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[rgba(240,246,252,0.08)] bg-[#1C222B] px-4 py-3 sm:px-6">
+            <div className="relative flex flex-wrap items-center justify-between gap-4 border-b border-[rgba(240,246,252,0.08)] bg-[#1C222B] px-4 py-3 sm:px-6">
+              <span
+                data-sim-header-rule
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-px origin-left bg-gradient-to-r from-[#38BDF8]/65 to-transparent"
+              />
               <div className="flex flex-wrap items-center gap-2">
                 <Lightning className="h-4 w-4 text-[#38BDF8]" weight="regular" aria-hidden="true" />
                 <span className="font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3]">
@@ -429,7 +558,7 @@ export function SystemsPlayground() {
                   const isActive = effectiveStages.includes(stage.id);
                   const isFocused = focusedStageId === stage.id;
                   return (
-                    <li key={stage.id}>
+                    <li key={stage.id} data-stage-chip>
                       <button
                         type="button"
                         onClick={() => toggleStageFocus(stage.id)}
@@ -567,7 +696,7 @@ export function SystemsPlayground() {
             </div>
           </div>
           </div>
-        </SectionReveal>
+        </div>
       </div>
     </section>
   );

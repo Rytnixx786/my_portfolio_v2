@@ -89,6 +89,7 @@ function GlobeAssembly({
   const focusAngleRef = useRef<number | null>(null);
   const lastSelectedRef = useRef<string>(selectedId);
   const lastResetSeqRef = useRef<number>(resetSeq);
+  const entryBoostRef = useRef(0);
   const { frameloop, gl, invalidate } = useThree();
 
   const dhakaPos = useMemo(() => latLonToVec3(DHAKA_LAT, DHAKA_LON, 1.32), []);
@@ -153,7 +154,21 @@ function GlobeAssembly({
 
   useEffect(() => {
     const dom = gl.domElement;
+    let observer: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver !== "undefined" && !shouldReduceAppMotion()) {
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry?.isIntersecting) {
+            entryBoostRef.current = 0.85;
+            observer?.disconnect();
+          }
+        },
+        { threshold: 0.2 }
+      );
+      observer.observe(dom);
+    }
     return () => {
+      observer?.disconnect();
       dom.style.cursor = "auto";
     };
   }, [gl]);
@@ -163,6 +178,7 @@ function GlobeAssembly({
     const dt = Math.min(delta, 0.05);
     if (!isStatic) {
       elapsedRef.current += dt;
+      entryBoostRef.current = THREE.MathUtils.damp(entryBoostRef.current, 0, 2.2, dt);
     }
     const t = elapsedRef.current;
 
@@ -187,7 +203,7 @@ function GlobeAssembly({
         const scrollVelocity = !shouldReduceAppMotion()
           ? Math.min(0.65, Math.abs(getPortfolioScrollState().velocity) * 0.012)
           : 0;
-        groupRef.current.rotation.y += dt * (0.095 + scrollVelocity);
+        groupRef.current.rotation.y += dt * (0.095 + scrollVelocity + entryBoostRef.current);
       }
     } else if (draggingRef.current) {
       focusAngleRef.current = null;
