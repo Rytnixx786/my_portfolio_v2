@@ -7,7 +7,14 @@ import {
   matchPortfolioQuery,
 } from "@/lib/query-engine";
 import { CATEGORY_HUES } from "@/lib/palette";
-import { resolveEffectiveTier, resolveQualityReason, detectMotionPreference } from "@/lib/device-tier";
+import {
+  CANVAS_RESIZE_CONFIG,
+  resolveEffectiveTier,
+  resolveMaxWebGLSlots,
+  resolveQualityReason,
+  detectMotionPreference,
+  shouldShowViewport2DFallback,
+} from "@/lib/device-tier";
 import { classifyNodeKind } from "@/lib/architecture";
 import {
   CHOREO,
@@ -622,5 +629,141 @@ describe("motion contract, ScrambleMetric numeric parsing, scroll-to-top, and 3D
     expect(
       resolveMatchMediaConditions({ width: 1440, finePointer: true, appReduced: true })
     ).toEqual({ desktopFine: false, mobile: false, appReduced: true });
+  });
+
+  it("prevents scroll-debounce starvation and black #0D1117 underlays across WebGL slots", () => {
+    // R3F resize config must disable scroll debounce so ResizeObserver never stalls at 0x0 during slow scroll
+    expect(CANVAS_RESIZE_CONFIG).toEqual({ scroll: false, debounce: 0 });
+    expect(resolveMaxWebGLSlots("high")).toBe(4);
+    expect(resolveMaxWebGLSlots("mid")).toBe(2);
+    expect(resolveMaxWebGLSlots("low")).toBe(0);
+
+    // Pre-mount SSR guard keeps hydration deterministic
+    expect(
+      shouldShowViewport2DFallback({
+        hasMounted: false,
+        canRender3D: true,
+        hasLoadingFallback: false,
+        hasSlot: true,
+        isPoolSaturated: false,
+        slotWaitElapsed: false,
+      })
+    ).toBe(false);
+
+    // Vector-SVG scenes (no custom loadingFallback) keep 2D underlay mounted while WebGL initializes or waits
+    expect(
+      shouldShowViewport2DFallback({
+        hasMounted: true,
+        canRender3D: true,
+        hasLoadingFallback: false,
+        hasSlot: true,
+        isPoolSaturated: false,
+        slotWaitElapsed: false,
+      })
+    ).toBe(true);
+
+    // Hero (hasLoadingFallback=true) avoids duplicate portrait loads while actively initializing
+    expect(
+      shouldShowViewport2DFallback({
+        hasMounted: true,
+        canRender3D: true,
+        hasLoadingFallback: true,
+        hasSlot: true,
+        isPoolSaturated: false,
+        slotWaitElapsed: false,
+      })
+    ).toBe(false);
+
+    // Hero still falls back to 2D if saturated GPU pool refuses a slot past grace delay
+    expect(
+      shouldShowViewport2DFallback({
+        hasMounted: true,
+        canRender3D: true,
+        hasLoadingFallback: true,
+        hasSlot: false,
+        isPoolSaturated: true,
+        slotWaitElapsed: true,
+      })
+    ).toBe(true);
+
+    const localCanvasSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/canvas/LocalCanvasInner.tsx"),
+      "utf8"
+    );
+    expect(localCanvasSrc).toContain("resize={CANVAS_RESIZE_CONFIG}");
+  });
+
+  it("keeps cursor visible above Top-Layer CommandPalette dialog and prevents Simulator clip cropping", () => {
+    const cursorSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/chrome/CustomCursor.tsx"),
+      "utf8"
+    );
+    const paletteSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/chrome/CommandPalette.tsx"),
+      "utf8"
+    );
+    const cssSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/app/globals.css"),
+      "utf8"
+    );
+    const simSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/sections/SystemsPlayground.tsx"),
+      "utf8"
+    );
+
+    expect(cursorSrc).toContain('popover="manual"');
+    expect(cursorSrc).toContain("showPopover");
+    expect(cursorSrc).toContain("capture: true");
+    expect(cursorSrc).toContain("button:disabled");
+    expect(paletteSrc).toContain("portfolio:top-layer-raise");
+    expect(cssSrc).toContain("dialog[open]");
+    expect(cssSrc).toContain("cursor: not-allowed !important");
+    expect(simSrc).not.toContain("inset(8% 5%");
+  });
+
+  it("never dismisses 2D fallback blindly before a sized WebGL frame renders and avoids blank loading placeholders", () => {
+    const localCanvasSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/canvas/LocalCanvasInner.tsx"),
+      "utf8"
+    );
+    const previewPlateSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/sections/ProjectPreviewPlate.tsx"),
+      "utf8"
+    );
+    const archDiagramSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/case-study/ArchitectureDiagram.tsx"),
+      "utf8"
+    );
+    const archDiagram3DSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/case-study/ArchitectureDiagram3D.tsx"),
+      "utf8"
+    );
+    const viewportCanvasSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/canvas/ViewportCanvas.tsx"),
+      "utf8"
+    );
+    const stackRackSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/canvas/StackRack3D.tsx"),
+      "utf8"
+    );
+    const globeSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/canvas/TelemetryGlobe3D.tsx"),
+      "utf8"
+    );
+    const heroCoreSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/canvas/HeroOrbitalCore3D.tsx"),
+      "utf8"
+    );
+
+    expect(localCanvasSrc).toContain("gl.domElement.width <= 0");
+    expect(localCanvasSrc).not.toContain("safetyTimerRef");
+    expect(previewPlateSrc).not.toContain("Loading interactive 3D topology...");
+    expect(archDiagramSrc).not.toContain("Loading spatial 3D topology...");
+    expect(archDiagram3DSrc).not.toContain("Loading spatial 3D topology...");
+    expect(viewportCanvasSrc).toContain("opacity: canvasReady ? 0 : 1");
+    expect(stackRackSrc).toContain("distScale");
+    expect(stackRackSrc).toContain("max-w-[calc(100%-184px)]");
+    expect(globeSrc).toContain("max-w-[calc(100%-180px)]");
+    expect(heroCoreSrc).toContain("max-w-[calc(100%-182px)]");
   });
 });

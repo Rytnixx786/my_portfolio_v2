@@ -16,6 +16,7 @@ import {
   detectMotionPreference,
   hasWebGLSupport,
   resolveEffectiveTier,
+  resolveMaxWebGLSlots,
   resolveQualityReason,
   type DeviceTier,
   type QualityPreference,
@@ -175,8 +176,9 @@ const WebGLContext = createContext<WebGLContextValue>({
 
 /**
  * Global WebGL quality, reduced-motion, and LRU WebGL context slot-pool provider.
- * Caps active container-scoped <Canvas> instances (max 3 on high, 2 on mid) so
- * WebGL scenes stay 100% locked to their DOM containers on scroll without hitting browser context limits.
+ * Caps active container-scoped <Canvas> instances (max 4 on high so 3 sticky-stacked
+ * work cards + preloaded simulator coexist smoothly, 2 on mid) so WebGL scenes stay
+ * 100% locked to their DOM containers on scroll without hitting browser context limits.
  */
 export function WebGLContextProvider({ children }: { children: ReactNode }) {
   const {
@@ -215,7 +217,7 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
     return resolveEffectiveTier(preference, hardwareTier, webglSupported);
   }, [hasMounted, preference, hardwareTier, webglSupported]);
 
-  const maxSlots = effectiveTier === "high" ? 3 : effectiveTier === "mid" ? 2 : 0;
+  const maxSlots = resolveMaxWebGLSlots(effectiveTier);
 
   const activeSlotIds = useMemo<ReadonlySet<string>>(() => {
     if (maxSlots <= 0 || slotOrder.length === 0) {

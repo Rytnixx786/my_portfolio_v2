@@ -192,71 +192,75 @@ export function ContactSection() {
               Available for AI engineering, LLM serving, and backend teams.
             </ScrollScrubText>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3.5">
-              <div data-contact-cta>
-                <MagneticButton>
-                  <a
-                    href={`mailto:${profile.email}`}
-                    className="group inline-flex min-h-[46px] items-center gap-3 rounded-full bg-[#38BDF8] py-2 pl-6 pr-2.5 font-sans text-sm font-semibold text-[#0D1117] transition-[background-color,color,transform] duration-500 ease-[var(--ease-editorial)] hover:bg-[#7DD3FC] active:scale-[0.98]"
-                  >
-                    <EnvelopeSimple className="h-4 w-4" weight="regular" aria-hidden="true" />
-                    <span>Email · {profile.email}</span>
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15 text-[#0D1117] transition-transform duration-500 ease-[var(--ease-editorial)] group-hover:translate-x-[3px] group-hover:-translate-y-[2px] group-hover:scale-105">
-                      <ArrowUpRight className="h-4 w-4" weight="regular" aria-hidden="true" />
-                    </span>
-                  </a>
-                </MagneticButton>
-              </div>
+            <div className="mt-8 flex flex-col items-start gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div data-contact-cta>
+                  <MagneticButton>
+                    <a
+                      href={`mailto:${profile.email}`}
+                      className="group inline-flex min-h-[46px] items-center gap-3 rounded-full bg-[#38BDF8] py-2 pl-6 pr-2.5 font-sans text-sm font-semibold text-[#0D1117] transition-[background-color,color,transform] duration-500 ease-[var(--ease-editorial)] hover:bg-[#7DD3FC] active:scale-[0.98]"
+                    >
+                      <EnvelopeSimple className="h-4 w-4" weight="regular" aria-hidden="true" />
+                      <span>Email · {profile.email}</span>
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0D1117]/15 text-[#0D1117] transition-transform duration-500 ease-[var(--ease-editorial)] group-hover:translate-x-[3px] group-hover:-translate-y-[2px] group-hover:scale-105">
+                        <ArrowUpRight className="h-4 w-4" weight="regular" aria-hidden="true" />
+                      </span>
+                    </a>
+                  </MagneticButton>
+                </div>
 
-              <button
-                data-contact-cta
-                data-cursor={copied ? "COPIED ✓" : "COPY"}
-                type="button"
-                onClick={() => void copy(profile.email)}
-                className={`inline-flex min-h-[46px] items-center gap-2 rounded-full border px-5 font-mono text-xs uppercase tracking-[0.12em] transition-colors active:scale-[0.98] ${
-                  copied
-                    ? "border-[#10B981]/50 bg-[#10B981]/10 text-[#10B981]"
-                    : "border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#E6EDF3] hover:border-[#38BDF8] hover:text-[#38BDF8]"
-                }`}
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4 text-[#10B981]" weight="regular" aria-hidden="true" />
-                    <span>Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 text-[#9DA7B3]" weight="regular" aria-hidden="true" />
-                    <span>Copy Email</span>
-                  </>
-                )}
-              </button>
-
-              <div data-contact-cta>
-                <TransitionLink
-                  href="/brief"
-                  className="group inline-flex min-h-[46px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8] active:scale-[0.98]"
+                <button
+                  data-contact-cta
+                  data-cursor={copied ? "COPIED ✓" : "COPY"}
+                  type="button"
+                  onClick={() => void copy(profile.email)}
+                  className={`inline-flex min-h-[46px] items-center gap-2 rounded-full border px-5 font-mono text-xs uppercase tracking-[0.12em] transition-colors active:scale-[0.98] ${
+                    copied
+                      ? "border-[#10B981]/50 bg-[#10B981]/10 text-[#10B981]"
+                      : "border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#E6EDF3] hover:border-[#38BDF8] hover:text-[#38BDF8]"
+                  }`}
                 >
-                  <span>Recruiter Brief</span>
-                  <ArrowUpRight
-                    className="h-3.5 w-3.5 transition-transform duration-300 ease-[var(--ease-editorial)] group-hover:translate-x-[2px] group-hover:-translate-y-[2px]"
-                    weight="regular"
-                    aria-hidden="true"
-                  />
-                </TransitionLink>
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4 text-[#10B981]" weight="regular" aria-hidden="true" />
+                      <span>Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 text-[#9DA7B3]" weight="regular" aria-hidden="true" />
+                      <span>Copy Email</span>
+                    </>
+                  )}
+                </button>
               </div>
 
-              <a
-                data-contact-cta
-                data-cursor="OPEN ↗"
-                href={profile.resume}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-[46px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8] active:scale-[0.98]"
-              >
-                <FilePdf className="h-4 w-4 text-[#38BDF8]" weight="regular" aria-hidden="true" />
-                <span>Resume PDF</span>
-              </a>
+              <div className="flex flex-wrap items-center gap-3">
+                <div data-contact-cta>
+                  <TransitionLink
+                    href="/brief"
+                    className="group inline-flex min-h-[46px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8] active:scale-[0.98]"
+                  >
+                    <span>Recruiter Brief</span>
+                    <ArrowUpRight
+                      className="h-3.5 w-3.5 transition-transform duration-300 ease-[var(--ease-editorial)] group-hover:translate-x-[2px] group-hover:-translate-y-[2px]"
+                      weight="regular"
+                      aria-hidden="true"
+                    />
+                  </TransitionLink>
+                </div>
+
+                <a
+                  data-contact-cta
+                  data-cursor="OPEN ↗"
+                  href={profile.resume}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-[46px] items-center gap-2 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] px-5 font-mono text-xs uppercase tracking-[0.12em] text-[#E6EDF3] transition-colors hover:border-[#38BDF8] hover:text-[#38BDF8] active:scale-[0.98]"
+                >
+                  <FilePdf className="h-4 w-4 text-[#38BDF8]" weight="regular" aria-hidden="true" />
+                  <span>Resume PDF</span>
+                </a>
+              </div>
             </div>
           </div>
 

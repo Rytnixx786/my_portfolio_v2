@@ -51,6 +51,7 @@ export function CommandPalette() {
       lastFocusedRef.current = document.activeElement;
     }
     if (!dlg.open) dlg.showModal();
+    window.dispatchEvent(new CustomEvent("portfolio:top-layer-raise"));
     setOpen(true);
     window.setTimeout(() => inputRef.current?.focus(), 40);
   }, []);
@@ -134,32 +135,32 @@ export function CommandPalette() {
       className="palette-dialog m-auto w-[min(740px,94vw)] rounded-3xl border border-[rgba(240,246,252,0.14)] bg-[#161B22] p-0 text-[#E6EDF3] shadow-2xl"
     >
       <div className="flex flex-col overflow-hidden rounded-3xl">
-        <div className="flex items-center justify-between gap-3 border-b border-[rgba(240,246,252,0.08)] bg-[#1C222B] px-5 py-3.5">
-          <div className="flex items-center gap-2 font-mono text-xs text-[#38BDF8]">
-            <TerminalWindow className="h-4 w-4" weight="regular" aria-hidden="true" />
-            <span className="font-semibold">command://query</span>
-            <span className="text-[#8B949E]">· SSE /api/query</span>
+        <div className="flex items-center justify-between gap-3 border-b border-[rgba(240,246,252,0.08)] bg-[#1C222B] px-4 py-3 sm:px-5 sm:py-3.5">
+          <div className="flex min-w-0 items-center gap-2 font-mono text-xs text-[#38BDF8]">
+            <TerminalWindow className="h-4 w-4 shrink-0" weight="regular" aria-hidden="true" />
+            <span className="whitespace-nowrap font-semibold">command://query</span>
+            <span className="hidden whitespace-nowrap text-[#8B949E] sm:inline">· SSE /api/query</span>
           </div>
           <button
             type="button"
             onClick={() => closeModal(true)}
             aria-label="Close command palette"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#9DA7B3] hover:border-[#38BDF8] hover:text-[#E6EDF3]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] text-[#9DA7B3] hover:border-[#38BDF8] hover:text-[#E6EDF3]"
           >
             <X className="h-4 w-4" weight="regular" aria-hidden="true" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] px-5 py-3.5">
-          <div className="flex items-center gap-3">
+        <form onSubmit={handleSubmit} className="border-b border-[rgba(240,246,252,0.08)] bg-[#0D1117] px-4 py-3 sm:px-5 sm:py-3.5">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <MagnifyingGlass className="h-4 w-4 shrink-0 text-[#38BDF8]" weight="regular" aria-hidden="true" />
             <input
               ref={inputRef}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask about Cinch, Nexus, ARES, FlyRank, benchmarks..."
-              className="w-full bg-transparent font-sans text-sm text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none"
+              placeholder="Ask about Cinch, Nexus, ARES, benchmarks..."
+              className="min-w-0 w-full bg-transparent font-sans text-sm text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none"
             />
             <button
               type="submit"
@@ -174,7 +175,7 @@ export function CommandPalette() {
 
         <div
           data-lenis-prevent
-          className="max-h-[55vh] space-y-5 overflow-y-auto p-5 editorial-scroll"
+          className="max-h-[62dvh] space-y-5 overflow-y-auto p-4 sm:max-h-[55vh] sm:p-5 editorial-scroll"
         >
           <div>
             <p className="mb-2 font-mono text-xs uppercase tracking-[0.14em] text-[#8B949E]">

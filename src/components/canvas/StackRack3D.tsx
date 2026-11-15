@@ -34,13 +34,18 @@ function RackCameraFit({
   controlsRef: React.RefObject<React.ComponentRef<typeof OrbitControls> | null>;
   zoomSeq: number;
 }) {
-  const { camera, frameloop, invalidate } = useThree();
+  const camera = useThree((s) => s.camera);
+  const frameloop = useThree((s) => s.frameloop);
+  const invalidate = useThree((s) => s.invalidate);
+  const size = useThree((s) => s.size);
+  const aspect = size.width / Math.max(1, size.height);
+  const distScale = aspect < 1.95 ? Math.min(1.95 / Math.max(aspect, 0.85), 2.15) : 1;
   const target = useMemo(
     () =>
       totalRows >= 3
-        ? new THREE.Vector3(0, 3.0, 4.15)
-        : new THREE.Vector3(0, 2.55, 3.55),
-    [totalRows]
+        ? new THREE.Vector3(0, 3.0 * distScale, 4.15 * distScale)
+        : new THREE.Vector3(0, 2.55 * distScale, 3.55 * distScale),
+    [totalRows, distScale]
   );
   const lookTarget = useMemo(() => new THREE.Vector3(0, 0.08, 0), []);
   const settlingRef = useRef(true);
@@ -294,6 +299,40 @@ function StackRack2DFallback({
   );
 }
 
+function ResponsiveStackZoom({
+  totalRows,
+  controlsRef,
+  defaultTarget,
+  zoomSignal,
+}: {
+  totalRows: number;
+  controlsRef: React.RefObject<React.ComponentRef<typeof OrbitControls> | null>;
+  defaultTarget: [number, number, number];
+  zoomSignal: ZoomSignal;
+}) {
+  const size = useThree((s) => s.size);
+  const aspect = size.width / Math.max(1, size.height);
+  const distScale = aspect < 1.95 ? Math.min(1.95 / Math.max(aspect, 0.85), 2.15) : 1;
+  const responsiveDefaultPos = useMemo<[number, number, number]>(
+    () =>
+      totalRows >= 3
+        ? [0, 3.0 * distScale, 4.15 * distScale]
+        : [0, 2.55 * distScale, 3.55 * distScale],
+    [totalRows, distScale]
+  );
+
+  return (
+    <CameraZoomController
+      controlsRef={controlsRef}
+      defaultPosition={responsiveDefaultPos}
+      defaultTarget={defaultTarget}
+      minDistance={2.2}
+      maxDistance={11.5}
+      zoomSignal={zoomSignal}
+    />
+  );
+}
+
 /**
  * Tactile 3D Stack Rack per architecture layer with per-layer hue underglow,
  * balanced row centering, collision-free sprite labels, and tactile 2D keycap fallback.
@@ -350,8 +389,8 @@ export function StackRack3D({
   return (
     <div
       data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
-      onPointerDown={() => {
-        if (canRender3D) setWheelEngaged(true);
+      onPointerDown={(e) => {
+        if (e.button === 0 && canRender3D) setWheelEngaged(true);
       }}
       onPointerLeave={() => {
         setWheelEngaged(false);
@@ -361,11 +400,11 @@ export function StackRack3D({
         hoveredTool ? "cursor-pointer" : ""
       }`}
     >
-      <div className="pointer-events-none absolute left-3 top-2.5 z-30 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3]">
-        <span className="font-semibold" style={{ color: accentHue }}>
+      <div className="pointer-events-none absolute left-3 top-2.5 z-30 flex max-w-[calc(100%-184px)] items-center gap-2 font-mono text-xs uppercase tracking-[0.12em] text-[#9DA7B3] sm:max-w-none">
+        <span className="shrink-0 font-semibold" style={{ color: accentHue }}>
           {layerCode}
         </span>
-        <span>{layerName}</span>
+        <span className="truncate">{layerName}</span>
       </div>
 
       {canRender3D && stageReady && (
@@ -399,12 +438,10 @@ export function StackRack3D({
           controlsRef={controlsRef}
           zoomSeq={zoomSignal.seq}
         />
-        <CameraZoomController
+        <ResponsiveStackZoom
+          totalRows={totalRows}
           controlsRef={controlsRef}
-          defaultPosition={defaultCamPos}
           defaultTarget={defaultTarget}
-          minDistance={2.2}
-          maxDistance={8.5}
           zoomSignal={zoomSignal}
         />
         <ambientLight intensity={0.62} />
@@ -438,7 +475,7 @@ export function StackRack3D({
           enableZoom={wheelEngaged}
           zoomSpeed={0.8}
           minDistance={2.2}
-          maxDistance={8.5}
+          maxDistance={11.5}
           enablePan={false}
           enableDamping
           dampingFactor={0.07}

@@ -140,51 +140,58 @@ export function SystemsPlayground() {
           const chips = pinStage.querySelectorAll<HTMLElement>("[data-stage-chip]");
           const simHeaderRule = pinStage.querySelector<HTMLElement>("[data-sim-header-rule]");
 
+          // Smooth unclipped entrance before entering pinned inspection band so edge HUD controls
+          // ("Request Rate", "Orbit", stage labels) are never cropped or dimmed at anchor scroll.
+          gsap.fromTo(
+            simShell,
+            { y: 24, scale: 0.985, opacity: 0.85 },
+            {
+              y: 0,
+              scale: 1,
+              opacity: 1,
+              ease: EASE.gsapOut,
+              scrollTrigger: {
+                trigger: pinStage,
+                start: "top 88%",
+                end: "top 24%",
+                scrub: MOTION.scrollTrigger.scrub,
+                invalidateOnRefresh: true,
+              },
+            }
+          );
+
           const bootTl = gsap.timeline({
             scrollTrigger: {
               trigger: pinStage,
               start: "top 96px",
-              end: "+=70%",
+              end: "+=55%",
               pin: true,
               pinSpacing: true,
               anticipatePin: 1,
               scrub: 0.45,
               invalidateOnRefresh: true,
               onLeave: () => {
-                gsap.set(simShell, { clearProps: "clipPath,transform" });
+                gsap.set(simShell, { clearProps: "clipPath,transform,opacity" });
               },
             },
           });
           bootTlRef.current = bootTl;
-
-          bootTl.fromTo(
-            simShell,
-            { clipPath: "inset(8% 5% round 2rem)", scale: 0.97, opacity: 0.55 },
-            {
-              clipPath: "inset(0% 0% round 1.75rem)",
-              scale: 1,
-              opacity: 1,
-              duration: 0.5,
-              ease: EASE.gsapOut,
-            },
-            0
-          );
 
           if (simHeaderRule) {
             bootTl.fromTo(
               simHeaderRule,
               { scaleX: 0 },
               { scaleX: 1, duration: 0.35, ease: EASE.gsapOut },
-              0.12
+              0.08
             );
           }
 
           if (chips.length > 0) {
             bootTl.fromTo(
               chips,
-              { y: 10, opacity: 0.35 },
-              { y: 0, opacity: 1, stagger: 0.08, duration: 0.35, ease: EASE.gsapOut },
-              0.32
+              { y: 8, opacity: 0.65 },
+              { y: 0, opacity: 1, stagger: 0.06, duration: 0.3, ease: EASE.gsapOut },
+              0.16
             );
           }
           return;
@@ -563,7 +570,7 @@ export function SystemsPlayground() {
                         type="button"
                         onClick={() => toggleStageFocus(stage.id)}
                         aria-pressed={isFocused}
-                        className={`flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left font-mono text-xs transition-colors ${
+                        className={`flex min-h-[44px] w-full items-center justify-between gap-1.5 rounded-xl border px-2.5 py-2.5 text-left font-mono text-[11px] transition-colors sm:gap-2 sm:px-3 sm:text-xs ${
                           isFocused
                             ? "border-[#38BDF8] bg-[#38BDF8]/18 text-[#F0F6FC] ring-1 ring-[#38BDF8]/40"
                             : isActive

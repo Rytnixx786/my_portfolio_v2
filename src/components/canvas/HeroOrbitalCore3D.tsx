@@ -914,14 +914,14 @@ export function HeroOrbitalCore3D({
   return (
     <div
       data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
-      onPointerDown={() => {
-        if (canRender3D) setWheelEngaged(true);
+      onPointerDown={(e) => {
+        if (e.button === 0 && canRender3D) setWheelEngaged(true);
       }}
       onPointerLeave={() => setWheelEngaged(false)}
       className="relative h-[280px] w-full overflow-hidden rounded-2xl sm:h-[380px] lg:h-[420px]"
     >
       {(!canRender3D || stageReady) && (
-        <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex max-w-[calc(100%-174px)] items-center gap-1.5 truncate rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/95 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] sm:max-w-none sm:gap-2 sm:px-3">
+        <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex max-w-[calc(100%-182px)] items-center gap-1.5 truncate rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/95 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] sm:max-w-none sm:gap-2 sm:px-3">
           <span style={{ color: displaySys.hue }}>{displaySys.code}</span>
           <span className="font-semibold">{displaySys.label}</span>
           <span className="hidden text-[#9DA7B3] sm:inline">· {displaySys.metric}</span>

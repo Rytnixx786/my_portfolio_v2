@@ -482,8 +482,8 @@ export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
   return (
     <div
       data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
-      onPointerDown={() => {
-        if (canRender3D) setWheelEngaged(true);
+      onPointerDown={(e) => {
+        if (e.button === 0 && canRender3D) setWheelEngaged(true);
       }}
       onPointerLeave={() => setWheelEngaged(false)}
       className="relative h-[340px] w-full overflow-hidden rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[410px]"
@@ -522,9 +522,9 @@ export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
 
       {/* Live Trace Indicator */}
       {props.playing && (
-        <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 inline-flex items-center gap-1.5 rounded-full border border-[#10B981]/40 bg-[#0D1117]/95 px-2.5 py-1 font-mono text-xs uppercase tracking-[0.1em] text-[#10B981] sm:bottom-3 sm:left-auto sm:right-3 sm:top-auto sm:gap-2 sm:px-3">
-          <span className="h-2 w-2 rounded-full bg-[#10B981]" aria-hidden="true" />
-          <span className="tabular-nums">
+        <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 inline-flex max-w-[calc(100%-180px)] items-center gap-1.5 rounded-full border border-[#10B981]/40 bg-[#0D1117]/95 px-2.5 py-1 font-mono text-xs uppercase tracking-[0.1em] text-[#10B981] sm:bottom-3 sm:left-auto sm:right-3 sm:top-auto sm:max-w-none sm:gap-2 sm:px-3">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-[#10B981]" aria-hidden="true" />
+          <span className="truncate tabular-nums">
             Tracing {String(props.activeIndex + 1).padStart(2, "0")}/
             {String(count).padStart(2, "0")}
           </span>
@@ -536,8 +536,29 @@ export function ArchitectureDiagram3D(props: ArchitectureDiagram3DProps) {
         cameraPosition={defaultCamPos}
         fov={40}
         loadingFallback={
-          <div className="flex h-full w-full items-center justify-center bg-[#0D1117] font-mono text-xs text-[#8B949E]">
-            Loading spatial 3D topology...
+          <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[#0D1117]">
+            <svg viewBox="0 0 360 120" className="h-28 w-72 animate-pulse opacity-65" aria-hidden="true">
+              <path
+                d="M 40 60 L 120 38 L 200 72 L 280 42 L 320 60"
+                fill="none"
+                stroke="#38BDF8"
+                strokeOpacity="0.45"
+                strokeWidth="1.5"
+                strokeDasharray="4 4"
+              />
+              {[40, 120, 200, 280, 320].map((cx, i) => (
+                <circle
+                  key={cx}
+                  cx={cx}
+                  cy={i === 0 || i === 4 ? 60 : i === 1 ? 38 : i === 2 ? 72 : 42}
+                  r="6"
+                  fill="#161B22"
+                  stroke="#38BDF8"
+                  strokeOpacity="0.65"
+                  strokeWidth="1.5"
+                />
+              ))}
+            </svg>
           </div>
         }
         className="h-full w-full"

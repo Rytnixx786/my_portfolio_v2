@@ -85,18 +85,18 @@ export function PlaygroundPipeline2D({
       />
 
       {/* Top HUD Metadata Row */}
-      <div className="relative z-10 flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-3 py-1 font-mono text-xs text-[#E6EDF3]">
+      <div className="relative z-10 flex items-center justify-between gap-2">
+        <div className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-1 font-mono text-[11px] text-[#E6EDF3] sm:gap-2 sm:px-3 sm:text-xs">
           <span
-            className="h-2 w-2 rounded-full"
+            className="h-2 w-2 shrink-0 rounded-full"
             style={{ backgroundColor: statusColor }}
             aria-hidden="true"
           />
-          <span>{scenarioAnnotation}</span>
+          <span className="truncate">{scenarioAnnotation}</span>
         </div>
 
-        <span className="rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-1 font-mono text-xs uppercase tracking-[0.12em] text-[#8B949E]">
-          2D Safe · Vector Trace · {rpsMultiplier.toFixed(1)}x
+        <span className="shrink-0 whitespace-nowrap rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-[#8B949E] sm:px-2.5 sm:text-xs sm:tracking-[0.12em]">
+          2D Safe<span className="hidden sm:inline"> · Vector Trace</span> · {rpsMultiplier.toFixed(1)}x
         </span>
       </div>
 
@@ -354,10 +354,13 @@ export function PlaygroundPipeline2D({
       </div>
 
       {/* Bottom Interactive Hint */}
-      <div className="relative z-10 flex items-center justify-between font-mono text-xs text-[#8B949E]">
-        <span>Click any stage node to inspect contract</span>
-        <span className="tabular-nums text-[#9DA7B3]">
-          {activeStages.length}/{stages.length} stations active
+      <div className="relative z-10 flex items-center justify-between gap-2 font-mono text-[11px] text-[#8B949E] sm:text-xs">
+        <span className="truncate">
+          <span className="sm:hidden">Tap node to inspect</span>
+          <span className="hidden sm:inline">Click any stage node to inspect contract</span>
+        </span>
+        <span className="shrink-0 whitespace-nowrap tabular-nums text-[#9DA7B3]">
+          {activeStages.length}/{stages.length} active
         </span>
       </div>
     </div>

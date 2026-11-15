@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
+import { shouldShowViewport2DFallback } from "@/lib/device-tier";
 import { MOTION } from "@/lib/motion";
 import { LocalCanvasInner } from "./LocalCanvasInner";
 
@@ -63,6 +64,8 @@ export function ViewportCanvas({
   const [glReady, setGlReady] = useState(false);
   const [fallbackDismissed, setFallbackDismissed] = useState(false);
   const [slotWaitElapsed, setSlotWaitElapsed] = useState(false);
+  const prevHasSlotRef = useRef(false);
+  const readyThisMountRef = useRef(false);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -70,10 +73,10 @@ export function ViewportCanvas({
 
     const rect = el.getBoundingClientRect();
     const vh = window.innerHeight || document.documentElement.clientHeight;
-    if (rect.bottom >= -280 && rect.top <= vh + 280) {
+    if (rect.bottom >= -360 && rect.top <= vh + 360) {
       setNearView(true);
     }
-    if (rect.bottom >= -40 && rect.top <= vh + 40) {
+    if (rect.bottom >= 0 && rect.top <= vh) {
       setInView(true);
     }
 
@@ -83,7 +86,7 @@ export function ViewportCanvas({
           setNearView(entry.isIntersecting);
         }
       },
-      { rootMargin: "280px 0px" }
+      { rootMargin: "360px 0px" }
     );
 
     const activeObserver = new IntersectionObserver(
@@ -92,7 +95,7 @@ export function ViewportCanvas({
           setInView(entry.isIntersecting);
         }
       },
-      { rootMargin: "40px 0px" }
+      { rootMargin: "0px" }
     );
 
     nearObserver.observe(el);
@@ -142,13 +145,28 @@ export function ViewportCanvas({
   }, [hasMounted, canRender3D, nearView, hasSlot, isPoolSaturated]);
 
   useEffect(() => {
+    const wasActive = prevHasSlotRef.current;
+    prevHasSlotRef.current = hasSlot;
+
     if (!hasSlot) {
+      readyThisMountRef.current = false;
       const raf = window.requestAnimationFrame(() => {
         setGlReady(false);
         setFallbackDismissed(false);
       });
       return () => window.cancelAnimationFrame(raf);
     }
+
+    if (!wasActive && !readyThisMountRef.current) {
+      const raf = window.requestAnimationFrame(() => {
+        if (!readyThisMountRef.current) {
+          setGlReady(false);
+          setFallbackDismissed(false);
+        }
+      });
+      return () => window.cancelAnimationFrame(raf);
+    }
+
     if (!canvasReady) return;
     const delayMs = isStaticPose ? 0 : Math.round(MOTION.durations.crossfade * 1000);
     const timer = window.setTimeout(() => {
@@ -162,17 +180,23 @@ export function ViewportCanvas({
   }, [canvasReady, onCanvasReadyChange]);
 
   const handleCanvasReady = useCallback(() => {
+    if (!prevHasSlotRef.current) return;
+    readyThisMountRef.current = true;
     setGlReady(true);
   }, []);
 
-  // Only render the 2D fallback when 3D is genuinely disabled or denied a saturated pool slot.
-  // When a dedicated loadingFallback is provided (e.g., HeroOrbitalCore3D), never mount the 2D
-  // fallback just because the viewport is offscreen or booting, avoiding duplicate asset loads and flashes.
-  const shouldRender2DFallback =
-    hasMounted &&
-    (!canRender3D ||
-      (!loadingFallback && !nearView) ||
-      (!hasSlot && isPoolSaturated && slotWaitElapsed));
+  // Only suppress the 2D fallback when a dedicated loadingFallback is explicitly provided
+  // (e.g., HeroOrbitalCore3D avoiding duplicate portrait <img> fetches). All lightweight vector
+  // 2D schematics stay mounted in the underlay until WebGL paints its first frame so scrolling never
+  // reveals an empty #0D1117 void.
+  const shouldRender2DFallback = shouldShowViewport2DFallback({
+    hasMounted,
+    canRender3D,
+    hasLoadingFallback: Boolean(loadingFallback),
+    hasSlot,
+    isPoolSaturated,
+    slotWaitElapsed,
+  });
   const showUnderlay = !hasSlot || !fallbackDismissed;
   const crossfadeDuration = isStaticPose
     ? "0ms"
@@ -195,7 +219,15 @@ export function ViewportCanvas({
       style={{ touchAction: "pan-y", ...style }}
     >
       {showUnderlay && (
-        <div className="relative z-0 h-full w-full">
+        <div
+          className="relative z-0 h-full w-full transition-opacity"
+          style={{
+            opacity: canvasReady ? 0 : 1,
+            transitionDuration: crossfadeDuration,
+            transitionTimingFunction: MOTION.easeEditorial,
+            pointerEvents: canvasReady ? "none" : undefined,
+          }}
+        >
           {shouldRender2DFallback
             ? fallback
             : (loadingFallback ?? (

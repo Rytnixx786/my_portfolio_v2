@@ -447,8 +447,8 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
   return (
     <div
       data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
-      onPointerDown={() => {
-        if (canRender3D) setWheelEngaged(true);
+      onPointerDown={(e) => {
+        if (e.button === 0 && canRender3D) setWheelEngaged(true);
       }}
       onPointerLeave={() => setWheelEngaged(false)}
       className={`relative h-[252px] w-full overflow-hidden rounded-b-[calc(1.5rem-0.375rem)] sm:h-[260px] ${className}`}

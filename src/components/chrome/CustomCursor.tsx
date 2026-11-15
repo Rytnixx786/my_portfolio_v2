@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { shouldReduceAppMotion } from "@/lib/motion";
 
 const INTERACTIVE_SNAP_SELECTOR =
-  'a, button, [role="tab"], [role="button"], [role="slider"], [data-cursor-snap]';
+  'a, button:not(:disabled):not([aria-disabled="true"]), [role="tab"]:not([aria-disabled="true"]), [role="button"]:not([aria-disabled="true"]), [role="slider"]:not([aria-disabled="true"]), [data-cursor-snap]:not([disabled]):not([aria-disabled="true"])';
 const NATIVE_CURSOR_SELECTOR =
-  'input, textarea, select, pre, code, [contenteditable="true"], [data-native-cursor]';
+  'input, textarea, select, pre, code, button:disabled, [aria-disabled="true"], [contenteditable="true"], [data-native-cursor]';
 
 /**
  * Precision "Telemetry Reticle" desktop cursor overlay.
@@ -17,6 +17,7 @@ const NATIVE_CURSOR_SELECTOR =
 export function CustomCursor() {
   const [eligible, setEligible] = useState(false);
 
+  const overlayRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
   const reticleRef = useRef<HTMLDivElement>(null);
   const pillRef = useRef<HTMLDivElement>(null);
@@ -58,16 +59,39 @@ export function CustomCursor() {
     if (!eligible) return;
 
     let rafId: number | null = null;
+    let insideWindow = false;
     let visible = false;
     let pressed = false;
     let currentLabel = "";
-    let lastTarget: HTMLElement | null = null;
+    let lastTarget: Element | null = null;
 
     const ptr = { x: -200, y: -200 };
     const tgt = { x: -200, y: -200, w: 28, h: 28, reticleOpacity: 0.9 };
     const cur = { x: -200, y: -200, w: 28, h: 28, reticleOpacity: 0 };
 
-    const syncTargetUnderPointer = (el: HTMLElement | null) => {
+    const overlay = overlayRef.current;
+
+    const raiseToTopLayer = () => {
+      if (!overlay || typeof overlay.showPopover !== "function") {
+        delete document.documentElement.dataset.cursorTopLayer;
+        return;
+      }
+      try {
+        if (overlay.matches(":popover-open")) {
+          overlay.hidePopover?.();
+        }
+        overlay.showPopover();
+        if (overlay.matches(":popover-open")) {
+          document.documentElement.dataset.cursorTopLayer = "true";
+        } else {
+          delete document.documentElement.dataset.cursorTopLayer;
+        }
+      } catch {
+        delete document.documentElement.dataset.cursorTopLayer;
+      }
+    };
+
+    const syncTargetUnderPointer = (el: Element | null) => {
       lastTarget = el;
       if (!el || el.closest(NATIVE_CURSOR_SELECTOR)) {
         delete document.documentElement.dataset.customCursor;
@@ -191,6 +215,7 @@ export function CustomCursor() {
 
     const onPointerMove = (e: PointerEvent) => {
       if (e.pointerType === "touch") return;
+      insideWindow = true;
       ptr.x = e.clientX;
       ptr.y = e.clientY;
       if (cur.x < -100) {
@@ -198,13 +223,14 @@ export function CustomCursor() {
         cur.y = ptr.y;
       }
       const target =
-        e.target instanceof HTMLElement ? e.target : document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+        e.target instanceof Element ? e.target : document.elementFromPoint(e.clientX, e.clientY);
       syncTargetUnderPointer(target);
       ensureTick();
     };
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.pointerType === "touch") return;
+      if (e.button === 1) return;
       pressed = true;
       ptr.x = e.clientX;
       ptr.y = e.clientY;
@@ -225,6 +251,7 @@ export function CustomCursor() {
 
     const onPointerUp = (e: PointerEvent) => {
       if (e.pointerType === "touch") return;
+      if (e.button === 1) return;
       pressed = false;
       const syncNow = () => {
         const currentEl = document.elementFromPoint(ptr.x, ptr.y) as HTMLElement | null;
@@ -235,34 +262,84 @@ export function CustomCursor() {
       window.setTimeout(syncNow, 150);
     };
 
-    const onScroll = () => {
-      if (!visible || ptr.x < -100) return;
-      const currentEl = document.elementFromPoint(ptr.x, ptr.y) as HTMLElement | null;
+    const syncPointerFromViewport = () => {
+      if (!insideWindow || ptr.x < -100) return;
+      const currentEl = document.elementFromPoint(ptr.x, ptr.y);
       syncTargetUnderPointer(currentEl ?? lastTarget);
       ensureTick();
     };
 
+    const onScroll = () => {
+      syncPointerFromViewport();
+    };
+
     const onMouseLeave = () => {
+      insideWindow = false;
       visible = false;
+      delete document.documentElement.dataset.customCursor;
       if (dotRef.current) dotRef.current.style.opacity = "0";
       if (reticleRef.current) reticleRef.current.style.opacity = "0";
       if (pillRef.current) pillRef.current.style.opacity = "0";
     };
 
+    const onTopLayerRaise = () => {
+      raiseToTopLayer();
+      syncPointerFromViewport();
+      window.requestAnimationFrame(syncPointerFromViewport);
+    };
+
+    raiseToTopLayer();
+
+    const dialogObserver = new MutationObserver((mutations) => {
+      let sawDialogOpen = false;
+      let sawDialogClose = false;
+      for (const m of mutations) {
+        if (m.target instanceof HTMLDialogElement) {
+          if (m.target.open) {
+            sawDialogOpen = true;
+          } else {
+            sawDialogClose = true;
+          }
+        }
+      }
+      if (sawDialogOpen) {
+        onTopLayerRaise();
+      } else if (sawDialogClose) {
+        syncPointerFromViewport();
+        window.requestAnimationFrame(syncPointerFromViewport);
+      }
+    });
+    dialogObserver.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["open"],
+      subtree: true,
+    });
+
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     window.addEventListener("pointerdown", onPointerDown, { passive: true });
     window.addEventListener("pointerup", onPointerUp, { passive: true });
-    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    window.addEventListener("portfolio:top-layer-raise", onTopLayerRaise);
     document.documentElement.addEventListener("mouseleave", onMouseLeave);
 
     return () => {
+      dialogObserver.disconnect();
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointerup", onPointerUp);
-      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", onScroll, { capture: true });
+      window.removeEventListener("portfolio:top-layer-raise", onTopLayerRaise);
       document.documentElement.removeEventListener("mouseleave", onMouseLeave);
       if (rafId !== null) window.cancelAnimationFrame(rafId);
+      try {
+        if (overlay?.matches?.(":popover-open")) {
+          overlay.hidePopover?.();
+        }
+      } catch {
+        // Ignore teardown errors
+      }
       delete document.documentElement.dataset.customCursor;
+      delete document.documentElement.dataset.cursorTopLayer;
     };
   }, [eligible]);
 
@@ -270,6 +347,8 @@ export function CustomCursor() {
 
   return (
     <div
+      ref={overlayRef}
+      popover="manual"
       data-custom-cursor-overlay
       aria-hidden="true"
       className="pointer-events-none fixed inset-0 z-[9999] overflow-hidden"

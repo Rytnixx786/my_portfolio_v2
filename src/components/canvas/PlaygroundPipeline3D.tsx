@@ -566,8 +566,8 @@ export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {
   return (
     <div
       data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
-      onPointerDown={() => {
-        if (canRender3D) setWheelEngaged(true);
+      onPointerDown={(e) => {
+        if (e.button === 0 && canRender3D) setWheelEngaged(true);
       }}
       onPointerLeave={() => {
         setWheelEngaged(false);

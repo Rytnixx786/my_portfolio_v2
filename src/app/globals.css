@@ -346,15 +346,41 @@ html[data-motion="reduced"] *::after {
   animation: cursor-pulse-wave 380ms var(--ease-editorial) forwards;
 }
 
+[data-custom-cursor-overlay][popover],
+[data-custom-cursor-overlay]:popover-open {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  pointer-events: none;
+  overflow: visible;
+}
+
 @media (hover: hover) and (pointer: fine) {
   html[data-custom-cursor="active"]:not([data-motion="reduced"]),
   html[data-custom-cursor="active"]:not([data-motion="reduced"]) body,
   html[data-custom-cursor="active"]:not([data-motion="reduced"]) a,
-  html[data-custom-cursor="active"]:not([data-motion="reduced"]) button,
-  html[data-custom-cursor="active"]:not([data-motion="reduced"]) [role="button"],
-  html[data-custom-cursor="active"]:not([data-motion="reduced"]) [role="tab"],
+  html[data-custom-cursor="active"]:not([data-motion="reduced"]) button:not(:disabled):not([aria-disabled="true"]),
+  html[data-custom-cursor="active"]:not([data-motion="reduced"]) [role="button"]:not([aria-disabled="true"]),
+  html[data-custom-cursor="active"]:not([data-motion="reduced"]) [role="tab"]:not([aria-disabled="true"]),
   html[data-custom-cursor="active"]:not([data-motion="reduced"]) .r3f-local-canvas canvas {
     cursor: none !important;
+  }
+  /* Failsafe: if Top-Layer popover promotion is unavailable, always reveal native pointer over open <dialog> */
+  html[data-custom-cursor="active"]:not([data-cursor-top-layer="true"]) dialog[open],
+  html[data-custom-cursor="active"]:not([data-cursor-top-layer="true"]) dialog[open] * {
+    cursor: auto !important;
+  }
+  html[data-custom-cursor="active"] button:disabled,
+  html[data-custom-cursor="active"] [aria-disabled="true"] {
+    cursor: not-allowed !important;
   }
   html[data-custom-cursor="active"] input,
   html[data-custom-cursor="active"] textarea,

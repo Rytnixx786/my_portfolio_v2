@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { CANVAS_RESIZE_CONFIG } from "@/lib/device-tier";
 
 // Filter upstream @react-three/fiber internal THREE.Clock deprecation noise on Three r183+
 // while forwarding every other Three.js warning/error untouched.
@@ -61,10 +62,43 @@ function FirstFrameNotifier({
   unmountingRef: React.RefObject<boolean>;
 }) {
   const firedRef = useRef(false);
-  const { gl } = useThree();
+  const gl = useThree((s) => s.gl);
+  const size = useThree((s) => s.size);
+  const invalidate = useThree((s) => s.invalidate);
+
+  useLayoutEffect(() => {
+    firedRef.current = false;
+    return () => {
+      firedRef.current = false;
+    };
+  }, []);
+
+  // Re-nudge demand frameloop whenever layout dimensions resolve or settle before frame 1
+  useEffect(() => {
+    if (firedRef.current || size.width <= 0 || size.height <= 0) return;
+    invalidate();
+    const t1 = window.setTimeout(() => {
+      if (!firedRef.current && !unmountingRef.current) invalidate();
+    }, 180);
+    const t2 = window.setTimeout(() => {
+      if (!firedRef.current && !unmountingRef.current) invalidate();
+    }, 520);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [size.width, size.height, invalidate, unmountingRef]);
 
   useFrame(() => {
     if (firedRef.current) return;
+    if (
+      size.width <= 0 ||
+      size.height <= 0 ||
+      gl.domElement.width <= 0 ||
+      gl.domElement.height <= 0
+    ) {
+      return;
+    }
     firedRef.current = true;
     window.requestAnimationFrame(() => {
       if (!unmountingRef.current && gl.domElement.isConnected) {
@@ -75,6 +109,11 @@ function FirstFrameNotifier({
 
   return null;
 }
+
+/**
+ * Re-exported from `@/lib/device-tier` for component consumers & tests.
+ */
+export { CANVAS_RESIZE_CONFIG };
 
 export function LocalCanvasInner({
   children,
@@ -102,34 +141,32 @@ export function LocalCanvasInner({
 }) {
   const unmountingRef = useRef(false);
   const readyFiredRef = useRef(false);
-  const safetyTimerRef = useRef<number | null>(null);
+  const onCanvasReadyRef = useRef(onCanvasReady);
   const loopEnabled = activeLoop && !isStaticPose;
+
+  useLayoutEffect(() => {
+    onCanvasReadyRef.current = onCanvasReady;
+  }, [onCanvasReady]);
 
   useLayoutEffect(() => {
     unmountingRef.current = false;
     readyFiredRef.current = false;
+
     return () => {
       unmountingRef.current = true;
-      if (safetyTimerRef.current !== null) {
-        window.clearTimeout(safetyTimerRef.current);
-        safetyTimerRef.current = null;
-      }
     };
   }, []);
 
   const notifyReady = () => {
     if (readyFiredRef.current || unmountingRef.current) return;
     readyFiredRef.current = true;
-    if (safetyTimerRef.current !== null) {
-      window.clearTimeout(safetyTimerRef.current);
-      safetyTimerRef.current = null;
-    }
-    onCanvasReady?.();
+    onCanvasReadyRef.current?.();
   };
 
   return (
     <Canvas
       className="r3f-local-canvas"
+      resize={CANVAS_RESIZE_CONFIG}
       dpr={dpr}
       frameloop={loopEnabled ? "always" : "demand"}
       camera={{ position: cameraPosition, fov, near: 0.1, far: 100 }}
@@ -164,11 +201,7 @@ export function LocalCanvasInner({
           false
         );
 
-        safetyTimerRef.current = window.setTimeout(() => {
-          if (!unmountingRef.current && canvas.isConnected) {
-            notifyReady();
-          }
-        }, 600);
+        state.invalidate();
       }}
       style={{
         width: "100%",

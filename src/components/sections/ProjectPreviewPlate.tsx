@@ -14,8 +14,41 @@ const LazyProjectTopology3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[225px] w-full items-center justify-center bg-[#0D1117] font-mono text-xs text-[#8B949E] sm:h-[260px]">
-        Loading interactive 3D topology...
+      <div
+        className="flex h-[225px] w-full items-center justify-center bg-[#0D1117] sm:h-[260px]"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(240, 246, 252, 0.06) 1px, transparent 1px)",
+          backgroundSize: "20px 20px",
+        }}
+      >
+        <svg viewBox="0 0 360 110" className="h-24 w-72 opacity-60" aria-hidden="true">
+          <path
+            d="M 44 64 Q 112 24 180 56 T 316 50"
+            fill="none"
+            stroke="rgba(56,189,248,0.45)"
+            strokeWidth="1.5"
+            strokeDasharray="5 5"
+          />
+          {[
+            { x: 44, y: 64 },
+            { x: 112, y: 42 },
+            { x: 180, y: 56 },
+            { x: 248, y: 70 },
+            { x: 316, y: 50 },
+          ].map((pt) => (
+            <circle
+              key={`${pt.x}-${pt.y}`}
+              cx={pt.x}
+              cy={pt.y}
+              r="7.5"
+              fill="#161B22"
+              stroke="#38BDF8"
+              strokeOpacity="0.55"
+              strokeWidth="1.4"
+            />
+          ))}
+        </svg>
       </div>
     ),
   }

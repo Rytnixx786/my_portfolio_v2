@@ -176,12 +176,12 @@ export function ScrollScrubText({
 
       if (split.words.length === 0) return;
 
-      gsap.set(split.words, { opacity: 0.16, y: 6 });
+      gsap.set(split.words, { opacity: 0.52, y: 4 });
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: el,
-          start: "top 92%",
-          end: "top 52%",
+          start: "top 95%",
+          end: "top 68%",
           scrub: 0.45,
           invalidateOnRefresh: true,
         },

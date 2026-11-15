@@ -130,9 +130,9 @@ export function AboutSection() {
             card,
             {
               clipPath: conditions.desktopFine
-                ? "inset(0 100% 0 0 round 1rem)"
-                : "inset(0 16% 0 0 round 1rem)",
-              opacity: 0.25,
+                ? "inset(0 28% 0 0 round 1rem)"
+                : "inset(0 12% 0 0 round 1rem)",
+              opacity: 0.5,
             },
             {
               clipPath: "inset(0 0% 0 0 round 1rem)",
@@ -140,8 +140,8 @@ export function AboutSection() {
               ease: EASE.gsapOut,
               scrollTrigger: {
                 trigger: card,
-                start: "top 90%",
-                end: "top 62%",
+                start: "top 92%",
+                end: "top 68%",
                 scrub: MOTION.scrollTrigger.scrub,
                 invalidateOnRefresh: true,
               },

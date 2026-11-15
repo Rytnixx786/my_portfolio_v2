@@ -612,15 +612,15 @@ export function TelemetryGlobe3D() {
   return (
     <div
       data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
-      onPointerDown={() => {
-        if (canRender3D) setWheelEngaged(true);
+      onPointerDown={(e) => {
+        if (e.button === 0 && canRender3D) setWheelEngaged(true);
       }}
       onPointerLeave={() => setWheelEngaged(false)}
       className="relative h-[265px] w-full overflow-hidden rounded-2xl sm:h-[295px]"
     >
-      <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 inline-flex items-center gap-2 rounded-full border border-[#10B981]/40 bg-[#0D1117]/95 px-2.5 py-0.5 font-mono text-xs uppercase tracking-[0.12em] text-[#10B981]">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#10B981]" aria-hidden="true" />
-        <span>Dhaka · UTC+6</span>
+      <div className="pointer-events-none absolute left-2.5 top-2.5 z-30 inline-flex max-w-[calc(100%-180px)] items-center gap-1.5 rounded-full border border-[#10B981]/40 bg-[#0D1117]/95 px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-[0.1em] text-[#10B981] sm:max-w-none sm:gap-2 sm:text-xs sm:tracking-[0.12em]">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#10B981]" aria-hidden="true" />
+        <span className="truncate">Dhaka · UTC+6</span>
       </div>
 
       {canRender3D && stageReady && (

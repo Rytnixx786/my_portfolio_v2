@@ -372,10 +372,10 @@ export function Navbar() {
               <li
                 key={item.href}
                 style={{
-                  transitionDelay: mobileOpen ? `${idx * 50}ms` : "0ms",
+                  transitionDelay: mobileOpen ? `${idx * 28}ms` : "0ms",
                 }}
-                className={`transition-[opacity,transform] duration-500 ease-[var(--ease-editorial)] ${
-                  mobileOpen ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
+                className={`transition-[opacity,transform] duration-300 ease-[var(--ease-editorial)] ${
+                  mobileOpen ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
                 }`}
               >
                 <TransitionLink

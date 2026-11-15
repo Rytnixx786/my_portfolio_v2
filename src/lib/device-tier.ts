@@ -134,3 +134,50 @@ export function resolveQualityReason(
   if (preference === "balanced") return "Balanced WebGL";
   return reducedMotion ? `${hardwareReason} · Reduced motion` : hardwareReason;
 }
+
+/**
+ * Resolves the concurrent WebGL canvas slot cap per active rendering tier.
+ * `high` allows 4 active slots so 3 sticky-stacked work cards + a preloading simulator coexist.
+ */
+export function resolveMaxWebGLSlots(tier: DeviceTier): number {
+  if (tier === "high") return 4;
+  if (tier === "mid") return 2;
+  return 0;
+}
+
+/**
+ * Prevent @react-three/fiber's default `debounce: { scroll: 50 }` from sharing
+ * its timeout with `ResizeObserver` in `react-use-measure`, which otherwise keeps
+ * `containerRect` at 0x0 during continuous slow wheel / middle-button scrolling.
+ */
+export const CANVAS_RESIZE_CONFIG = {
+  scroll: false,
+  debounce: 0,
+} as const;
+
+export interface ViewportFallbackPolicyInput {
+  hasMounted: boolean;
+  canRender3D: boolean;
+  hasLoadingFallback: boolean;
+  hasSlot: boolean;
+  isPoolSaturated: boolean;
+  slotWaitElapsed: boolean;
+}
+
+/**
+ * Determines whether the rich 2D fallback should render in the ViewportCanvas underlay.
+ * Vector-SVG scenes (no custom loadingFallback) stay rendered until WebGL paints frame 1.
+ */
+export function shouldShowViewport2DFallback({
+  hasMounted,
+  canRender3D,
+  hasLoadingFallback,
+  hasSlot,
+  isPoolSaturated,
+  slotWaitElapsed,
+}: ViewportFallbackPolicyInput): boolean {
+  if (!hasMounted) return false;
+  if (!canRender3D) return true;
+  if (!hasLoadingFallback) return true;
+  return !hasSlot && isPoolSaturated && slotWaitElapsed;
+}

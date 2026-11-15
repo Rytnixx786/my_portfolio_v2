@@ -13,8 +13,46 @@ const LazyArchitectureDiagram3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[340px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] font-mono text-xs text-[#8B949E] sm:h-[410px]">
-        Loading spatial 3D topology...
+      <div
+        className="flex h-[340px] w-full items-center justify-center rounded-2xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117] sm:h-[410px]"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(240, 246, 252, 0.06) 1px, transparent 1px)",
+          backgroundSize: "22px 22px",
+        }}
+      >
+        <svg viewBox="0 0 420 140" className="h-32 w-80 opacity-60" aria-hidden="true">
+          <path
+            d="M 48 48 H 372 M 48 96 H 372 M 210 48 V 96"
+            fill="none"
+            stroke="rgba(56,189,248,0.35)"
+            strokeWidth="1.4"
+            strokeDasharray="5 5"
+          />
+          {[
+            [48, 48],
+            [156, 48],
+            [264, 48],
+            [372, 48],
+            [48, 96],
+            [156, 96],
+            [264, 96],
+            [372, 96],
+          ].map(([cx, cy]) => (
+            <rect
+              key={`${cx}-${cy}`}
+              x={cx - 14}
+              y={cy - 10}
+              width="28"
+              height="20"
+              rx="6"
+              fill="#161B22"
+              stroke="#38BDF8"
+              strokeOpacity="0.5"
+              strokeWidth="1.2"
+            />
+          ))}
+        </svg>
       </div>
     ),
   }
