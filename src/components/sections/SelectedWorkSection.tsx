@@ -49,6 +49,7 @@ export function SelectedWorkSection() {
   const gridRef = useRef<HTMLDivElement>(null);
   const flipStateRef = useRef<ReturnType<typeof Flip.getState> | null>(null);
   const hasInteractedRef = useRef(false);
+  const prevFilterKeyRef = useRef(`${activeFilter}:${showAllSystems}`);
   const appReduced = useAppReducedMotion();
 
   const {
@@ -109,7 +110,7 @@ export function SelectedWorkSection() {
         }
       );
     },
-    { scope: sectionRef, dependencies: [appReduced] }
+    { scope: sectionRef, dependencies: [appReduced], revertOnUpdate: true }
   );
 
   useGSAP(
@@ -223,7 +224,11 @@ export function SelectedWorkSection() {
         appMm.mm.revert();
       };
 
-      if (!hasInteractedRef.current) {
+      const filterKey = `${activeFilter}:${showAllSystems}`;
+      const filterChanged = prevFilterKeyRef.current !== filterKey;
+      prevFilterKeyRef.current = filterKey;
+
+      if (!hasInteractedRef.current || !filterChanged) {
         hasInteractedRef.current = true;
         setupCardMotion();
         return cleanup;
@@ -285,7 +290,11 @@ export function SelectedWorkSection() {
 
       return cleanup;
     },
-    { scope: gridRef, dependencies: [activeFilter, showAllSystems, appReduced] }
+    {
+      scope: gridRef,
+      dependencies: [activeFilter, showAllSystems, appReduced],
+      revertOnUpdate: true,
+    }
   );
 
   useEffect(() => {

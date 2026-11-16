@@ -47,6 +47,7 @@ export function HeroEditorial() {
 
       const clearHeroState = () => {
         setPortfolioScrollState({ heroProgress: 0 });
+        gsap.set(hero, { clearProps: "transform" });
         gsap.set(["[data-hero-copy]", "[data-hero-stage]", "[data-hero-exit-veil]"], {
           clearProps: "transform,opacity,filter",
         });
@@ -172,7 +173,7 @@ export function HeroEditorial() {
         setPortfolioScrollState({ heroProgress: 0 });
       };
     },
-    { scope: heroRef, dependencies: [appReduced] }
+    { scope: heroRef, dependencies: [appReduced], revertOnUpdate: true }
   );
 
   return (

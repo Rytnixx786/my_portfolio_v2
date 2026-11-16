@@ -227,7 +227,7 @@ export function SystemsPlayground() {
         mm.revert();
       };
     },
-    { scope: sectionRef, dependencies: [appReduced] }
+    { scope: sectionRef, dependencies: [appReduced], revertOnUpdate: true }
   );
 
   useGSAP(
@@ -254,6 +254,7 @@ export function SystemsPlayground() {
     {
       scope: telemetryPanelRef,
       dependencies: [tab, activeScenario.id, piiGuardEnabled, semanticCacheEnabled, appReduced],
+      revertOnUpdate: true,
     }
   );
 

@@ -76,7 +76,7 @@ export function HeroSystemSwitcher({
         }
       );
     },
-    { scope: cardRef, dependencies: [safeIndex] }
+    { scope: cardRef, dependencies: [safeIndex], revertOnUpdate: true }
   );
 
   return (

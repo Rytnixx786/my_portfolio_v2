@@ -217,9 +217,19 @@ export function LenisProvider({ children }: { children: ReactNode }) {
 
     setupScrollDriver(shouldReduceAppMotion());
 
+    let motionRefreshRaf: number | null = null;
     const onMotionMode = (event: Event) => {
       const reduced = Boolean((event as CustomEvent<{ reduced?: boolean }>).detail?.reduced);
       setupScrollDriver(reduced);
+      if (motionRefreshRaf !== null) {
+        window.cancelAnimationFrame(motionRefreshRaf);
+      }
+      motionRefreshRaf = window.requestAnimationFrame(() => {
+        motionRefreshRaf = null;
+        refreshMaxScroll();
+        lenisRef.current?.resize();
+        ScrollTrigger.refresh();
+      });
     };
     window.addEventListener("portfolio:motion-mode", onMotionMode);
 
@@ -324,6 +334,9 @@ export function LenisProvider({ children }: { children: ReactNode }) {
 
     return () => {
       window.cancelAnimationFrame(refreshId);
+      if (motionRefreshRaf !== null) {
+        window.cancelAnimationFrame(motionRefreshRaf);
+      }
       if (resizeTimer !== null) {
         window.clearTimeout(resizeTimer);
       }

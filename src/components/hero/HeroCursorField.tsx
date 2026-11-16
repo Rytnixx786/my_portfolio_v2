@@ -34,7 +34,7 @@ export function HeroCursorField({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reducedMotion = shouldReduceAppMotion();
+    let reducedMotion = shouldReduceAppMotion();
     const isCoarseOnly =
       window.matchMedia?.("(pointer: coarse) and (hover: none)").matches ?? false;
 
@@ -501,6 +501,18 @@ export function HeroCursorField({
           )
         : null;
 
+    const onMotionMode = (event: Event) => {
+      const detail = (event as CustomEvent<{ reduced?: boolean }>).detail;
+      reducedMotion =
+        typeof detail?.reduced === "boolean" ? detail.reduced : shouldReduceAppMotion();
+      if (reducedMotion) {
+        pulses.length = 0;
+        drawStaticGrid();
+      } else {
+        scheduleFrame();
+      }
+    };
+
     observer?.observe(container);
     container.addEventListener("pointerenter", onPointerEnter, { passive: true });
     container.addEventListener("pointermove", onPointerMove, { passive: true });
@@ -509,6 +521,7 @@ export function HeroCursorField({
     container.addEventListener("touchstart", onTouchDeactivate, { passive: true });
     window.addEventListener("scroll", onScrollMarkDirty, { passive: true });
     window.addEventListener("resize", onResize, { passive: true });
+    window.addEventListener("portfolio:motion-mode", onMotionMode);
 
     return () => {
       if (rafId !== null) window.cancelAnimationFrame(rafId);
@@ -520,6 +533,7 @@ export function HeroCursorField({
       container.removeEventListener("touchstart", onTouchDeactivate);
       window.removeEventListener("scroll", onScrollMarkDirty);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("portfolio:motion-mode", onMotionMode);
     };
   }, [containerRef, accentColor]);
 

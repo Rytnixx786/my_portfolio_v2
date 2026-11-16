@@ -982,4 +982,57 @@ describe("motion contract, ScrambleMetric numeric parsing, scroll-to-top, and 3D
     expect(tiny.top).toBe(95.5);
     expect(tiny.bottom).toBe(95.5);
   });
+
+  it("enforces revertOnUpdate: true on all dependent useGSAP hooks and atomic motion-mode transitions", () => {
+    const srcRoot = path.join(process.cwd(), "src");
+    const walk = (dir: string): string[] => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      const out: string[] = [];
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) out.push(...walk(full));
+        else if (/\.(tsx?|jsx?)$/.test(entry.name) && !entry.name.includes(".test.")) {
+          out.push(full);
+        }
+      }
+      return out;
+    };
+
+    const files = walk(srcRoot);
+    const missingRevert: string[] = [];
+
+    for (const file of files) {
+      const content = fs.readFileSync(file, "utf8");
+      if (!content.includes("useGSAP(")) continue;
+
+      const depRegex = /\bdependencies\s*:\s*\[[^\]]+\]/g;
+      let match: RegExpExecArray | null;
+      while ((match = depRegex.exec(content)) !== null) {
+        const windowSlice = content.slice(Math.max(0, match.index - 40), match.index + match[0].length + 120);
+        if (!windowSlice.includes("revertOnUpdate: true")) {
+          missingRevert.push(`${path.relative(srcRoot, file)} -> ${match[0]}`);
+        }
+      }
+    }
+
+    expect(missingRevert).toEqual([]);
+
+    const webglProviderSrc = fs.readFileSync(
+      path.join(srcRoot, "components/canvas/WebGLContextProvider.tsx"),
+      "utf8"
+    );
+    const lenisSrc = fs.readFileSync(
+      path.join(srcRoot, "components/chrome/LenisProvider.tsx"),
+      "utf8"
+    );
+    const latticeSrc = fs.readFileSync(
+      path.join(srcRoot, "components/hero/HeroCursorField.tsx"),
+      "utf8"
+    );
+
+    expect(webglProviderSrc).toContain("syncDocumentMotionMode");
+    expect(webglProviderSrc).toMatch(/useLayoutEffect\(\(\)\s*=>\s*\{\s*if \(!hasMounted/);
+    expect(lenisSrc).toContain("motionRefreshRaf");
+    expect(latticeSrc).toContain('"portfolio:motion-mode"');
+  });
 });

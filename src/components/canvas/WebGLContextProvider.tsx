@@ -4,7 +4,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -110,6 +109,7 @@ function subscribeClientEnv(listener: () => void): () => void {
     if (event.key !== STORAGE_KEY) return;
     const nextPref = readStoredPreference();
     const current = getClientEnvSnapshot();
+    syncDocumentMotionMode(nextPref);
     if (current.preference !== nextPref) {
       cachedClientEnv = { ...current, preference: nextPref };
       emitClientEnvChange();
@@ -126,16 +126,30 @@ function subscribeClientEnv(listener: () => void): () => void {
   };
 }
 
+let lastSyncedReduced: boolean | null = null;
+
+function syncDocumentMotionMode(preference: QualityPreference) {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+  const isReduced = preference === "2d";
+  document.documentElement.dataset.motion = isReduced ? "reduced" : "full";
+  if (lastSyncedReduced === isReduced) return;
+  lastSyncedReduced = isReduced;
+  window.dispatchEvent(
+    new CustomEvent("portfolio:motion-mode", { detail: { reduced: isReduced } })
+  );
+}
+
 function updateStoredPreference(next: QualityPreference) {
   const current = getClientEnvSnapshot();
-  if (current.preference !== next) {
-    cachedClientEnv = { ...current, preference: next };
-    emitClientEnvChange();
-  }
   try {
     window.localStorage.setItem(STORAGE_KEY, next);
   } catch {
     // Ignore storage write errors
+  }
+  syncDocumentMotionMode(next);
+  if (current.preference !== next) {
+    cachedClientEnv = { ...current, preference: next };
+    emitClientEnvChange();
   }
 }
 
@@ -364,8 +378,8 @@ const WebGLContext = createContext<WebGLContextValue>({
   qualityReason: "Initializing",
   maxSlots: 0,
   eventSourceRef: { current: null },
-  setPreference: () => {},
-  setContextLost: () => {},
+  setPreference: () => { },
+  setContextLost: () => { },
 });
 
 /**
@@ -395,13 +409,9 @@ export function WebGLContextProvider({ children }: { children: ReactNode }) {
     updateStoredPreference(next);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!hasMounted || typeof document === "undefined") return;
-    const isReduced = preference === "2d";
-    document.documentElement.dataset.motion = isReduced ? "reduced" : "full";
-    window.dispatchEvent(
-      new CustomEvent("portfolio:motion-mode", { detail: { reduced: isReduced } })
-    );
+    syncDocumentMotionMode(preference);
   }, [hasMounted, preference]);
 
   const effectiveTier = useMemo(() => {

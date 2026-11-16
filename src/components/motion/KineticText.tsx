@@ -119,7 +119,11 @@ export function KineticHeading({
         split.revert();
       };
     },
-    { scope: ref, dependencies: [fontsReady, immediate, delay, reveal, appReduced] }
+    {
+      scope: ref,
+      dependencies: [fontsReady, immediate, delay, reveal, appReduced],
+      revertOnUpdate: true,
+    }
   );
 
   return (
@@ -199,7 +203,7 @@ export function ScrollScrubText({
         split.revert();
       };
     },
-    { scope: ref, dependencies: [fontsReady, appReduced] }
+    { scope: ref, dependencies: [fontsReady, appReduced], revertOnUpdate: true }
   );
 
   return (
@@ -247,7 +251,7 @@ export function OutlineFillText({ children, className = "" }: OutlineFillTextPro
         }
       );
     },
-    { scope: ref, dependencies: [appReduced] }
+    { scope: ref, dependencies: [appReduced], revertOnUpdate: true }
   );
 
   if (appReduced) {
@@ -330,7 +334,7 @@ export function ScrambleMetric({ value, className = "" }: ScrambleMetricProps) {
       }
       hasAnimatedRef.current = true;
     },
-    { scope: ref, dependencies: [value, appReduced] }
+    { scope: ref, dependencies: [value, appReduced], revertOnUpdate: true }
   );
 
   return (

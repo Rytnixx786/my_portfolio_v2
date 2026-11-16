@@ -166,7 +166,7 @@ export function ExpertiseSection() {
 
       return () => mm.revert();
     },
-    { scope: sectionRef, dependencies: [appReduced] }
+    { scope: sectionRef, dependencies: [appReduced], revertOnUpdate: true }
   );
 
   useGSAP(
@@ -176,8 +176,12 @@ export function ExpertiseSection() {
         prevLayerIdxRef.current = activeLayerIdx;
         return;
       }
+      if (prevLayerIdxRef.current === activeLayerIdx) return;
       const panel = panelRef.current;
-      if (!panel || appReduced) return;
+      if (!panel || appReduced) {
+        prevLayerIdxRef.current = activeLayerIdx;
+        return;
+      }
 
       const direction = activeLayerIdx >= prevLayerIdxRef.current ? 1 : -1;
       prevLayerIdxRef.current = activeLayerIdx;
@@ -212,7 +216,11 @@ export function ExpertiseSection() {
         }
       );
     },
-    { scope: panelRef, dependencies: [activeLayer.code, activeLayerIdx, appReduced] }
+    {
+      scope: panelRef,
+      dependencies: [activeLayer.code, activeLayerIdx, appReduced],
+      revertOnUpdate: true,
+    }
   );
 
   const handleSelectTool = (tool: string) => {

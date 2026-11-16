@@ -45,7 +45,7 @@ export function Footer() {
         }
       );
     },
-    { scope: footerRef, dependencies: [appReduced] }
+    { scope: footerRef, dependencies: [appReduced], revertOnUpdate: true }
   );
 
   return (

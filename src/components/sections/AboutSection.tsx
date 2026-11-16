@@ -182,7 +182,7 @@ export function AboutSection() {
 
       return () => mm.revert();
     },
-    { scope: sectionRef, dependencies: [appReduced] }
+    { scope: sectionRef, dependencies: [appReduced], revertOnUpdate: true }
   );
 
   const activeLab = lab[selectedLabIdx] ?? lab[0];

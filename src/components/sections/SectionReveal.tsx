@@ -343,7 +343,11 @@ export function SectionReveal({
         mm.revert();
       };
     },
-    { scope: ref, dependencies: [variant, parallaxY, disableExitFade, settleAtBottom, appReduced] }
+    {
+      scope: ref,
+      dependencies: [variant, parallaxY, disableExitFade, settleAtBottom, appReduced],
+      revertOnUpdate: true,
+    }
   );
 
   return (

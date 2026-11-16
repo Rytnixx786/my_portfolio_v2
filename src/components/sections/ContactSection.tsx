@@ -169,7 +169,7 @@ export function ContactSection() {
 
       return () => mm.revert();
     },
-    { scope: sectionRef, dependencies: [appReduced] }
+    { scope: sectionRef, dependencies: [appReduced], revertOnUpdate: true }
   );
 
   return (
