@@ -893,13 +893,20 @@ describe("motion contract, ScrambleMetric numeric parsing, scroll-to-top, and 3D
       ).length;
       expect(loopCountAtRest).toBe(2);
 
+      const scrollEvents: boolean[] = [];
+      const unsubScroll = store.subscribeScrolling((s) => scrollEvents.push(s));
+      expect(store.isScrollingNow()).toBe(false);
+
       store.markScrolling(140);
+      expect(store.isScrollingNow()).toBe(true);
       const loopCountWhileScrolling = ["hero", "work-1", "work-2"].filter(
         (id) => (store.getSlotMaskSnapshot(id) & 4) !== 0
       ).length;
       expect(loopCountWhileScrolling).toBe(1);
 
       vi.advanceTimersByTime(150);
+      expect(store.isScrollingNow()).toBe(false);
+      expect(scrollEvents).toEqual([true, false]);
       const loopCountAfterSettle = ["hero", "work-1", "work-2"].filter(
         (id) => (store.getSlotMaskSnapshot(id) & 4) !== 0
       ).length;
@@ -909,6 +916,7 @@ describe("motion contract, ScrambleMetric numeric parsing, scroll-to-top, and 3D
       store.focusSlotLoop("hero");
       expect((store.getSlotMaskSnapshot("hero") & 4) !== 0).toBe(true);
 
+      unsubScroll();
       unsubHero();
       unsubWork1();
     } finally {
@@ -1032,7 +1040,21 @@ describe("motion contract, ScrambleMetric numeric parsing, scroll-to-top, and 3D
     expect(simSrc).toContain("Live Step");
     expect(simSrc).not.toContain("pin: true");
     expect(viewportCanvasSrc).toContain("rootMargin: \"900px 0px\"");
+    expect(viewportCanvasSrc).toContain("subscribeWebGLScrollBurst");
+    expect(viewportCanvasSrc).toContain("isWebGLScrollBursting");
     expect(motionSrc).toContain("(any-pointer: fine)");
+
+    const aboutSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/sections/AboutSection.tsx"),
+      "utf8"
+    );
+    const workSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/components/sections/SelectedWorkSection.tsx"),
+      "utf8"
+    );
+    expect(aboutSrc).not.toContain("getPointAtLength");
+    expect(aboutSrc).toContain("sampleSpinePoint");
+    expect(workSrc).toContain("createOcclusionStore");
   });
 
   it("positions 4 independent 9x9 cursor corner brackets symmetrically without non-uniform scaling", () => {

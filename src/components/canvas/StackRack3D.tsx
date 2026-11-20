@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, RoundedBox } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { STACK_LAYER_HUES } from "@/lib/palette";
 import {
@@ -97,6 +98,9 @@ function KeycapNode({
   isSelected,
   rippleDelay,
   selectKey,
+  keycapGeom,
+  ringGeom,
+  capGeom,
   onSelect,
   onHoverChange,
 }: {
@@ -106,6 +110,9 @@ function KeycapNode({
   isSelected: boolean;
   rippleDelay: number;
   selectKey: string;
+  keycapGeom: THREE.BufferGeometry;
+  ringGeom: THREE.BufferGeometry;
+  capGeom: THREE.BufferGeometry;
   onSelect: () => void;
   onHoverChange?: (hovered: boolean) => void;
 }) {
@@ -146,21 +153,18 @@ function KeycapNode({
 
   return (
     <group position={position}>
-      <mesh position={[0, -0.18, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.42, 0.5, 4]} />
+      <mesh position={[0, -0.18, 0]} rotation={[-Math.PI / 2, 0, 0]} geometry={ringGeom}>
         <meshBasicMaterial
           color={isSelected || hovered ? accentHue : "#2C3748"}
           transparent
           opacity={isSelected ? 0.95 : hovered ? 0.72 : 0.55}
-          toneMapped={!isSelected}
+          toneMapped={false}
         />
       </mesh>
 
       <group ref={groupRef}>
-        <RoundedBox
-          args={[1.18, 0.34, 0.84]}
-          radius={0.07}
-          smoothness={4}
+        <mesh
+          geometry={keycapGeom}
           onClick={(e) => {
             e.stopPropagation();
             onSelect();
@@ -182,15 +186,14 @@ function KeycapNode({
             emissive={isSelected ? accentHue : hovered ? accentHue : "#162030"}
             emissiveIntensity={isSelected ? 0.45 : hovered ? 0.22 : 0.1}
           />
-        </RoundedBox>
+        </mesh>
 
-        <mesh position={[0, 0.18, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[1.02, 0.68]} />
+        <mesh position={[0, 0.18, 0]} rotation={[-Math.PI / 2, 0, 0]} geometry={capGeom}>
           <meshBasicMaterial
             color={isSelected ? accentHue : "#9DA7B3"}
             transparent
             opacity={isSelected ? 0.42 : hovered ? 0.24 : 0.12}
-            toneMapped={!isSelected}
+            toneMapped={false}
           />
         </mesh>
 
@@ -386,6 +389,23 @@ export function StackRack3D({
   const baseW = cols * xSpacing + 0.55;
   const baseD = totalRows * zSpacing + 0.55;
 
+  const sharedGeoms = useMemo(
+    () => ({
+      keycap: new RoundedBoxGeometry(1.18, 0.34, 0.84, 2, 0.07),
+      ring: new THREE.RingGeometry(0.42, 0.5, 4),
+      cap: new THREE.PlaneGeometry(1.02, 0.68),
+    }),
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      sharedGeoms.keycap.dispose();
+      sharedGeoms.ring.dispose();
+      sharedGeoms.cap.dispose();
+    };
+  }, [sharedGeoms]);
+
   return (
     <div
       data-lenis-prevent-wheel={wheelEngaged ? "true" : undefined}
@@ -457,13 +477,16 @@ export function StackRack3D({
 
         {tools.map((tool, idx) => (
           <KeycapNode
-            key={`${layerCode}-${tool}`}
+            key={idx}
             label={tool}
             position={positions[idx]}
             accentHue={accentHue}
             isSelected={selectedTool === tool}
             rippleDelay={Math.abs(idx - selectedIndex) * 0.05}
             selectKey={selectKey}
+            keycapGeom={sharedGeoms.keycap}
+            ringGeom={sharedGeoms.ring}
+            capGeom={sharedGeoms.cap}
             onSelect={() => onSelectTool(tool)}
             onHoverChange={(isHovered) => handleHoverTool(tool, isHovered)}
           />

@@ -11,6 +11,47 @@ import { useAppReducedMotion } from "@/components/motion/useAppReducedMotion";
 
 gsap.registerPlugin(ScrollTrigger, SplitText, ScrambleTextPlugin, useGSAP);
 
+let sharedFontsResolved = false;
+let sharedFontsPromise: Promise<void> | null = null;
+
+function subscribeFontsReady(onReady: () => void): () => void {
+  if (sharedFontsResolved) {
+    onReady();
+    return () => {};
+  }
+  let active = true;
+  if (!sharedFontsPromise) {
+    sharedFontsPromise = new Promise<void>((resolve) => {
+      const done = () => {
+        sharedFontsResolved = true;
+        resolve();
+      };
+      const timer = window.setTimeout(done, MOTION.fontReadyTimeoutMs);
+      if (typeof document !== "undefined" && document.fonts?.ready) {
+        document.fonts.ready.then(
+          () => {
+            window.clearTimeout(timer);
+            done();
+          },
+          () => {
+            window.clearTimeout(timer);
+            done();
+          }
+        );
+      } else {
+        window.clearTimeout(timer);
+        window.requestAnimationFrame(done);
+      }
+    });
+  }
+  void sharedFontsPromise.then(() => {
+    if (active) onReady();
+  });
+  return () => {
+    active = false;
+  };
+}
+
 interface KineticHeadingProps {
   as?: "h1" | "h2" | "h3" | "span";
   className?: string;
@@ -33,40 +74,13 @@ export function KineticHeading({
   reveal = "words",
 }: KineticHeadingProps) {
   const ref = useRef<HTMLHeadingElement>(null);
-  const [fontsReady, setFontsReady] = useState(false);
+  const [fontsReady, setFontsReady] = useState(() => sharedFontsResolved);
   const appReduced = useAppReducedMotion();
 
   useEffect(() => {
-    let alive = true;
-    let settled = false;
-
-    const markReady = () => {
-      if (!alive || settled) return;
-      settled = true;
-      setFontsReady(true);
-    };
-
-    const fallbackTimer = window.setTimeout(
-      markReady,
-      MOTION.fontReadyTimeoutMs
-    );
-
-    if (typeof document !== "undefined" && document.fonts?.ready) {
-      document.fonts.ready.then(markReady, markReady);
-    } else {
-      const raf = window.requestAnimationFrame(markReady);
-      return () => {
-        alive = false;
-        window.clearTimeout(fallbackTimer);
-        window.cancelAnimationFrame(raf);
-      };
-    }
-
-    return () => {
-      alive = false;
-      window.clearTimeout(fallbackTimer);
-    };
-  }, []);
+    if (fontsReady) return;
+    return subscribeFontsReady(() => setFontsReady(true));
+  }, [fontsReady]);
 
   useGSAP(
     () => {
@@ -149,25 +163,13 @@ export function ScrollScrubText({
   children,
 }: ScrollScrubTextProps) {
   const ref = useRef<HTMLParagraphElement>(null);
-  const [fontsReady, setFontsReady] = useState(false);
+  const [fontsReady, setFontsReady] = useState(() => sharedFontsResolved);
   const appReduced = useAppReducedMotion();
 
   useEffect(() => {
-    let alive = true;
-    const markReady = () => {
-      if (alive) setFontsReady(true);
-    };
-    const timer = window.setTimeout(markReady, MOTION.fontReadyTimeoutMs);
-    if (typeof document !== "undefined" && document.fonts?.ready) {
-      document.fonts.ready.then(markReady, markReady);
-    } else {
-      window.requestAnimationFrame(markReady);
-    }
-    return () => {
-      alive = false;
-      window.clearTimeout(timer);
-    };
-  }, []);
+    if (fontsReady) return;
+    return subscribeFontsReady(() => setFontsReady(true));
+  }, [fontsReady]);
 
   useGSAP(
     () => {

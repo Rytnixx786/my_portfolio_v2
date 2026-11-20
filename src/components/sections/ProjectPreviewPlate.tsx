@@ -60,6 +60,7 @@ interface ProjectPreviewPlateProps {
   project: Project;
   indexLabel: string;
   variant?: "featured" | "compact";
+  occluded?: boolean;
 }
 
 /**
@@ -70,6 +71,7 @@ export function ProjectPreviewPlate({
   project,
   indexLabel,
   variant = "featured",
+  occluded = false,
 }: ProjectPreviewPlateProps) {
   const nodes = project.architecture.nodes;
   const connections = project.architecture.connections;
@@ -165,7 +167,7 @@ export function ProjectPreviewPlate({
       </div>
 
       {show3DStage ? (
-        <LazyProjectTopology3D slug={project.slug} />
+        <LazyProjectTopology3D slug={project.slug} occluded={occluded} />
       ) : (
         <div
           className="relative p-3 sm:p-4"

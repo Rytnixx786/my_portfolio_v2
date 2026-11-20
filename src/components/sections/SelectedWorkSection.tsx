@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import gsap from "gsap";
 import { Flip } from "gsap/Flip";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -9,6 +9,7 @@ import { ArrowUpRight, FunnelSimple } from "@phosphor-icons/react";
 import {
   PROJECT_CATEGORIES,
   projects,
+  type Project,
   type ProjectCategory,
 } from "@/data/projects";
 import { getCategoryHue } from "@/lib/palette";
@@ -42,13 +43,77 @@ const FILTER_OPTIONS: ReadonlyArray<{ label: string; value: FilterValue }> = [
   })),
 ];
 
+function createOcclusionStore() {
+  let mask = 0;
+  const listeners = new Set<() => void>();
+  return {
+    getSnapshot: (bit: number) => (mask & bit) !== 0,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setBit: (bit: number, occluded: boolean) => {
+      const next = occluded ? mask | bit : mask & ~bit;
+      if (next === mask) return;
+      mask = next;
+      for (const cb of listeners) cb();
+    },
+    reset: () => {
+      if (mask === 0) return;
+      mask = 0;
+      for (const cb of listeners) cb();
+    },
+  };
+}
+
+type OcclusionStore = ReturnType<typeof createOcclusionStore>;
+
+function OccludedProjectPreviewPlate({
+  project,
+  indexLabel,
+  variant,
+  isStackMode,
+  position,
+  occlusionStore,
+}: {
+  project: Project;
+  indexLabel: string;
+  variant: "featured" | "compact";
+  isStackMode: boolean;
+  position: number;
+  occlusionStore: OcclusionStore;
+}) {
+  const bit = 1 << position;
+  const subscribe = useCallback(
+    (listener: () => void) => occlusionStore.subscribe(listener),
+    [occlusionStore]
+  );
+  const isBitOccluded = useSyncExternalStore(
+    subscribe,
+    () => occlusionStore.getSnapshot(bit),
+    () => false
+  );
+  return (
+    <ProjectPreviewPlate
+      project={project}
+      indexLabel={indexLabel}
+      variant={variant}
+      occluded={isStackMode && isBitOccluded}
+    />
+  );
+}
+
 export function SelectedWorkSection() {
   const [activeFilter, setActiveFilter] = useState<FilterValue>("All");
   const [showAllSystems, setShowAllSystems] = useState(false);
+  const [occlusionStore] = useState(createOcclusionStore);
   const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const flipStateRef = useRef<ReturnType<typeof Flip.getState> | null>(null);
   const hasInteractedRef = useRef(false);
+  const didFilterMountRef = useRef(false);
   const prevFilterKeyRef = useRef(`${activeFilter}:${showAllSystems}`);
   const appReduced = useAppReducedMotion();
 
@@ -125,6 +190,7 @@ export function SelectedWorkSection() {
       flipStateRef.current = null;
 
       if (appReduced) {
+        occlusionStore.reset();
         gsap.set(items, { clearProps: "transform,opacity" });
         items.forEach((item) => {
           const stackScale = item.querySelector("[data-stack-scale]");
@@ -142,6 +208,7 @@ export function SelectedWorkSection() {
         if (disposed) return;
         appMm.register(({ conditions }) => {
           if (conditions.appReduced) {
+            occlusionStore.reset();
             gsap.set(items, { clearProps: "transform,opacity" });
             return;
           }
@@ -158,6 +225,7 @@ export function SelectedWorkSection() {
               const stackScale = items[i].querySelector<HTMLElement>("[data-stack-scale]");
               const dimmer = items[i].querySelector<HTMLElement>("[data-stack-dimmer]");
               const nextWrapper = items[i + 1];
+              const bit = 1 << i;
 
               if (stackScale) {
                 gsap.fromTo(
@@ -173,6 +241,13 @@ export function SelectedWorkSection() {
                       end: "top 24%",
                       scrub: MOTION.scrollTrigger.scrub,
                       invalidateOnRefresh: true,
+                      onUpdate: (self) => {
+                        if (self.progress >= 0.85) {
+                          occlusionStore.setBit(bit, true);
+                        } else if (self.progress < 0.78) {
+                          occlusionStore.setBit(bit, false);
+                        }
+                      },
                     },
                   }
                 );
@@ -205,6 +280,7 @@ export function SelectedWorkSection() {
             return;
           }
 
+          occlusionStore.reset();
           items.forEach((item) => {
             const stackScale = item.querySelector("[data-stack-scale]");
             const dimmer = item.querySelector("[data-stack-dimmer]");
@@ -298,6 +374,10 @@ export function SelectedWorkSection() {
   );
 
   useEffect(() => {
+    if (!didFilterMountRef.current) {
+      didFilterMountRef.current = true;
+      return;
+    }
     const timer = window.setTimeout(() => {
       ScrollTrigger.refresh();
     }, 720);
@@ -578,10 +658,13 @@ export function SelectedWorkSection() {
                         </div>
 
                         <div className={isWideCard ? "lg:col-span-6" : ""}>
-                          <ProjectPreviewPlate
+                          <OccludedProjectPreviewPlate
                             project={project}
                             indexLabel={num}
                             variant={isWideCard ? "featured" : "compact"}
+                            isStackMode={isStackMode}
+                            position={position}
+                            occlusionStore={occlusionStore}
                           />
                         </div>
                       </div>

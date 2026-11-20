@@ -209,8 +209,8 @@ export function Navbar() {
       <header
         className={`site-navbar-shell fixed inset-x-0 top-0 z-40 mx-auto transition-[max-width,margin-top,border-radius,border-color,background-color,box-shadow] duration-500 ease-[var(--ease-editorial)] ${
           isScrolled && !mobileOpen
-            ? "mt-3 max-w-[min(1300px,calc(100vw-1.5rem))] rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/88 shadow-[var(--shadow-deep)] backdrop-blur-xl"
-            : "mt-0 max-w-full rounded-none border-b border-[rgba(240,246,252,0.06)] bg-[#0D1117]/75 backdrop-blur-md"
+            ? "mt-3 max-w-[min(1300px,calc(100vw-1.5rem))] rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/90 shadow-[var(--shadow-deep)] backdrop-blur-md"
+            : "mt-0 max-w-full rounded-none border-b border-[rgba(240,246,252,0.06)] bg-[#0D1117]/80 backdrop-blur-md"
         }`}
       >
         <nav
@@ -373,8 +373,8 @@ export function Navbar() {
         ref={drawerRef}
         id="mobile-nav-drawer"
         inert={!mobileOpen ? true : undefined}
-        className={`fixed inset-0 z-30 flex flex-col justify-between overflow-y-auto bg-[#0D1117]/95 px-6 pt-24 pb-8 backdrop-blur-2xl transition-opacity duration-400 ease-[var(--ease-editorial)] lg:hidden ${
-          mobileOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        className={`fixed inset-0 z-30 flex flex-col justify-between overflow-y-auto bg-[#0D1117]/95 px-6 pt-24 pb-8 transition-opacity duration-400 ease-[var(--ease-editorial)] lg:hidden ${
+          mobileOpen ? "pointer-events-auto opacity-100 backdrop-blur-2xl" : "pointer-events-none opacity-0"
         }`}
       >
         <ul className="flex flex-col gap-2">

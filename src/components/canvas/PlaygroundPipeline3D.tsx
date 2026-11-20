@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, RoundedBox } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import type { SimulatorTab } from "@/data/playground";
@@ -375,6 +376,9 @@ function StationPedestal({
   isFocused,
   statusColor,
   pulsePhase,
+  boxGeom,
+  ringGeom,
+  capGeom,
   onSelect,
   onHoverChange,
 }: {
@@ -384,6 +388,9 @@ function StationPedestal({
   isFocused: boolean;
   statusColor: string;
   pulsePhase: number;
+  boxGeom: THREE.BufferGeometry;
+  ringGeom: THREE.BufferGeometry;
+  capGeom: THREE.BufferGeometry;
   onSelect?: () => void;
   onHoverChange?: (hovered: boolean) => void;
 }) {
@@ -397,7 +404,7 @@ function StationPedestal({
 
   useEffect(() => {
     invalidate();
-  }, [isActive, isFocused, statusColor, hovered, invalidate]);
+  }, [stage.label, isActive, isFocused, statusColor, hovered, invalidate]);
 
   useFrame((_, delta) => {
     const isStatic = frameloop === "demand";
@@ -427,21 +434,19 @@ function StationPedestal({
 
   return (
     <group position={[x, 0.12, 0]}>
-      <mesh ref={ringRef} position={[0, -0.34, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.52, 0.59, 32]} />
+      <mesh ref={ringRef} position={[0, -0.34, 0]} rotation={[-Math.PI / 2, 0, 0]} geometry={ringGeom}>
         <meshBasicMaterial
           color={pedestalColor}
           transparent
           opacity={isFocused ? 0.92 : isActive ? 0.45 : 0.12}
-          toneMapped={!isActive && !isFocused}
+          toneMapped={false}
         />
       </mesh>
 
       <group ref={bodyRef}>
-        <RoundedBox
-          args={[0.94, isActive ? 0.64 : 0.4, 0.94]}
-          radius={0.08}
-          smoothness={3}
+        <mesh
+          geometry={boxGeom}
+          scale={[1, isActive ? 1.6 : 1, 1]}
           onClick={(e) => {
             e.stopPropagation();
             onSelect?.();
@@ -463,13 +468,12 @@ function StationPedestal({
             emissive={pedestalColor}
             emissiveIntensity={isFocused ? 0.55 : isActive ? 0.32 : 0.06}
           />
-        </RoundedBox>
+        </mesh>
 
-        <mesh position={[0, isActive ? 0.335 : 0.215, 0]}>
-          <boxGeometry args={[0.78, 0.04, 0.78]} />
+        <mesh position={[0, isActive ? 0.335 : 0.215, 0]} geometry={capGeom}>
           <meshBasicMaterial
             color={pedestalColor}
-            toneMapped={!isActive && !isFocused}
+            toneMapped={false}
             transparent
             opacity={isFocused ? 1 : isActive ? 0.92 : 0.4}
           />
@@ -525,6 +529,23 @@ function PipelineDioramaScene({
   const lastActiveIdx =
     activeIndices.length > 0 ? activeIndices[activeIndices.length - 1] : 0;
 
+  const pedestalGeoms = useMemo(
+    () => ({
+      box: new RoundedBoxGeometry(0.94, 0.4, 0.94, 2, 0.07),
+      ring: new THREE.RingGeometry(0.52, 0.59, 28),
+      cap: new THREE.BoxGeometry(0.78, 0.04, 0.78),
+    }),
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      pedestalGeoms.box.dispose();
+      pedestalGeoms.ring.dispose();
+      pedestalGeoms.cap.dispose();
+    };
+  }, [pedestalGeoms]);
+
   return (
     <group>
       <ambientLight intensity={0.5} />
@@ -563,13 +584,16 @@ function PipelineDioramaScene({
 
         return (
           <StationPedestal
-            key={stage.id}
+            key={idx}
             stage={stage}
             x={x}
             isActive={isActive}
             isFocused={isFocused}
             statusColor={statusColor}
             pulsePhase={idx * 0.65}
+            boxGeom={pedestalGeoms.box}
+            ringGeom={pedestalGeoms.ring}
+            capGeom={pedestalGeoms.cap}
             onSelect={() => onSelectStage?.(stage.id)}
             onHoverChange={(isHovered) => onHoverStage(stage.id, isHovered)}
           />

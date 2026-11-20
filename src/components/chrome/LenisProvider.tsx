@@ -121,11 +121,14 @@ export function LenisProvider({ children }: { children: ReactNode }) {
       );
     };
 
+    let lastScrollY = window.scrollY;
+
     const updateProgress = (velocity = 0, direction: 1 | -1 | 0 = 0, explicitScrollY?: number) => {
-      if (Math.abs(velocity) > 0.35) {
+      const scrollY = explicitScrollY ?? window.scrollY;
+      if (Math.abs(velocity) > 0.45 || Math.abs(scrollY - lastScrollY) > 4) {
         markWebGLScrollBurst();
       }
-      const scrollY = explicitScrollY ?? window.scrollY;
+      lastScrollY = scrollY;
       const ratio = Math.min(1, Math.max(0, scrollY / maxScrollRef.current));
       setPortfolioScrollState({
         scrollY,
@@ -301,9 +304,14 @@ export function LenisProvider({ children }: { children: ReactNode }) {
     ScrollTrigger.addEventListener("refresh", onTriggerRefresh);
 
     const mainEl = document.getElementById("main-content");
+    let lastMainHeight = mainEl?.getBoundingClientRect().height ?? 0;
     const resizeObserver =
       typeof ResizeObserver !== "undefined" && mainEl
-        ? new ResizeObserver(() => {
+        ? new ResizeObserver((entries) => {
+            const nextHeight =
+              entries[0]?.contentRect?.height ?? mainEl.getBoundingClientRect().height;
+            if (Math.abs(nextHeight - lastMainHeight) <= 4) return;
+            lastMainHeight = nextHeight;
             refreshMaxScroll();
             scheduleRefresh();
           })

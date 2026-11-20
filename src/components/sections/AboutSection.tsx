@@ -31,6 +31,52 @@ const SPINE_WAYPOINTS = [
   { cx: 352, cy: 22, threshold: 0.96 },
 ] as const;
 
+const SPINE_VERTICES: ReadonlyArray<readonly [number, number]> = [
+  [8, 22],
+  [88, 22],
+  [116, 10],
+  [180, 10],
+  [208, 34],
+  [272, 34],
+  [300, 22],
+  [352, 22],
+];
+
+const SPINE_SEGMENTS = (() => {
+  const segs: Array<{
+    x0: number;
+    y0: number;
+    dx: number;
+    dy: number;
+    startDist: number;
+    len: number;
+  }> = [];
+  let acc = 0;
+  for (let i = 0; i < SPINE_VERTICES.length - 1; i++) {
+    const [x0, y0] = SPINE_VERTICES[i];
+    const [x1, y1] = SPINE_VERTICES[i + 1];
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const len = Math.hypot(dx, dy);
+    segs.push({ x0, y0, dx, dy, startDist: acc, len });
+    acc += len;
+  }
+  return { segs, total: acc };
+})();
+
+function sampleSpinePoint(progress: number): [number, number] {
+  const target = progress * SPINE_SEGMENTS.total;
+  const segs = SPINE_SEGMENTS.segs;
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i];
+    if (target <= seg.startDist + seg.len || i === segs.length - 1) {
+      const t = seg.len > 0 ? Math.min(1, Math.max(0, (target - seg.startDist) / seg.len)) : 0;
+      return [seg.x0 + seg.dx * t, seg.y0 + seg.dy * t];
+    }
+  }
+  return [352, 22];
+}
+
 /**
  * Unified Background & Experience section combining identity, sticky engineering dial,
  * ScrollTrigger SVG spine trace, FlyRank + BRAC University timeline, principles, and systems lab.
@@ -42,6 +88,7 @@ export function AboutSection() {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const percentReadoutRef = useRef<HTMLSpanElement>(null);
   const waypointRefs = useRef<Array<SVGCircleElement | null>>([]);
+  const lastMilestoneRef = useRef(0);
   const [selectedLabIdx, setSelectedLabIdx] = useState(0);
   const [activeMilestone, setActiveMilestone] = useState(0);
   const appReduced = useAppReducedMotion();
@@ -55,7 +102,11 @@ export function AboutSection() {
       const totalLength = path.getTotalLength();
       const applySpineProgress = (progress: number) => {
         const clamped = Math.min(1, Math.max(0, progress));
-        setActiveMilestone(clamped >= 0.5 ? 1 : 0);
+        const nextMilestone = clamped >= 0.5 ? 1 : 0;
+        if (nextMilestone !== lastMilestoneRef.current) {
+          lastMilestoneRef.current = nextMilestone;
+          setActiveMilestone(nextMilestone);
+        }
 
         if (progressBarRef.current) {
           progressBarRef.current.style.transform = `scaleX(${clamped.toFixed(4)})`;
@@ -69,9 +120,9 @@ export function AboutSection() {
 
         const tracer = tracerDotRef.current;
         if (tracer) {
-          const pt = path.getPointAtLength(clamped * totalLength);
-          tracer.setAttribute("cx", pt.x.toFixed(2));
-          tracer.setAttribute("cy", pt.y.toFixed(2));
+          const [px, py] = sampleSpinePoint(clamped);
+          tracer.setAttribute("cx", px.toFixed(2));
+          tracer.setAttribute("cy", py.toFixed(2));
           tracer.setAttribute("opacity", clamped > 0.01 ? "1" : "0");
         }
 

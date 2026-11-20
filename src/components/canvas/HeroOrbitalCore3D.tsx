@@ -111,6 +111,7 @@ function PortraitDepthSlab({
   const readyNotifiedRef = useRef(false);
   const currentAccentRef = useRef(new THREE.Color(accentHue));
   const targetAccentRef = useRef(new THREE.Color(accentHue));
+  const accentDirtyRef = useRef(true);
   const { frameloop, invalidate } = useThree();
 
   useEffect(() => {
@@ -153,6 +154,7 @@ function PortraitDepthSlab({
 
   useEffect(() => {
     targetAccentRef.current.set(accentHue);
+    accentDirtyRef.current = true;
     if (frameloop === "demand") {
       currentAccentRef.current.copy(targetAccentRef.current);
       if (shaderRef.current) {
@@ -161,6 +163,7 @@ function PortraitDepthSlab({
       if (backMatRef.current) {
         backMatRef.current.emissive.copy(currentAccentRef.current);
       }
+      accentDirtyRef.current = false;
     }
     invalidate();
   }, [accentHue, frameloop, invalidate]);
@@ -177,21 +180,28 @@ function PortraitDepthSlab({
   );
 
   useFrame((_, delta) => {
-    const dt = Math.min(delta, 0.05);
-    if (frameloop === "demand") {
-      currentAccentRef.current.copy(targetAccentRef.current);
-    } else {
-      currentAccentRef.current.lerp(targetAccentRef.current, Math.min(1, dt * 6));
-    }
+    if (accentDirtyRef.current) {
+      const dt = Math.min(delta, 0.05);
+      if (frameloop === "demand") {
+        currentAccentRef.current.copy(targetAccentRef.current);
+        accentDirtyRef.current = false;
+      } else {
+        currentAccentRef.current.lerp(targetAccentRef.current, Math.min(1, dt * 6));
+        const dr = currentAccentRef.current.r - targetAccentRef.current.r;
+        const dg = currentAccentRef.current.g - targetAccentRef.current.g;
+        const db = currentAccentRef.current.b - targetAccentRef.current.b;
+        if (dr * dr + dg * dg + db * db < 1e-6) {
+          currentAccentRef.current.copy(targetAccentRef.current);
+          accentDirtyRef.current = false;
+        }
+      }
 
-    if (shaderRef.current) {
-      shaderRef.current.uniforms.uMap.value = textureRef.current;
-      shaderRef.current.uniforms.uHasMap.value = textureRef.current ? 1.0 : 0.0;
-      shaderRef.current.uniforms.uImgAspect.value = imgAspectRef.current;
-      shaderRef.current.uniforms.uAccent.value.copy(currentAccentRef.current);
-    }
-    if (backMatRef.current) {
-      backMatRef.current.emissive.copy(currentAccentRef.current);
+      if (shaderRef.current) {
+        shaderRef.current.uniforms.uAccent.value.copy(currentAccentRef.current);
+      }
+      if (backMatRef.current) {
+        backMatRef.current.emissive.copy(currentAccentRef.current);
+      }
     }
 
     if (
@@ -210,7 +220,7 @@ function PortraitDepthSlab({
   return (
     <group>
       {/* Slim Precision Obsidian Chassis (clean silhouette, zero bulky rim) */}
-      <RoundedBox args={[2.04, 2.32, 0.08]} radius={0.12} smoothness={5}>
+      <RoundedBox args={[2.04, 2.32, 0.08]} radius={0.12} smoothness={3}>
         <meshStandardMaterial
           ref={backMatRef}
           color="#0E131B"
@@ -469,7 +479,7 @@ function HeroOrbitalScene({
         <group rotation={[0.4, 0.12, -0.15]}>
           {/* Primary Track Ring */}
           <mesh rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[ORBIT_RADIUS, 0.0085, 16, 128]} />
+            <torusGeometry args={[ORBIT_RADIUS, 0.0085, 10, 80]} />
             <meshBasicMaterial
               ref={ringMatRef}
               color={activeSystem.hue}
@@ -480,7 +490,7 @@ function HeroOrbitalScene({
 
           {/* Secondary Inner Reference Ring */}
           <mesh ref={innerRingRef} rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[INNER_ORBIT_RADIUS, 0.0045, 12, 96]} />
+            <torusGeometry args={[INNER_ORBIT_RADIUS, 0.0045, 8, 64]} />
             <meshBasicMaterial color={UI_ACCENT} transparent opacity={0.22} />
           </mesh>
 
@@ -513,14 +523,14 @@ function HeroOrbitalScene({
                     gl.domElement.style.cursor = "auto";
                   }}
                 >
-                  <sphereGeometry args={[0.08, 20, 20]} />
+                  <sphereGeometry args={[0.08, 14, 14]} />
                   <meshStandardMaterial
                     color={isActive ? sys.hue : "#232E3F"}
                     emissive={sys.hue}
                     emissiveIntensity={isActive ? 1.45 : isHovered ? 0.95 : 0.48}
                     roughness={0.24}
                     metalness={0.38}
-                    toneMapped={!isActive}
+                    toneMapped={false}
                   />
                 </mesh>
 
@@ -529,7 +539,7 @@ function HeroOrbitalScene({
                     gimbalsRef.current[idx] = el;
                   }}
                 >
-                  <torusGeometry args={[0.142, 0.01, 14, 40]} />
+                  <torusGeometry args={[0.142, 0.01, 10, 28]} />
                   <meshBasicMaterial
                     color={sys.hue}
                     transparent
@@ -539,7 +549,7 @@ function HeroOrbitalScene({
 
                 {isActive && (
                   <mesh rotation={[Math.PI / 2, 0, 0]}>
-                    <torusGeometry args={[0.195, 0.006, 10, 40]} />
+                    <torusGeometry args={[0.195, 0.006, 8, 28]} />
                     <meshBasicMaterial color={sys.hue} transparent opacity={0.6} />
                   </mesh>
                 )}
@@ -932,11 +942,18 @@ export function HeroOrbitalCore3D({
   onSelectSystem,
 }: HeroOrbitalCore3DProps) {
   const { canRender3D } = useCanRender3D();
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [wheelEngaged, setWheelEngaged] = useState(false);
   const [zoomSignal, setZoomSignal] = useState<ZoomSignal>({ action: "reset", seq: 0 });
   const [portraitReady, setPortraitReady] = useState(false);
   const [stageReady, setStageReady] = useState(false);
+  const badgeCodeRef = useRef<HTMLSpanElement>(null);
+  const badgeLabelRef = useRef<HTMLSpanElement>(null);
+  const badgeMetricRef = useRef<HTMLSpanElement>(null);
+  const activeIdxRef = useRef(activeSystemIndex);
+
+  useEffect(() => {
+    activeIdxRef.current = activeSystemIndex;
+  }, [activeSystemIndex]);
 
   useEffect(() => {
     if (canRender3D) {
@@ -956,8 +973,21 @@ export function HeroOrbitalCore3D({
     setPortraitReady(false);
   }, []);
 
-  const displaySys =
-    ORBITAL_SYSTEMS[hoveredIdx ?? activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
+  const handleHoverSystem = useCallback((idx: number | null) => {
+    const sys = ORBITAL_SYSTEMS[idx ?? activeIdxRef.current] ?? ORBITAL_SYSTEMS[0];
+    if (badgeCodeRef.current) {
+      badgeCodeRef.current.style.color = sys.hue;
+      badgeCodeRef.current.textContent = sys.code;
+    }
+    if (badgeLabelRef.current) {
+      badgeLabelRef.current.textContent = sys.label;
+    }
+    if (badgeMetricRef.current) {
+      badgeMetricRef.current.textContent = `· ${sys.metric}`;
+    }
+  }, []);
+
+  const displaySys = ORBITAL_SYSTEMS[activeSystemIndex] ?? ORBITAL_SYSTEMS[0];
 
   return (
     <div
@@ -970,9 +1000,9 @@ export function HeroOrbitalCore3D({
     >
       {(!canRender3D || stageReady) && (
         <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex max-w-[calc(100%-182px)] items-center gap-1.5 truncate rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/95 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] sm:max-w-none sm:gap-2 sm:px-3">
-          <span style={{ color: displaySys.hue }}>{displaySys.code}</span>
-          <span className="font-semibold">{displaySys.label}</span>
-          <span className="hidden text-[#9DA7B3] sm:inline">· {displaySys.metric}</span>
+          <span ref={badgeCodeRef} style={{ color: displaySys.hue }}>{displaySys.code}</span>
+          <span ref={badgeLabelRef} className="font-semibold">{displaySys.label}</span>
+          <span ref={badgeMetricRef} className="hidden text-[#9DA7B3] sm:inline">· {displaySys.metric}</span>
         </div>
       )}
 
@@ -1003,7 +1033,7 @@ export function HeroOrbitalCore3D({
         <HeroOrbitalScene
           activeSystemIndex={activeSystemIndex}
           onSelectSystem={onSelectSystem}
-          onHoverSystem={setHoveredIdx}
+          onHoverSystem={handleHoverSystem}
           onPortraitReady={handlePortraitReady}
           onPortraitReset={handlePortraitReset}
           enableWheelZoom={wheelEngaged}

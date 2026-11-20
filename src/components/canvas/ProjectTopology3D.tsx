@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { CATEGORY_HUES, STATE_FAULT, STATE_HEALTHY, STATE_WARN, UI_ACCENT } from "@/lib/palette";
 import {
@@ -17,6 +18,7 @@ import { ViewportCanvas } from "./ViewportCanvas";
 interface ProjectTopology3DProps {
   slug: string;
   className?: string;
+  occluded?: boolean;
 }
 
 /**
@@ -80,6 +82,21 @@ function TallyCostSculpture({
     }),
     []
   );
+
+  const setupBGeoms = useMemo(
+    () => ({
+      slat: new THREE.BoxGeometry(0.46, 0.05, 0.018),
+      led: new THREE.SphereGeometry(0.032, 10, 10),
+    }),
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      setupBGeoms.slat.dispose();
+      setupBGeoms.led.dispose();
+    };
+  }, [setupBGeoms]);
 
   const STREAM_COUNT = 8;
 
@@ -169,7 +186,7 @@ function TallyCostSculpture({
 
       {/* Setup A: Slim glowing emerald TF-IDF column (99.8%, 0.046ms, $3.01e-07/1k) */}
       <group position={[-1.18, -0.02, 0.34]}>
-        <RoundedBox args={[0.24, 1.08, 0.24]} radius={0.035} smoothness={3}>
+        <RoundedBox args={[0.24, 1.08, 0.24]} radius={0.035} smoothness={2}>
           <meshStandardMaterial
             ref={tfidfMatRef}
             color="#1B2A28"
@@ -195,7 +212,7 @@ function TallyCostSculpture({
 
       {/* Setup B: Larger heavy Qwen-7B GPU rack (90.5%, 1,298ms, 10,276x cost) */}
       <group position={[-0.74, -0.08, -0.34]}>
-        <RoundedBox args={[0.56, 0.96, 0.46]} radius={0.04} smoothness={3}>
+        <RoundedBox args={[0.56, 0.96, 0.46]} radius={0.04} smoothness={2}>
           <meshStandardMaterial
             ref={qwenMatRef}
             color="#1E2736"
@@ -207,16 +224,14 @@ function TallyCostSculpture({
         </RoundedBox>
         {[-0.22, 0, 0.22].map((y) => (
           <group key={y} position={[0, y, 0.236]}>
-            <mesh>
-              <boxGeometry args={[0.46, 0.05, 0.018]} />
+            <mesh geometry={setupBGeoms.slat}>
               <meshBasicMaterial
                 color={mode === "qwen7b" ? UI_ACCENT : "#475569"}
                 transparent
                 opacity={mode === "qwen7b" ? 0.88 : 0.4}
               />
             </mesh>
-            <mesh position={[0.2, 0.05, 0]}>
-              <sphereGeometry args={[0.032, 10, 10]} />
+            <mesh position={[0.2, 0.05, 0]} geometry={setupBGeoms.led}>
               <meshBasicMaterial
                 color={mode === "qwen7b" ? STATE_WARN : "#334155"}
                 toneMapped={false}
@@ -249,7 +264,7 @@ function TallyCostSculpture({
         </mesh>
       </group>
 
-      {/* Guide tubes for each route */}
+      {/* Guide tubes for each route (fixed radius avoids TubeGeometry rebuilds on mode switch) */}
       {(["tfidf", "qwen7b", "cache_bug"] as const).map((routeKey) => {
         const isActive = mode === routeKey;
         const tubeColor =
@@ -260,11 +275,11 @@ function TallyCostSculpture({
               : STATE_WARN;
         return (
           <mesh key={routeKey}>
-            <tubeGeometry args={[curves[routeKey], 48, isActive ? 0.022 : 0.012, 8, false]} />
+            <tubeGeometry args={[curves[routeKey], 36, 0.018, 6, false]} />
             <meshBasicMaterial
               color={tubeColor}
               transparent
-              opacity={isActive ? 0.48 : 0.08}
+              opacity={isActive ? 0.56 : 0.08}
             />
           </mesh>
         );
@@ -350,6 +365,21 @@ function LexiconSqlSculpture({
     }),
     []
   );
+
+  const pgDiscGeoms = useMemo(
+    () => ({
+      disc: new THREE.CylinderGeometry(0.42, 0.42, 0.16, 20),
+      ring: new THREE.TorusGeometry(0.43, 0.016, 8, 24),
+    }),
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      pgDiscGeoms.disc.dispose();
+      pgDiscGeoms.ring.dispose();
+    };
+  }, [pgDiscGeoms]);
 
   const STREAM_COUNT = 9;
   const litRingCount = mode === "l0" ? 1 : mode === "l2" ? 3 : mode === "l3" ? 4 : 3;
@@ -473,7 +503,7 @@ function LexiconSqlSculpture({
                 emissiveIntensity={isLit ? (mode === "l3" ? 0.82 : 0.55) : 0.05}
                 roughness={0.28}
                 metalness={0.45}
-                toneMapped={!isLit}
+                toneMapped={false}
               />
             </mesh>
           );
@@ -510,8 +540,7 @@ function LexiconSqlSculpture({
       <group position={[1.14, -0.02, 0]}>
         {[-0.3, 0, 0.3].map((y, idx) => (
           <group key={y} position={[0, y, 0]}>
-            <mesh>
-              <cylinderGeometry args={[0.42, 0.42, 0.16, 24]} />
+            <mesh geometry={pgDiscGeoms.disc}>
               <meshStandardMaterial
                 ref={(el) => {
                   pgDiscMatsRef.current[idx] = el;
@@ -523,8 +552,7 @@ function LexiconSqlSculpture({
                 metalness={0.42}
               />
             </mesh>
-            <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[0.43, 0.016, 8, 24]} />
+            <mesh rotation={[Math.PI / 2, 0, 0]} geometry={pgDiscGeoms.ring}>
               <meshBasicMaterial
                 color={isSqli ? STATE_HEALTHY : mode === "l3" ? STATE_HEALTHY : UI_ACCENT}
                 transparent
@@ -581,6 +609,7 @@ function CinchGpuSculpture({
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const packetPt = useMemo(() => new THREE.Vector3(), []);
   const packetTan = useMemo(() => new THREE.Vector3(), []);
+  const lookTarget = useMemo(() => new THREE.Vector3(), []);
   const elapsedRef = useRef(0);
   const hue = CATEGORY_HUES["Inference & Serving"].hex;
   const { frameloop, gl, invalidate } = useThree();
@@ -604,6 +633,23 @@ function CinchGpuSculpture({
       new THREE.Vector3(1.35, 0.15, -0.3),
     ]);
   }, []);
+
+  const slabGeoms = useMemo(
+    () => ({
+      slab: new RoundedBoxGeometry(1.38, 0.12, 0.92, 2, 0.03),
+      trim: new THREE.BoxGeometry(1.28, 0.016, 0.012),
+      led: new THREE.SphereGeometry(0.045, 12, 12),
+    }),
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      slabGeoms.slab.dispose();
+      slabGeoms.trim.dispose();
+      slabGeoms.led.dispose();
+    };
+  }, [slabGeoms]);
 
   const STREAM_COUNT = 5;
 
@@ -631,7 +677,8 @@ function CinchGpuSculpture({
         bypassCurve.getPointAt(t, packetPt);
         bypassCurve.getTangentAt(t, packetTan);
         dummy.position.copy(packetPt);
-        dummy.lookAt(packetPt.clone().add(packetTan));
+        lookTarget.copy(packetPt).add(packetTan);
+        dummy.lookAt(lookTarget);
         const taper = 0.45 + 0.55 * Math.sin(t * Math.PI);
         dummy.scale.set(taper * 0.8, taper * 0.8, taper * 1.45);
         dummy.updateMatrix();
@@ -659,7 +706,7 @@ function CinchGpuSculpture({
 
       {[-0.48, -0.16, 0.16, 0.48].map((y, idx) => (
         <group key={y} position={[0, y, 0]}>
-          <RoundedBox args={[1.38, 0.12, 0.92]} radius={0.03} smoothness={3}>
+          <mesh geometry={slabGeoms.slab}>
             <meshStandardMaterial
               ref={(el) => {
                 slabMatsRef.current[idx] = el;
@@ -670,13 +717,11 @@ function CinchGpuSculpture({
               roughness={0.34}
               metalness={0.38}
             />
-          </RoundedBox>
-          <mesh position={[0, 0.062, 0.458]}>
-            <boxGeometry args={[1.28, 0.016, 0.012]} />
+          </mesh>
+          <mesh position={[0, 0.062, 0.458]} geometry={slabGeoms.trim}>
             <meshBasicMaterial color={idx === 2 ? pulseColor : hue} transparent opacity={idx === 2 ? 0.65 : 0.25} />
           </mesh>
-          <mesh position={[0.66, 0, 0.42]}>
-            <sphereGeometry args={[0.045, 14, 14]} />
+          <mesh position={[0.66, 0, 0.42]} geometry={slabGeoms.led}>
             <meshBasicMaterial
               color={mode === "breaker" && idx === 0 ? STATE_FAULT : pulseColor}
               toneMapped={false}
@@ -828,7 +873,7 @@ function NexusDagSculpture({
                 emissiveIntensity={isSelected || isHitl ? 1.05 : 0.35}
                 roughness={0.28}
                 metalness={0.45}
-                toneMapped={!isSelected}
+                toneMapped={false}
               />
             </mesh>
           </group>
@@ -900,7 +945,7 @@ function AresGateSculpture({
             key={s.id}
             args={[0.3, height, 0.3]}
             radius={0.04}
-            smoothness={3}
+            smoothness={2}
             position={[s.x, -0.55 + height * 0.5, 0]}
           >
             <meshStandardMaterial
@@ -909,7 +954,7 @@ function AresGateSculpture({
               emissiveIntensity={passed ? 0.35 : 0.9}
               roughness={0.36}
               metalness={0.3}
-              toneMapped={passed}
+              toneMapped={false}
             />
           </RoundedBox>
         );
@@ -975,7 +1020,7 @@ const TOPOLOGY_CAM_POS: [number, number, number] = [0, 0.85, 3.65];
 /**
  * Interactive 3D mini-labs mounted inside flagship Selected Work cards.
  */
-export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DProps) {
+export function ProjectTopology3D({ slug, className = "", occluded = false }: ProjectTopology3DProps) {
   const { canRender3D } = useCanRender3D();
   const [cinchMode, setCinchMode] = useState<"cache" | "marlin" | "breaker">("cache");
   const [tallyMode, setTallyMode] = useState<"tfidf" | "qwen7b" | "cache_bug">("tfidf");
@@ -1017,6 +1062,7 @@ export function ProjectTopology3D({ slug, className = "" }: ProjectTopology3DPro
         onCanvasReadyChange={setStageReady}
         cameraPosition={TOPOLOGY_CAM_POS}
         fov={38}
+        occluded={occluded}
         fallback={<TopologySlotFallback slug={slug} />}
         className="h-full w-full"
       >

@@ -127,11 +127,21 @@ function GlobeAssembly({
     return geom;
   }, []);
 
+  const sharedSpheres = useMemo(
+    () => ({
+      packet: new THREE.SphereGeometry(0.042, 10, 10),
+      target: new THREE.SphereGeometry(0.06, 12, 12),
+    }),
+    []
+  );
+
   useEffect(() => {
     return () => {
       latticeGeometry.dispose();
+      sharedSpheres.packet.dispose();
+      sharedSpheres.target.dispose();
     };
-  }, [latticeGeometry]);
+  }, [latticeGeometry, sharedSpheres]);
 
   useEffect(() => {
     if (lastSelectedRef.current !== selectedId) {
@@ -246,13 +256,13 @@ function GlobeAssembly({
     <group ref={groupRef} position={[0, 0.04, 0]} rotation={[0.2, DEFAULT_GLOBE_ROT_Y, 0]}>
       {/* Luminous Geodesic Mesh */}
       <mesh>
-        <icosahedronGeometry args={[1.29, 3]} />
+        <icosahedronGeometry args={[1.29, 2]} />
         <meshBasicMaterial color="#385676" wireframe transparent opacity={0.44} />
       </mesh>
 
       {/* Deep Illuminated Oceanic Core (avoids crushed black silhouette) */}
       <mesh>
-        <sphereGeometry args={[1.255, 32, 32]} />
+        <sphereGeometry args={[1.255, 24, 24]} />
         <meshStandardMaterial
           color="#131E2D"
           emissive="#0C223B"
@@ -275,27 +285,27 @@ function GlobeAssembly({
 
       {/* Crisp Latitude Parallels & Longitude Meridians */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[1.295, 0.0055, 8, 96]} />
+        <torusGeometry args={[1.295, 0.0055, 6, 64]} />
         <meshBasicMaterial color={UI_ACCENT} transparent opacity={0.34} />
       </mesh>
       <mesh position={[0, 0.64, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[1.12, 0.004, 8, 72]} />
+        <torusGeometry args={[1.12, 0.004, 6, 48]} />
         <meshBasicMaterial color="#4B6B8F" transparent opacity={0.32} />
       </mesh>
       <mesh position={[0, -0.64, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[1.12, 0.004, 8, 72]} />
+        <torusGeometry args={[1.12, 0.004, 6, 48]} />
         <meshBasicMaterial color="#4B6B8F" transparent opacity={0.24} />
       </mesh>
       {[0, Math.PI / 3, (2 * Math.PI) / 3].map((angle, i) => (
         <mesh key={i} rotation={[0, angle, 0]}>
-          <torusGeometry args={[1.292, 0.0038, 8, 84]} />
+          <torusGeometry args={[1.292, 0.0038, 6, 56]} />
           <meshBasicMaterial color="#3D5A7A" transparent opacity={0.26} />
         </mesh>
       ))}
 
       {/* Soft Atmosphere Halo */}
       <mesh>
-        <sphereGeometry args={[1.38, 28, 28]} />
+        <sphereGeometry args={[1.38, 20, 20]} />
         <meshBasicMaterial
           color={UI_ACCENT}
           transparent
@@ -306,7 +316,7 @@ function GlobeAssembly({
 
       {/* Inclined Orbital Telemetry Track */}
       <mesh rotation={[Math.PI / 2, 0.14, 0]}>
-        <torusGeometry args={[1.56, 0.009, 10, 96]} />
+        <torusGeometry args={[1.56, 0.009, 6, 64]} />
         <meshBasicMaterial color={UI_ACCENT} transparent opacity={0.45} />
       </mesh>
 
@@ -317,12 +327,12 @@ function GlobeAssembly({
           <group key={route.id}>
             <mesh>
               <tubeGeometry
-                args={[route.curve, 44, isSelected ? 0.023 : 0.013, 8, false]}
+                args={[route.curve, 36, 0.017, 6, false]}
               />
               <meshBasicMaterial
                 color={route.hue}
                 transparent
-                opacity={isSelected ? 0.96 : 0.42}
+                opacity={isSelected ? 0.96 : 0.36}
               />
             </mesh>
 
@@ -330,13 +340,16 @@ function GlobeAssembly({
               ref={(el) => {
                 packetRefs.current[idx] = el;
               }}
+              geometry={sharedSpheres.packet}
+              scale={isSelected ? 1.15 : 0.85}
             >
-              <sphereGeometry args={[isSelected ? 0.048 : 0.036, 12, 12]} />
               <meshBasicMaterial color={route.hue} toneMapped={false} />
             </mesh>
 
             <mesh
               position={route.target}
+              geometry={sharedSpheres.target}
+              scale={isSelected ? 1.2 : 0.88}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect(route.id);
@@ -349,8 +362,7 @@ function GlobeAssembly({
                 gl.domElement.style.cursor = "auto";
               }}
             >
-              <sphereGeometry args={[isSelected ? 0.072 : 0.052, 14, 14]} />
-              <meshBasicMaterial color={route.hue} toneMapped={!isSelected} />
+              <meshBasicMaterial color={route.hue} toneMapped={false} />
             </mesh>
 
             {isSelected && (

@@ -12,10 +12,12 @@ import {
 import {
   focusWebGLSlotLoop,
   getSlotStoreSnapshot,
+  isWebGLScrollBursting,
   releaseWebGLSlot,
   requestWebGLSlot,
   setWebGLSlotInView,
   subscribeSlotStore,
+  subscribeWebGLScrollBurst,
 } from "@/components/canvas/WebGLContextProvider";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
 import { shouldShowViewport2DFallback } from "@/lib/device-tier";
@@ -33,7 +35,18 @@ interface ViewportCanvasProps {
   fov?: number;
   maxDpr?: [number, number];
   eager?: boolean;
+  occluded?: boolean;
   style?: React.CSSProperties;
+}
+
+// Serialize non-eager WebGL context creation across frames and defer during active
+// scroll bursts so scrolling never stalls on synchronous WebGL2 / GLSL shader compilation.
+let nextCanvasMountSlotMs = 0;
+function claimStaggeredMountDelayMs(): number {
+  const now = performance.now();
+  const scheduled = Math.max(now, nextCanvasMountSlotMs);
+  nextCanvasMountSlotMs = scheduled + 75;
+  return Math.max(0, scheduled - now);
 }
 
 /**
@@ -52,6 +65,7 @@ export function ViewportCanvas({
   fov = 42,
   maxDpr,
   eager = false,
+  occluded = false,
   style,
 }: ViewportCanvasProps) {
   const slotId = useId();
@@ -79,6 +93,7 @@ export function ViewportCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(eager);
   const [nearView, setNearView] = useState(eager);
+  const [mountAllowed, setMountAllowed] = useState(eager);
   const [glReady, setGlReady] = useState(false);
   const [fallbackDismissed, setFallbackDismissed] = useState(false);
   const [slotWaitElapsed, setSlotWaitElapsed] = useState(false);
@@ -141,21 +156,23 @@ export function ViewportCanvas({
     };
   }, []);
 
+  const effectiveInView = inView && !occluded;
+
   useEffect(() => {
     if (!canRender3D) {
       releaseWebGLSlot(slotId);
       return;
     }
-    if (eager || nearView) {
-      requestWebGLSlot(slotId, eager || inView);
+    if (nearView) {
+      requestWebGLSlot(slotId, effectiveInView);
     } else {
       releaseWebGLSlot(slotId);
     }
-  }, [canRender3D, nearView, inView, eager, slotId]);
+  }, [canRender3D, nearView, effectiveInView, slotId]);
 
   useEffect(() => {
-    setWebGLSlotInView(slotId, canRender3D && inView);
-  }, [canRender3D, inView, slotId]);
+    setWebGLSlotInView(slotId, canRender3D && effectiveInView);
+  }, [canRender3D, effectiveInView, slotId]);
 
   useEffect(() => {
     return () => {
@@ -163,7 +180,49 @@ export function ViewportCanvas({
     };
   }, [slotId]);
 
-  const hasSlot = canRender3D && (eager || nearView) && rawHasSlot;
+  const rawAllocatedSlot = canRender3D && nearView && rawHasSlot;
+
+  useEffect(() => {
+    if (!rawAllocatedSlot) {
+      if (!eager) {
+        const raf = window.requestAnimationFrame(() => setMountAllowed(false));
+        return () => window.cancelAnimationFrame(raf);
+      }
+      return;
+    }
+    if (eager || mountAllowed) return;
+
+    let cancelled = false;
+    let timerId: number | null = null;
+
+    const scheduleMount = () => {
+      if (cancelled || timerId !== null || isWebGLScrollBursting()) return;
+      const delay = claimStaggeredMountDelayMs();
+      timerId = window.setTimeout(() => {
+        timerId = null;
+        if (cancelled || isWebGLScrollBursting()) return;
+        setMountAllowed(true);
+      }, delay);
+    };
+
+    const unsubScroll = subscribeWebGLScrollBurst((scrolling) => {
+      if (!scrolling) {
+        scheduleMount();
+      }
+    });
+
+    scheduleMount();
+
+    return () => {
+      cancelled = true;
+      unsubScroll();
+      if (timerId !== null) {
+        window.clearTimeout(timerId);
+      }
+    };
+  }, [rawAllocatedSlot, eager, mountAllowed]);
+
+  const hasSlot = rawAllocatedSlot && (eager || mountAllowed);
   const canvasReady = hasSlot && glReady && readyGate;
   const dpr: [number, number] =
     maxDpr ?? (effectiveTier === "high" ? [1, 1.5] : [1, 1.25]);
@@ -289,7 +348,7 @@ export function ViewportCanvas({
             fov={fov}
             dpr={dpr}
             antialias={effectiveTier !== "low"}
-            activeLoop={!isStaticPose && inView && (loopAllowed || !glReady)}
+            activeLoop={!isStaticPose && effectiveInView && (loopAllowed || !glReady)}
             isStaticPose={isStaticPose}
             onCanvasReady={handleCanvasReady}
             onDecline={() => {

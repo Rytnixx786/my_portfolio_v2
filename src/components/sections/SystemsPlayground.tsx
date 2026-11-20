@@ -318,7 +318,7 @@ export function SystemsPlayground() {
       ScrollTrigger.refresh();
     }, 320);
     return () => window.clearTimeout(timer);
-  }, [focusedStageId, tab]);
+  }, [focusedStageId]);
 
   const toggleStageFocus = (stageId: string) => {
     setReplayPlaying(false);

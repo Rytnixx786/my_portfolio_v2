@@ -393,7 +393,6 @@ export function ExpertiseSection() {
                 className="double-bezel-outer spotlight-card"
               >
                 <div
-                  key={activeLayer.code}
                   data-layer-panel-core
                   className="double-bezel-core space-y-5 p-5 sm:p-6"
                 >

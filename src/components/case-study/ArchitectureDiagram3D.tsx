@@ -280,7 +280,7 @@ function SpatialDagScene({
                 color={edgeColor}
                 transparent
                 opacity={highlighted ? 0.92 : 0.45}
-                toneMapped={!highlighted}
+                toneMapped={false}
               />
             </mesh>
 
@@ -293,7 +293,7 @@ function SpatialDagScene({
                 color={edgeColor}
                 transparent
                 opacity={highlighted ? 0.96 : 0.58}
-                toneMapped={!highlighted}
+                toneMapped={false}
               />
             </mesh>
 
@@ -308,7 +308,7 @@ function SpatialDagScene({
               />
               <meshBasicMaterial
                 color={isOutgoing ? STATE_HEALTHY : UI_ACCENT}
-                toneMapped={!highlighted}
+                toneMapped={false}
               />
             </mesh>
           </group>
@@ -361,7 +361,7 @@ function SpatialDagScene({
                   color={hue}
                   transparent
                   opacity={isActive ? 0.95 : isHovered ? 0.65 : 0.25}
-                  toneMapped={!isActive}
+                  toneMapped={false}
                 />
               </mesh>
             </group>

@@ -156,6 +156,8 @@ function updateStoredPreference(next: QualityPreference) {
 export interface WebGLSlotStore {
   getSlotMaskSnapshot: (id: string) => number;
   subscribeSlot: (id: string, listener: () => void) => () => void;
+  subscribeScrolling: (listener: (scrolling: boolean) => void) => () => void;
+  isScrollingNow: () => boolean;
   setMaxSlots: (nextMax: number) => void;
   requestSlot: (id: string, pinned?: boolean) => void;
   releaseSlot: (id: string) => void;
@@ -176,7 +178,14 @@ export function createWebGLSlotStore(initialMaxSlots = 0): WebGLSlotStore {
   let scrollSettleTimer: ReturnType<typeof setTimeout> | null = null;
 
   const listenersById = new Map<string, Set<() => void>>();
+  const scrollListeners = new Set<(scrolling: boolean) => void>();
   const lastNotifiedMask = new Map<string, number>();
+
+  const notifyScrollState = () => {
+    for (const cb of scrollListeners) {
+      cb(isScrolling);
+    }
+  };
 
   const computeMask = (id: string): number => {
     const hasSlot = maxSlots > 0 && activeIds.has(id);
@@ -241,6 +250,15 @@ export function createWebGLSlotStore(initialMaxSlots = 0): WebGLSlotStore {
       };
     },
 
+    subscribeScrolling: (listener: (scrolling: boolean) => void) => {
+      scrollListeners.add(listener);
+      return () => {
+        scrollListeners.delete(listener);
+      };
+    },
+
+    isScrollingNow: () => isScrolling,
+
     setMaxSlots: (nextMax: number) => {
       const normalized = Math.max(0, nextMax);
       if (normalized === maxSlots) return;
@@ -300,6 +318,7 @@ export function createWebGLSlotStore(initialMaxSlots = 0): WebGLSlotStore {
       isScrolling = true;
       if (!wasScrolling) {
         recomputeAndNotify();
+        notifyScrollState();
       }
       if (scrollSettleTimer !== null) {
         clearTimeout(scrollSettleTimer);
@@ -308,6 +327,7 @@ export function createWebGLSlotStore(initialMaxSlots = 0): WebGLSlotStore {
         scrollSettleTimer = null;
         isScrolling = false;
         recomputeAndNotify();
+        notifyScrollState();
       }, settleMs);
     },
 
@@ -350,6 +370,16 @@ export function focusWebGLSlotLoop(id: string) {
 
 export function markWebGLScrollBurst() {
   defaultSlotStore.markScrolling();
+}
+
+export function subscribeWebGLScrollBurst(
+  listener: (scrolling: boolean) => void
+): () => void {
+  return defaultSlotStore.subscribeScrolling(listener);
+}
+
+export function isWebGLScrollBursting(): boolean {
+  return defaultSlotStore.isScrollingNow();
 }
 
 interface WebGLContextValue {
