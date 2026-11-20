@@ -314,6 +314,8 @@ export function SelectedWorkSection() {
       ? indexedProjects
       : indexedProjects.filter(({ project }) => project.category === activeFilter);
 
+  const featuredProjects = projects.filter((project) => project.featured);
+
   const visibleProjects =
     activeFilter === "All" && !showAllSystems
       ? byCategory.filter(({ project }) => project.featured)
@@ -601,7 +603,7 @@ export function SelectedWorkSection() {
             >
               <span>
                 {showAllSystems
-                  ? "Show top 3 featured"
+                  ? `Show top ${featuredProjects.length} featured`
                   : `View all ${projects.length} systems (+${hiddenCount})`}
               </span>
             </button>

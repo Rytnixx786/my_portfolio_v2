@@ -20,9 +20,10 @@ import { ViewportCanvas } from "./ViewportCanvas";
 
 const ORBITAL_SYSTEMS = [
   { id: "cinch", code: "01", label: "Cinch", metric: "331 tok/s", hue: HERO_ORBIT_HUES[0] },
-  { id: "nexus", code: "02", label: "Nexus", metric: "91% Refusal", hue: HERO_ORBIT_HUES[1] },
-  { id: "ares", code: "03", label: "ARES", metric: "92%+ CI", hue: HERO_ORBIT_HUES[2] },
-  { id: "mindstack", code: "04", label: "MindStack", metric: "95% Ground", hue: HERO_ORBIT_HUES[3] },
+  { id: "tally", code: "02", label: "Tally", metric: "99.8% · 10,276x", hue: HERO_ORBIT_HUES[1] },
+  { id: "lexicon", code: "03", label: "Lexicon", metric: "+36.2 pts CI", hue: HERO_ORBIT_HUES[2] },
+  { id: "nexus", code: "04", label: "Nexus", metric: "91% Refusal", hue: HERO_ORBIT_HUES[3] },
+  { id: "ares", code: "05", label: "ARES", metric: "92%+ CI", hue: HERO_ORBIT_HUES[4] },
 ] as const;
 
 const ORBIT_RADIUS = 2.18;
@@ -426,7 +427,7 @@ function HeroOrbitalScene({
     ORBITAL_SYSTEMS.forEach((_, idx) => {
       const node = nodesRef.current[idx];
       if (!node) return;
-      const angle = orbitAngleRef.current + (idx * Math.PI) / 2;
+      const angle = orbitAngleRef.current + (idx * Math.PI * 2) / ORBITAL_SYSTEMS.length;
       node.position.set(
         Math.cos(angle) * ORBIT_RADIUS,
         0,
@@ -645,7 +646,7 @@ function HeroOrbital2DFallback({
         const visual = beaconVisualRefs.current[idx];
         if (!btn) continue;
 
-        const a = baseAngle + (idx * Math.PI) / 2;
+        const a = baseAngle + (idx * Math.PI * 2) / ORBITAL_SYSTEMS.length;
         const ex = Math.cos(a) * rx;
         const ey = Math.sin(a) * ry;
 
@@ -965,7 +966,7 @@ export function HeroOrbitalCore3D({
         if (e.button === 0 && canRender3D) setWheelEngaged(true);
       }}
       onPointerLeave={() => setWheelEngaged(false)}
-      className="relative h-[280px] w-full overflow-hidden rounded-2xl sm:h-[360px] lg:h-[400px] xl:h-[420px]"
+      className="relative h-[252px] w-full overflow-hidden rounded-2xl sm:h-[360px] lg:h-[400px] xl:h-[420px]"
     >
       {(!canRender3D || stageReady) && (
         <div className="pointer-events-none absolute left-3 top-3 z-30 inline-flex max-w-[calc(100%-182px)] items-center gap-1.5 truncate rounded-full border border-[rgba(240,246,252,0.14)] bg-[#0D1117]/95 px-2.5 py-1 font-mono text-xs text-[#E6EDF3] sm:max-w-none sm:gap-2 sm:px-3">

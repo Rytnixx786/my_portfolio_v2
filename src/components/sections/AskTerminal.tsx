@@ -11,9 +11,9 @@ gsap.registerPlugin(ScrollTrigger);
 
 const SUGGESTIONS = [
   "How does Cinch achieve 4.12ms?",
-  "What did Mehedi build at FlyRank?",
+  "Why did Tally flag Cinch's 3.7% cache bug?",
+  "How does Lexicon get +36.2 pts & 0/90 SQLi?",
   "Explain Nexus Researcher's 91% refusal",
-  "What is his backend stack?",
 ] as const;
 
 /**
@@ -27,7 +27,7 @@ export function AskTerminal() {
   const { query, setQuery, loading, history, submitQuestion } = useQueryConsole([
     {
       q: "status",
-      a: "Ready. Ask anything about Cinch, Nexus Researcher, ARES, MindStack, OFFBoarder, MaSheba AI, FlyRank, or press Ctrl/Cmd+K anywhere.",
+      a: "Ready. Ask anything about Cinch, Tally, Lexicon, Nexus Researcher, ARES, MindStack, OFFBoarder, MaSheba AI, FlyRank, or press Ctrl/Cmd+K anywhere.",
       citations: [{ label: "Recruiter Brief", href: "/brief" }],
     },
   ]);
@@ -139,7 +139,7 @@ export function AskTerminal() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   aria-label="Ask a grounded engineering question"
-                  placeholder="Ask about benchmarks, FlyRank, latency, or stack..."
+                  placeholder="Ask about Cinch, Tally, Lexicon, ARES, FlyRank, or stack..."
                   className="min-h-[44px] flex-1 rounded-full border border-[rgba(240,246,252,0.12)] bg-[#0D1117] px-4 font-sans text-sm text-[#E6EDF3] placeholder:text-[#8B949E] focus:border-[#38BDF8] focus:outline-none"
                 />
                 <button

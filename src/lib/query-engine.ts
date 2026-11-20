@@ -13,6 +13,8 @@ export interface PortfolioQueryMatch {
 
 const PROJECT_KEYWORDS: Record<string, readonly string[]> = {
   cinch: ["cinch", "serving", "gateway", "vllm", "marlin", "awq", "331", "10.86", "4.12", "finops"],
+  tally: ["tally", "bitext", "tfidf", "tf idf", "otlp", "dbt", "minhash", "99.8%", "90.5%", "3.7%", "10 276x", "10 276", "10276x", "logprobs", "cost per correct", "cache bug"],
+  lexicon: ["lexicon", "text to sql", "sqlglot", "lexicon ro", "36.2", "l0", "l3", "red team", "sqli", "0 90", "ares pr", "model2vec"],
   "nexus-researcher": ["nexus", "researcher", "langgraph", "multi agent", "multi-agent", "8.05", "91%"],
   ares: ["ares", "promotion", "regression", "mlops", "92%", "drift gate", "champion"],
   mindstack: ["mindstack", "mind stack", "rag", "bm25", "chromadb", "rrf", "95%", "66.7%", "groundedness"],
@@ -43,6 +45,76 @@ function matchesKeyword(normalizedQuery: string, keyword: string): boolean {
 export function matchPortfolioQuery(query: string): PortfolioQueryMatch | null {
   const q = normalizeQuery(query);
   if (!q) return null;
+
+  if (
+    /\b(tally|bitext|minhash|dbt|46\s+46|otlp|10\s*276x?|tf\s*idf|logprobs?|cost\s+per\s+correct|cache\s+bug)\b/i.test(
+      q
+    ) ||
+    /(?:^|\s)(?:99\.8%|90\.5%|3\.7%)(?=\s|$)/.test(q)
+  ) {
+    if (/\b(cache\s+bug|false\s+hits?|4\s*672|system\s+header)\b/i.test(q) || /(?:^|\s)(?:3\.7%|3\.3%|99\.6%)(?=\s|$)/.test(q)) {
+      return {
+        answer:
+          "Tally's paired Bitext evaluation caught a critical regression in Cinch's whole-prompt semantic cache: hashing the shared 1,500-token system header produced a 99.6% hit rate with only 3.3% precision, collapsing Qwen2.5-7B accuracy from 90.5% to 3.7% (4,672 decisions broken).",
+        citations: [
+          { label: "Tally Case Study", href: "/work/tally" },
+          { label: "Cinch Case Study", href: "/work/cinch" },
+        ],
+      };
+    }
+
+    return {
+      answer:
+        "Tally measures cost per correct outcome (sigma cost / # correct) across 26,872 MinHash-deduplicated Bitext tickets (22,037 LSH families, n = 5,373 held-out test pairs). Tuned TF-IDF achieved 99.8% accuracy in 0.046ms vs 90.5% for local Qwen2.5-7B-AWQ (1,298ms) at 10,276x lower cost ($3.01e-07 vs $0.00309 per 1k correct), backed by privacy-stripped OTLP telemetry and 46/46 passing dbt contract tests.",
+      citations: [
+        { label: "Tally Case Study", href: "/work/tally" },
+        { label: "GitHub Repo", href: "https://github.com/Rytnixx786/Tally" },
+      ],
+    };
+  }
+
+  if (
+    /\b(lexicon|sqlglot|lexicon\s+ro|l0|l3|text\s+to\s+sql|0\s+90|red\s+team|sqli|ares\s+pr|pr\s+1|pr\s+gate|model2vec|should\s+refuse)\b/i.test(
+      q
+    ) ||
+    /(?:^|\s)\+?36\.2\b/i.test(q)
+  ) {
+    const mentionsAresGate = /\bares\b/i.test(q) || /\b(pr\s+1|pr\s+gate|should\s+refuse)\b/i.test(q);
+    const mentionsSecurity = /\b(sqlglot|lexicon\s+ro|0\s+90|0\s+46|0\s+44|red\s+team|sqli|injection|read\s+only|ast)\b/i.test(
+      q
+    );
+
+    if (mentionsAresGate) {
+      return {
+        answer:
+          "Lexicon enforces 3-seed CI evaluation gates via lexicon-ares-gate across 120 golden queries. In PR #1, removing rule R-RESOLVED-IS-STATUS nudged EX +5.0 pts while silently dropping should_refuse recall (0.800 -> 0.750), so ARES blocked the merge. Runtime queries stay protected behind 2-layer sqlglot AST + lexicon_ro READ ONLY guards (0/90 red-team bypasses) at $0.000242/query.",
+        citations: [
+          { label: "Lexicon Case Study", href: "/work/lexicon" },
+          { label: "ARES Case Study", href: "/work/ares" },
+        ],
+      };
+    }
+
+    if (mentionsSecurity) {
+      return {
+        answer:
+          "Lexicon enforces a 2-layer deterministic security boundary over Tally's Postgres warehouse: an 8-step sqlglot AST firewall (100% statement and branch coverage; blocks 28 write/DDL nodes and 19 functions/catalogs, clamps LIMIT 1000) paired with a lexicon_ro BEGIN READ ONLY Postgres role (5s statement_timeout), yielding 0/90 red-team SQLi bypasses (0/46 AST, 0/44 direct DB).",
+        citations: [
+          { label: "Lexicon Case Study", href: "/work/lexicon" },
+          { label: "GitHub Repo", href: "https://github.com/Rytnixx786/Lexicon" },
+        ],
+      };
+    }
+
+    return {
+      answer:
+        "Lexicon is a 9-node LangGraph text-to-SQL analyst over Tally's warehouse marts. Across a 3-model x 4-context-level (L0..L3) factorial ablation on 120 golden queries, structured context delivered +36.2 pts lift (95% CI +27.9 to +44.6) vs +18.4 pts from model scaling, with 99.0% hybrid BM25 + model2vec RRF recall, 0/90 red-team SQLi bypasses (sqlglot + lexicon_ro), ARES PR gates, and $0.000242/query live Tally cost.",
+      citations: [
+        { label: "Lexicon Case Study", href: "/work/lexicon" },
+        { label: "GitHub Repo", href: "https://github.com/Rytnixx786/Lexicon" },
+      ],
+    };
+  }
 
   for (const [slug, aliases] of Object.entries(PROJECT_KEYWORDS)) {
     if (aliases.some((alias) => matchesKeyword(q, alias))) {
@@ -125,7 +197,7 @@ export function answerPortfolioQuery(query: string): string | null {
 export function fallbackPortfolioMatch(query: string): PortfolioQueryMatch {
   return (
     matchPortfolioQuery(query) ?? {
-      answer: `No exact local match for "${query.trim().slice(0, 60)}". Ask about Cinch, Nexus Researcher, ARES, MindStack, OFFBoarder, MaSheba AI, FlyRank, benchmarks, or contact details.`,
+      answer: `No exact local match for "${query.trim().slice(0, 60)}". Ask about Cinch, Tally, Lexicon, Nexus Researcher, ARES, MindStack, OFFBoarder, MaSheba AI, FlyRank, benchmarks, or contact details.`,
       citations: [
         { label: "Selected Work", href: "/#work" },
         { label: "Recruiter Brief", href: "/brief" },
@@ -145,6 +217,14 @@ const CITATION_PATTERNS: ReadonlyArray<{
   {
     slug: "cinch",
     patterns: [/\/work\/cinch\b/i, /\bcinch\b/i],
+  },
+  {
+    slug: "tally",
+    patterns: [/\/work\/tally\b/i, /\btally\b/i],
+  },
+  {
+    slug: "lexicon",
+    patterns: [/\/work\/lexicon\b/i, /\blexicon\b/i],
   },
   {
     slug: "nexus-researcher",

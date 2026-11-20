@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
-import { STATE_FAULT, STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
+import { STATE_HEALTHY, UI_ACCENT } from "@/lib/palette";
 import { useCanRender3D } from "@/hooks/usePortfolioUtils";
+import type { SimulatorTab } from "@/data/playground";
 import { PlaygroundPipeline2D } from "@/components/sections/PlaygroundPipeline2D";
 import {
   CameraZoomController,
@@ -19,11 +20,12 @@ import { ViewportCanvas } from "./ViewportCanvas";
 export type PlaygroundCameraPreset = "isometric" | "top" | "orbit";
 
 interface PlaygroundPipeline3DProps {
-  tab: "cinch" | "rag";
+  tab: SimulatorTab;
   scenarioId: string;
   stages: ReadonlyArray<{ id: string; label: string }>;
   activeStages: string[];
   statusColor: "#10B981" | "#38BDF8" | "#F59E0B" | "#EF4444";
+  shortCircuitMode?: "bypass" | "fault" | "pause";
   cameraPreset: PlaygroundCameraPreset;
   presetTrigger?: number;
   focusedStageId?: string | null;
@@ -200,7 +202,11 @@ function CameraRigController({
   );
 }
 
-function buildScenarioCurve(scenarioId: string, lastActiveIdx: number): THREE.CatmullRomCurve3 {
+function buildScenarioCurve(
+  scenarioId: string,
+  lastActiveIdx: number,
+  shortCircuitMode?: "bypass" | "fault" | "pause"
+): THREE.CatmullRomCurve3 {
   const endX = STATION_X[Math.max(0, Math.min(5, lastActiveIdx))] ?? 4.0;
 
   if (scenarioId === "cache-hit") {
@@ -215,7 +221,28 @@ function buildScenarioCurve(scenarioId: string, lastActiveIdx: number): THREE.Ca
     ]);
   }
 
-  if (scenarioId === "breaker-open" || scenarioId === "budget-cutoff" || scenarioId === "nli-refusal") {
+  if (shortCircuitMode === "bypass" || scenarioId === "tfidf-win") {
+    // Elevated bypass arc skipping station index 2 ("GPU / Cost" at x = -0.8) into stations 3..5
+    return new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-4.2, 0.46, 0),
+      new THREE.Vector3(-2.4, 0.46, 0),
+      new THREE.Vector3(-1.6, 0.92, 0.16),
+      new THREE.Vector3(-0.8, 1.24, 0.26),
+      new THREE.Vector3(0.0, 0.92, 0.16),
+      new THREE.Vector3(0.8, 0.48, 0),
+      new THREE.Vector3(2.4, 0.46, 0),
+      new THREE.Vector3(4.2, 0.46, 0),
+    ]);
+  }
+
+  if (
+    shortCircuitMode === "fault" ||
+    scenarioId === "breaker-open" ||
+    scenarioId === "budget-cutoff" ||
+    scenarioId === "nli-refusal" ||
+    scenarioId === "cache-regression" ||
+    scenarioId === "sqli-blocked"
+  ) {
     return new THREE.CatmullRomCurve3([
       new THREE.Vector3(-4.2, 0.46, 0),
       new THREE.Vector3((-4.2 + endX) * 0.5, 0.46, 0),
@@ -225,15 +252,19 @@ function buildScenarioCurve(scenarioId: string, lastActiveIdx: number): THREE.Ca
     ]);
   }
 
-  if (scenarioId === "hitl-replan") {
+  if (
+    shortCircuitMode === "pause" ||
+    scenarioId === "hitl-replan" ||
+    scenarioId === "ares-block"
+  ) {
     return new THREE.CatmullRomCurve3([
       new THREE.Vector3(-4.2, 0.46, 0),
-      new THREE.Vector3(-2.4, 0.46, 0),
-      new THREE.Vector3(-0.8, 0.52, 0),
-      new THREE.Vector3(-0.35, 0.72, 0.42),
-      new THREE.Vector3(-0.8, 0.85, 0),
-      new THREE.Vector3(-1.25, 0.72, -0.42),
-      new THREE.Vector3(-0.8, 0.52, 0),
+      new THREE.Vector3((-4.2 + endX) * 0.5, 0.46, 0),
+      new THREE.Vector3(endX, 0.52, 0),
+      new THREE.Vector3(endX + 0.45, 0.72, 0.42),
+      new THREE.Vector3(endX, 0.85, 0),
+      new THREE.Vector3(endX - 0.45, 0.72, -0.42),
+      new THREE.Vector3(endX, 0.52, 0),
     ]);
   }
 
@@ -251,11 +282,13 @@ function InstancedPacketStream({
   scenarioId,
   lastActiveIdx,
   statusColor,
+  shortCircuitMode,
   rpsMultiplier,
 }: {
   scenarioId: string;
   lastActiveIdx: number;
   statusColor: string;
+  shortCircuitMode?: "bypass" | "fault" | "pause";
   rpsMultiplier: number;
 }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
@@ -265,8 +298,8 @@ function InstancedPacketStream({
   const tangentVec = useMemo(() => new THREE.Vector3(), []);
 
   const curve = useMemo(
-    () => buildScenarioCurve(scenarioId, lastActiveIdx),
-    [scenarioId, lastActiveIdx]
+    () => buildScenarioCurve(scenarioId, lastActiveIdx, shortCircuitMode),
+    [scenarioId, lastActiveIdx, shortCircuitMode]
   );
 
   const seeds = useMemo(
@@ -282,7 +315,7 @@ function InstancedPacketStream({
 
   useEffect(() => {
     invalidate();
-  }, [scenarioId, lastActiveIdx, statusColor, rpsMultiplier, invalidate]);
+  }, [scenarioId, lastActiveIdx, statusColor, shortCircuitMode, rpsMultiplier, invalidate]);
 
   useFrame((_, delta) => {
     const mesh = meshRef.current;
@@ -294,8 +327,11 @@ function InstancedPacketStream({
     }
 
     const speed =
-      (scenarioId === "cache-hit" ? 0.36 : scenarioId === "hitl-replan" ? 0.26 : 0.3) *
-      rpsMultiplier;
+      (scenarioId === "cache-hit" || shortCircuitMode === "bypass" || scenarioId === "tfidf-win"
+        ? 0.36
+        : shortCircuitMode === "pause" || scenarioId === "hitl-replan" || scenarioId === "ares-block"
+          ? 0.26
+          : 0.3) * rpsMultiplier;
 
     for (let i = 0; i < TOKEN_COUNT; i++) {
       const s = seeds[i];
@@ -457,6 +493,7 @@ function PipelineDioramaScene({
   stages,
   activeStages,
   statusColor,
+  shortCircuitMode,
   cameraPreset,
   presetTrigger = 0,
   focusedStageId = null,
@@ -471,10 +508,16 @@ function PipelineDioramaScene({
   zoomSignal: ZoomSignal;
 }) {
   const isFaultBurst =
+    shortCircuitMode === "fault" ||
     scenarioId === "breaker-open" ||
     scenarioId === "budget-cutoff" ||
-    scenarioId === "nli-refusal";
-  const isCacheBypass = scenarioId === "cache-hit";
+    scenarioId === "nli-refusal" ||
+    scenarioId === "cache-regression" ||
+    scenarioId === "sqli-blocked";
+  const isBypassFlow =
+    shortCircuitMode === "bypass" ||
+    scenarioId === "cache-hit" ||
+    scenarioId === "tfidf-win";
 
   const activeIndices = stages
     .map((s, idx) => (activeStages.includes(s.id) ? idx : -1))
@@ -507,7 +550,7 @@ function PipelineDioramaScene({
       <mesh position={[0, 0.44, 0]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.015, 0.015, 8.4, 10]} />
         <meshBasicMaterial
-          color={isFaultBurst ? STATE_FAULT : isCacheBypass ? STATE_HEALTHY : "#2A3646"}
+          color={isFaultBurst ? statusColor : isBypassFlow ? STATE_HEALTHY : "#2A3646"}
           transparent
           opacity={0.35}
         />
@@ -537,6 +580,7 @@ function PipelineDioramaScene({
         scenarioId={scenarioId}
         lastActiveIdx={lastActiveIdx}
         statusColor={statusColor}
+        shortCircuitMode={shortCircuitMode}
         rpsMultiplier={rpsMultiplier}
       />
     </group>
@@ -597,6 +641,7 @@ export function PlaygroundPipeline3D(props: PlaygroundPipeline3DProps) {
             stages={props.stages}
             activeStages={props.activeStages}
             statusColor={props.statusColor}
+            shortCircuitMode={props.shortCircuitMode}
             focusedStageId={props.focusedStageId}
             rpsMultiplier={props.rpsMultiplier}
             onSelectStage={props.onSelectStage}

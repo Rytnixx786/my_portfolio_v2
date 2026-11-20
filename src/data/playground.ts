@@ -1,4 +1,4 @@
-export type SimulatorTab = "cinch" | "rag";
+export type SimulatorTab = "cinch" | "tally" | "lexicon" | "rag";
 
 export interface StageNodeSpec {
   id: string;
@@ -25,6 +25,7 @@ export interface ScenarioSpec {
   baseLatencyMs: number;
   latencyLabel: string;
   vramOrCost: string;
+  shortCircuitMode?: "bypass" | "fault" | "pause";
   activeStages: string[];
   summary: string;
   payload: Record<string, string | number | boolean>;
@@ -466,6 +467,265 @@ export const RAG_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
         metricDelta: "HITL saved",
         logLine: "AsyncPostgresSaver saved graph state and paused stream via Last-Event-ID",
       },
+    ],
+  },
+];
+
+export const TALLY_STAGES: ReadonlyArray<StageNodeSpec> = [
+  {
+    id: "dedup",
+    label: "MinHash Split",
+    role: "Leakage-proof dataset clustering",
+    contract: "Clusters 26,872 Bitext tickets into 22,037 LSH families (Jaccard >= 0.80) before 60/20/20 StratifiedGroupKFold",
+    faultBehavior: "Prevents duplicate ticket phrasing from crossing dev, tune, and held-out test splits",
+  },
+  {
+    id: "arm",
+    label: "Setup Arm",
+    role: "TF-IDF vs Qwen2.5-7B-AWQ evaluator",
+    contract: "Routes paired test tickets (n = 5,373) across calibrated Setup A linear model or Setup B INT4 guided_choice",
+    faultBehavior: "Exposes when deterministic linear features (99.8%) dominate 7B LLM decoding (90.5%)",
+  },
+  {
+    id: "power",
+    label: "GPU / Cost",
+    role: "nvidia-smi power & hardware amortizer",
+    contract: "Polls 0.5s board wattage (141.45W mean on RTX 3060 Ti) and apportions cost by token share",
+    faultBehavior: "Computes cost per correct outcome strictly as Sigma(cost) / count(correct)",
+  },
+  {
+    id: "otel",
+    label: "OTel Strip",
+    role: "Privacy-enforced telemetry proxy",
+    contract: "Emits deterministic trace/span IDs while stripping gen_ai prompt and completion text in collector",
+    faultBehavior: "Drops raw user/model text before storage while retaining tokens, latency, and outcome labels",
+  },
+  {
+    id: "ingest",
+    label: "FastAPI Ingest",
+    role: "OTLP Postgres raw span sink",
+    contract: "Sanitizes NaN/Inf JSONB values and inserts idempotently (ON CONFLICT DO NOTHING) into raw.otel_spans",
+    faultBehavior: "Guards warehouse ingestion against malformed float payloads or retried batches",
+  },
+  {
+    id: "dbt",
+    label: "dbt Marts (46)",
+    role: "Contracted warehouse aggregator",
+    contract: "Materializes fct_outcomes & mart_cost_per_outcome validated by 46/46 dbt schema and leakage tests",
+    faultBehavior: "Fails build immediately if any model call lacks a price-book entry or test split leaks into selection",
+  },
+] as const;
+
+export const TALLY_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
+  {
+    id: "tfidf-win",
+    label: "Setup A: TF-IDF",
+    trigger: "word 1-2 + char 3-5",
+    statusColor: "#10B981",
+    statusCode: "200 A_TFIDF",
+    baseLatencyMs: 0.046,
+    latencyLabel: "0.046 ms p50",
+    vramOrCost: "$3.01e-07 / 1k",
+    shortCircuitMode: "bypass",
+    activeStages: ["dedup", "arm", "otel", "ingest", "dbt"],
+    summary:
+      "Tuned LogisticRegression + TF-IDF hits 99.8% accuracy in 0.046 ms at 10,276x lower cost than local Qwen2.5-7B-AWQ.",
+    payload: {
+      setup: "A_tfidf (C=2.0)",
+      accuracy_test: 0.9983,
+      cost_per_1k_correct_usd: 3.01e-7,
+      p50_latency_ms: 0.046,
+      roi_100k_mo_usd: 14907.87,
+    },
+    traceSpans: [
+      { stageId: "dedup", durationMs: 0.01, status: "PASS", metricDelta: "22,037 LSH", logLine: "Clustered paraphrase verified on held-out test split (n=5,373)" },
+      { stageId: "arm", durationMs: 0.026, status: "PASS", metricDelta: "99.8% Acc", logLine: "TF-IDF + LogReg scored 27 intents with 0 GPU utilization" },
+      { stageId: "otel", durationMs: 0.004, status: "HIT", metricDelta: "stripped", logLine: "Deterministic span emitted cleanly without raw ticket text" },
+      { stageId: "ingest", durationMs: 0.003, status: "PASS", metricDelta: "0 conflict", logLine: "FastAPI /v1/traces persisted span to raw.otel_spans" },
+      { stageId: "dbt", durationMs: 0.003, status: "PASS", metricDelta: "46/46", logLine: "mart_cost_per_outcome committed ($3.01e-07 per 1k correct)" },
+    ],
+  },
+  {
+    id: "qwen-eval",
+    label: "Setup B: Qwen-7B",
+    trigger: "AWQ guided_choice",
+    statusColor: "#38BDF8",
+    statusCode: "200 B_LOCAL",
+    baseLatencyMs: 1298,
+    latencyLabel: "1,298 ms p50",
+    vramOrCost: "$0.00309 / 1k",
+    activeStages: ["dedup", "arm", "power", "otel", "ingest", "dbt"],
+    summary:
+      "Qwen2.5-7B-Instruct-AWQ via Cinch hits 90.5% accuracy with 141.45W GPU telemetry & prefix-renormalized logprobs.",
+    payload: {
+      model: "Qwen2.5-7B-Instruct-AWQ",
+      accuracy_test: 0.9055,
+      mean_power_w: 141.45,
+      cost_ratio_b_over_a: "10276x",
+      mcnemar_p: "3.36e-142",
+    },
+    traceSpans: [
+      { stageId: "dedup", durationMs: 4.0, status: "PASS", metricDelta: "cluster ok", logLine: "MinHash group verified non-overlapping across tune/test" },
+      { stageId: "arm", durationMs: 1120.0, status: "PASS", metricDelta: "90.5% Acc", logLine: "vLLM guided_choice returned valid intent + top_logprobs=20" },
+      { stageId: "power", durationMs: 14.0, status: "PASS", metricDelta: "141.45 W", logLine: "RTX 3060 Ti 0.5s power window amortized across token count" },
+      { stageId: "otel", durationMs: 18.0, status: "PASS", metricDelta: "stripped", logLine: "Collector deleted prompt/completion fields before storage" },
+      { stageId: "ingest", durationMs: 42.0, status: "PASS", metricDelta: "OTLP 200", logLine: "Batch written to raw.otel_spans via psycopg pool" },
+      { stageId: "dbt", durationMs: 100.0, status: "PASS", metricDelta: "46/46", logLine: "dbt marts reconciled decision cost ($0.00309 / 1k correct)" },
+    ],
+  },
+  {
+    id: "cache-regression",
+    label: "Cinch Cache Bug",
+    trigger: "99.6% false hits",
+    statusColor: "#F59E0B",
+    statusCode: "WARN 3.7% ACC",
+    baseLatencyMs: 412,
+    latencyLabel: "3.3% Precision",
+    vramOrCost: "4,672 Broken",
+    shortCircuitMode: "fault",
+    activeStages: ["dedup", "arm", "otel"],
+    summary:
+      "Tally audit caught Cinch whole-prompt TF cache hashing the 1,500-token header: 99.6% hit rate dropped accuracy 90.5% -> 3.7%.",
+    payload: {
+      cache_hit_rate: 0.9959,
+      cache_hit_precision: 0.0333,
+      accuracy_drop: "90.5% -> 3.7%",
+      tickets_regressed: 4672,
+    },
+    traceSpans: [
+      { stageId: "dedup", durationMs: 4.0, status: "PASS", metricDelta: "test n=5373", logLine: "Paired test harness initialized with cache_on flag enabled" },
+      { stageId: "arm", durationMs: 392.0, status: "TRIP", metricDelta: "3.3% prec", logLine: "Cinch semantic cache matched shared system prompt across different tickets" },
+      { stageId: "otel", durationMs: 16.0, status: "TRIP", metricDelta: "-86.8 pts", logLine: "Accuracy collapsed from 90.5% to 3.7% (4,672 decisions flipped wrong)" },
+    ],
+  },
+];
+
+export const LEXICON_STAGES: ReadonlyArray<StageNodeSpec> = [
+  {
+    id: "retrieve",
+    label: "Hybrid RRF",
+    role: "BM25 + model2vec schema retriever",
+    contract: "Fuses lexical BM25 + potion-base-8M vectors (RRF k=60) + glossary synonyms, pulling rules deterministically",
+    faultBehavior: "Achieves 99.0% table & rule retrieval recall across all 120 golden queries while stripping PII cols",
+  },
+  {
+    id: "classify",
+    label: "Route Gate",
+    role: "Guided-choice safety classifier",
+    contract: "Renormalizes token logprobs over 6 routes; deterministic refusal templates burn zero extra LLM tokens",
+    faultBehavior: "Halts write_operation, pii_or_sensitive, and out_of_scope queries before SQL synthesis",
+  },
+  {
+    id: "generate",
+    label: "Qwen-Coder L3",
+    role: "Context-leveled SQL generator",
+    contract: "Injects L0 DDL -> L3 verified examples (+36.2 pts CI lift over L0, beating model scaling +18.4 pts)",
+    faultBehavior: "Self-corrects SQL violations up to 2 retries within LangGraph cyclic edges",
+  },
+  {
+    id: "sqlguard",
+    label: "sqlglot AST",
+    role: "Layer-1 deterministic SQL firewall",
+    contract: "Enforces single SELECT/set-op, denies 28 write/DDL nodes & 19 funcs/catalogs, and clamps LIMIT 1000",
+    faultBehavior: "100% statement & branch coverage; blocked all 46 red-team AST attack vectors",
+  },
+  {
+    id: "ro_exec",
+    label: "lexicon_ro DB",
+    role: "Layer-2 Postgres read-only boundary",
+    contract: "Executes inside BEGIN READ ONLY with statement_timeout = 5000ms against frozen Tally marts.*",
+    faultBehavior: "Blocks direct DB privilege abuse (0/44 bypasses even when AST guard is disabled)",
+  },
+  {
+    id: "ares_otlp",
+    label: "ARES + OTLP",
+    role: "PR gate plugin & live cost export",
+    contract: "Publishes GenAI OTLP spans to Tally ($0.000242/q) & enforces 3-seed ARES gates on golden buckets",
+    faultBehavior: "Fails CI automatically whenever protected buckets (should_refuse / should_clarify) regress",
+  },
+] as const;
+
+export const LEXICON_SCENARIOS: ReadonlyArray<ScenarioSpec> = [
+  {
+    id: "l3-pass",
+    label: "L3 Grounded Pass",
+    trigger: "+36.2 pts Context",
+    statusColor: "#10B981",
+    statusCode: "200 VERIFIED_SQL",
+    baseLatencyMs: 640,
+    latencyLabel: "60.0% Strict EX",
+    vramOrCost: "$0.000242 / q",
+    activeStages: ["retrieve", "classify", "generate", "sqlguard", "ro_exec", "ares_otlp"],
+    summary:
+      "Hybrid RRF retrieves schema + rules at L3, passes sqlglot AST + lexicon_ro READ ONLY execution, and logs $0.000242/q to Tally.",
+    payload: {
+      model: "Qwen2.5-Coder-7B-AWQ",
+      context_level: "L3",
+      context_effect_ci: "+36.2 pts (+27.9 to +44.6)",
+      retrieval_recall: 0.99,
+      tally_cost_per_q_usd: 0.000242,
+    },
+    traceSpans: [
+      { stageId: "retrieve", durationMs: 28.0, status: "PASS", metricDelta: "99.0% recall", logLine: "BM25 + model2vec RRF pulled marts.mart_cost_per_outcome + linked rules" },
+      { stageId: "classify", durationMs: 92.0, status: "PASS", metricDelta: "answerable", logLine: "Guided-choice route logprob confidence passed answerable threshold" },
+      { stageId: "generate", durationMs: 410.0, status: "PASS", metricDelta: "L3 + examples", logLine: "Synthesized Postgres query grounded in L3 semantic context" },
+      { stageId: "sqlguard", durationMs: 6.0, status: "PASS", metricDelta: "LIMIT 1000", logLine: "sqlglot validated AST allowlist, qualified cols, and clamped rows" },
+      { stageId: "ro_exec", durationMs: 68.0, status: "PASS", metricDelta: "READ ONLY", logLine: "lexicon_ro returned sanity-checked rows within 5s timeout" },
+      { stageId: "ares_otlp", durationMs: 36.0, status: "PASS", metricDelta: "$0.000242/q", logLine: "280/280 spans verified in Tally; 3-seed ARES gate PASS" },
+    ],
+  },
+  {
+    id: "sqli-blocked",
+    label: "Red-Team SQLi",
+    trigger: "DROP / pg_read_file",
+    statusColor: "#EF4444",
+    statusCode: "403 AST_DENY",
+    baseLatencyMs: 95,
+    latencyLabel: "0 / 90 Bypass",
+    vramOrCost: "DB Untouched",
+    shortCircuitMode: "fault",
+    activeStages: ["retrieve", "classify", "generate", "sqlguard"],
+    summary:
+      "Multi-statement injection, pg_catalog inspection, or forbidden DDL node is trapped inside sqlglot AST before any DB connection opens.",
+    payload: {
+      attack_class: "forbidden_statement | table_not_allowed",
+      ast_suite_bypassed: "0 / 46",
+      db_layer_bypassed: "0 / 44",
+      sqlguard_coverage: "100% stmt + branch",
+    },
+    traceSpans: [
+      { stageId: "retrieve", durationMs: 22.0, status: "PASS", metricDelta: "schema fetched", logLine: "Context loaded for red-team adversarial evaluation prompt" },
+      { stageId: "classify", durationMs: 38.0, status: "PASS", metricDelta: "probe active", logLine: "Passed probe payload into SQL generator boundary test" },
+      { stageId: "generate", durationMs: 31.0, status: "PASS", metricDelta: "unsafe SQL", logLine: "Candidate emitted multi-statement DROP + pg_catalog read" },
+      { stageId: "sqlguard", durationMs: 4.0, status: "DENY", metricDelta: "AST blocked", logLine: "sql_guard rejected multiple_statements + _DENY_SCHEMAS before Postgres" },
+    ],
+  },
+  {
+    id: "ares-block",
+    label: "PR #1 Gate Block",
+    trigger: "Drop Rule Regression",
+    statusColor: "#F59E0B",
+    statusCode: "FAIL ARES_GATE",
+    baseLatencyMs: 480,
+    latencyLabel: "Refusal -5.0 pts",
+    vramOrCost: "Merge Blocked",
+    shortCircuitMode: "pause",
+    activeStages: ["retrieve", "classify", "generate", "sqlguard", "ro_exec", "ares_otlp"],
+    summary:
+      "Deleting rule R-RESOLVED-IS-STATUS nudged EX +5.0 pts while silently dropping should_refuse (0.80 -> 0.75); lexicon-ares-gate blocked PR #1.",
+    payload: {
+      pr: "Rytnixx786/Lexicon#1",
+      majority_ex_delta: "+5.0 pts (41.25%)",
+      should_refuse_delta: "0.800 -> 0.750 (FAIL)",
+      seed_flip_rate: "0.8% (1/120)",
+    },
+    traceSpans: [
+      { stageId: "retrieve", durationMs: 24.0, status: "PASS", metricDelta: "-1 rule", logLine: "Loaded PR #1 branch context_without_reopen_rule" },
+      { stageId: "classify", durationMs: 85.0, status: "PASS", metricDelta: "3 seeds", logLine: "Evaluated 120 golden queries across 3 deterministic replay seeds" },
+      { stageId: "generate", durationMs: 280.0, status: "PASS", metricDelta: "EX 41.25%", logLine: "Headline EX rose +5.0 pts masking protected refusal drift" },
+      { stageId: "sqlguard", durationMs: 5.0, status: "PASS", metricDelta: "clean AST", logLine: "All executed queries cleared sqlglot AST checks" },
+      { stageId: "ro_exec", durationMs: 54.0, status: "PASS", metricDelta: "READ ONLY", logLine: "Snapshot queries verified on Postgres lexicon_eval" },
+      { stageId: "ares_otlp", durationMs: 32.0, status: "TRIP", metricDelta: "GATE FAIL", logLine: "lexicon-ares-gate blocked merge: should_refuse 0.75 < champion 0.80" },
     ],
   },
 ];

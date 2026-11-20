@@ -40,8 +40,12 @@ import {
   CINCH_SCENARIOS,
   CINCH_STAGES,
   computeTraceSpanTimeline,
+  LEXICON_SCENARIOS,
+  LEXICON_STAGES,
   RAG_SCENARIOS,
   RAG_STAGES,
+  TALLY_SCENARIOS,
+  TALLY_STAGES,
 } from "@/data/playground";
 import { POST } from "@/app/api/query/route";
 
@@ -73,6 +77,43 @@ describe("query-engine grounded retrieval", () => {
       "FlyRank"
     );
   });
+
+  it("matches Tally and Lexicon queries cleanly with exact /work/tally and /work/lexicon citations", () => {
+    const tallyCost = matchPortfolioQuery(
+      "How does Tally compare 99.8% vs 90.5% across Bitext with 10,276x savings, OTLP, and dbt 46/46?"
+    );
+    expect(tallyCost).not.toBeNull();
+    expect(tallyCost?.answer).toContain("99.8%");
+    expect(tallyCost?.answer).toContain("10,276x");
+    expect(tallyCost?.answer).toContain("46/46");
+    expect(tallyCost?.citations.some((c) => c.href === "/work/tally")).toBe(true);
+
+    const tallyBug = matchPortfolioQuery("Why did Tally catch Cinch's cache bug at 3.7%?");
+    expect(tallyBug).not.toBeNull();
+    expect(tallyBug?.answer).toContain("3.7%");
+    expect(tallyBug?.citations.some((c) => c.href === "/work/tally")).toBe(true);
+    expect(tallyBug?.citations.some((c) => c.href === "/work/cinch")).toBe(true);
+
+    const lexiconAblation = matchPortfolioQuery(
+      "Why did Lexicon gain +36.2 pts across L0..L3 context?"
+    );
+    expect(lexiconAblation).not.toBeNull();
+    expect(lexiconAblation?.answer).toContain("+36.2 pts");
+    expect(lexiconAblation?.citations.some((c) => c.href === "/work/lexicon")).toBe(true);
+
+    const lexiconSec = matchPortfolioQuery(
+      "How do sqlglot and lexicon_ro achieve 0/90 red-team bypasses?"
+    );
+    expect(lexiconSec).not.toBeNull();
+    expect(lexiconSec?.answer).toContain("0/90");
+    expect(lexiconSec?.citations.some((c) => c.href === "/work/lexicon")).toBe(true);
+
+    const lexiconAres = matchPortfolioQuery("How did Lexicon's ARES PR gate block PR #1?");
+    expect(lexiconAres).not.toBeNull();
+    expect(lexiconAres?.answer).toContain("should_refuse");
+    expect(lexiconAres?.citations.some((c) => c.href === "/work/lexicon")).toBe(true);
+    expect(lexiconAres?.citations.some((c) => c.href === "/work/ares")).toBe(true);
+  });
 });
 
 describe("palette, device tier, and project data integrity", () => {
@@ -81,8 +122,8 @@ describe("palette, device tier, and project data integrity", () => {
     expect(hexes).not.toContain("#a855f7");
   });
 
-  it("provides Section 15 methodology, evals, nextSteps, and dash-free UI copy on all 6 projects", () => {
-    expect(projects).toHaveLength(6);
+  it("provides Section 15 methodology, evals, nextSteps, and dash-free UI copy on all 8 projects", () => {
+    expect(projects).toHaveLength(8);
     for (const project of projects) {
       expect(project.methodology.length).toBeGreaterThan(20);
       expect(project.evalSeries.length).toBeGreaterThanOrEqual(2);
@@ -91,12 +132,34 @@ describe("palette, device tier, and project data integrity", () => {
       expect(project.nextSteps.length).toBeGreaterThan(20);
       expect(/[\u2013\u2014]/.test(project.description)).toBe(false);
     }
+
+    const tally = projects.find((p) => p.slug === "tally");
+    expect(tally).toBeDefined();
+    expect(tally?.name).toBe("Tally");
+    expect(tally?.category).toBe("MLOps & Security");
+    expect(tally?.architecture.nodes.length).toBeGreaterThanOrEqual(5);
+    expect(tally?.highlightMetrics.map((m) => m.value)).toContain("10,276x");
+
+    const lexicon = projects.find((p) => p.slug === "lexicon");
+    expect(lexicon).toBeDefined();
+    expect(lexicon?.name).toBe("Lexicon");
+    expect(lexicon?.category).toBe("Agents & RAG");
+    expect(lexicon?.architecture.nodes.length).toBeGreaterThanOrEqual(5);
+    expect(lexicon?.highlightMetrics.map((m) => m.value)).toContain("+36.2 pts");
   });
 
   it("validates playground stage contracts, thresholds, and scenario stage IDs", () => {
     const cinchIds = new Set(CINCH_STAGES.map((s) => s.id));
+    const tallyIds = new Set(TALLY_STAGES.map((s) => s.id));
+    const lexiconIds = new Set(LEXICON_STAGES.map((s) => s.id));
     const ragIds = new Set(RAG_STAGES.map((s) => s.id));
-    for (const stage of [...CINCH_STAGES, ...RAG_STAGES]) {
+
+    expect(TALLY_STAGES).toHaveLength(6);
+    expect(LEXICON_STAGES).toHaveLength(6);
+    expect(TALLY_SCENARIOS.length).toBeGreaterThanOrEqual(3);
+    expect(LEXICON_SCENARIOS.length).toBeGreaterThanOrEqual(3);
+
+    for (const stage of [...CINCH_STAGES, ...TALLY_STAGES, ...LEXICON_STAGES, ...RAG_STAGES]) {
       expect(stage.role.trim().length).toBeGreaterThan(4);
       expect(stage.contract.trim().length).toBeGreaterThan(10);
       expect(stage.faultBehavior.trim().length).toBeGreaterThan(10);
@@ -107,10 +170,22 @@ describe("palette, device tier, and project data integrity", () => {
       expect(sc.activeStages.every((id) => cinchIds.has(id))).toBe(true);
       expect(sc.summary).not.toContain("0 W GPU");
     }
+    for (const sc of TALLY_SCENARIOS) {
+      expect(sc.activeStages.length).toBeGreaterThanOrEqual(1);
+      expect(sc.activeStages.every((id) => tallyIds.has(id))).toBe(true);
+    }
+    for (const sc of LEXICON_SCENARIOS) {
+      expect(sc.activeStages.length).toBeGreaterThanOrEqual(1);
+      expect(sc.activeStages.every((id) => lexiconIds.has(id))).toBe(true);
+    }
     for (const sc of RAG_SCENARIOS) {
       expect(sc.activeStages.length).toBeGreaterThanOrEqual(1);
       expect(sc.activeStages.every((id) => ragIds.has(id))).toBe(true);
     }
+    expect(TALLY_SCENARIOS.find((s) => s.id === "tfidf-win")?.shortCircuitMode).toBe("bypass");
+    expect(TALLY_SCENARIOS.find((s) => s.id === "cache-regression")?.shortCircuitMode).toBe("fault");
+    expect(LEXICON_SCENARIOS.find((s) => s.id === "sqli-blocked")?.shortCircuitMode).toBe("fault");
+    expect(LEXICON_SCENARIOS.find((s) => s.id === "ares-block")?.shortCircuitMode).toBe("pause");
     const refusal = RAG_SCENARIOS.find((s) => s.id === "nli-refusal");
     expect(refusal?.payload.threshold_required).toBe(0.7);
   });
@@ -217,6 +292,11 @@ describe("/api/query handler", () => {
       "/work/nexus-researcher",
       "/work/ares",
       "/work/masheba-ai",
+    ]);
+
+    expect(extractCitationsFromText("Tally exports OTLP telemetry for Lexicon SQL queries.").map((c) => c.href)).toEqual([
+      "/work/tally",
+      "/work/lexicon",
     ]);
 
     expect(extractCitationsFromText("General engineering summary without specific slugs")).toEqual([
@@ -390,7 +470,7 @@ describe("architecture topology integrity & semantic classification", () => {
     expect(fs.existsSync(path.join(publicDir, profile.portrait.replace(/^\//, "")))).toBe(true);
     expect(fs.existsSync(path.join(publicDir, profile.heroPortrait.replace(/^\//, "")))).toBe(true);
 
-    for (const slug of ["cinch", "nexus-researcher", "ares", "mindstack"]) {
+    for (const slug of ["cinch", "tally", "lexicon", "nexus-researcher", "ares", "mindstack"]) {
       const p = projects.find((item) => item.slug === slug);
       expect(p).toBeDefined();
       expect(p?.highlightMetrics[0]?.value.trim().length).toBeGreaterThan(0);
@@ -838,7 +918,13 @@ describe("motion contract, ScrambleMetric numeric parsing, scroll-to-top, and 3D
   });
 
   it("enforces traceSpans integrity and recorded timing sums across all simulator scenarios", () => {
-    for (const s of [...CINCH_SCENARIOS, ...RAG_SCENARIOS]) {
+    const allScenarios = [
+      ...CINCH_SCENARIOS,
+      ...TALLY_SCENARIOS,
+      ...LEXICON_SCENARIOS,
+      ...RAG_SCENARIOS,
+    ];
+    for (const s of allScenarios) {
       expect(s.traceSpans.length).toBe(s.activeStages.length);
       expect(s.traceSpans.map((sp) => sp.stageId)).toEqual(s.activeStages);
       const sumMs = s.traceSpans.reduce((acc, sp) => acc + sp.durationMs, 0);
@@ -868,7 +954,7 @@ describe("motion contract, ScrambleMetric numeric parsing, scroll-to-top, and 3D
     expect(skipRow.offsetPct).toBe(96);
     expect(skipRow.offsetPct + skipRow.widthPct).toBeLessThanOrEqual(100);
 
-    for (const s of [...CINCH_SCENARIOS, ...RAG_SCENARIOS]) {
+    for (const s of allScenarios) {
       const { spanTimeline } = computeTraceSpanTimeline(s.traceSpans);
       for (const row of spanTimeline) {
         expect(row.offsetPct).toBeGreaterThanOrEqual(0);

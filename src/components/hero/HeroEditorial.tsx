@@ -181,7 +181,7 @@ export function HeroEditorial() {
       ref={heroRef}
       id="hero"
       data-cursor-hero
-      className="relative z-[2] flex min-h-[100dvh] items-center overflow-hidden bg-[#0D1117] pt-24 pb-14 sm:pt-24 sm:pb-16 lg:pt-20 lg:pb-12"
+      className="relative z-[2] flex min-h-[100dvh] items-center overflow-hidden bg-[#0D1117] pt-20 pb-10 sm:pt-24 sm:pb-16 lg:pt-20 lg:pb-12"
     >
       {/* Interactive Cursor-Reactive Precision Lattice Field */}
       <HeroCursorField containerRef={heroRef} />
@@ -200,7 +200,7 @@ export function HeroEditorial() {
       />
 
       <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 sm:px-8">
-        <div className="grid grid-cols-1 items-center gap-6 sm:gap-10 lg:grid-cols-12 lg:gap-12">
+        <div className="grid grid-cols-1 items-center gap-4 sm:gap-10 lg:grid-cols-12 lg:gap-12">
           {/* Left 7 Cols: Focused Editorial Identity */}
           <div data-hero-copy className="min-w-0 lg:col-span-7">
             <p

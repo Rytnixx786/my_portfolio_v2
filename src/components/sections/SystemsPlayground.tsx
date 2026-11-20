@@ -7,7 +7,9 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
   ArrowCounterClockwise,
   ArrowUpRight,
+  ChartBar,
   Cpu,
+  Database,
   GitBranch,
   Lightning,
   Pause,
@@ -21,8 +23,12 @@ import {
   CINCH_SCENARIOS,
   CINCH_STAGES,
   computeTraceSpanTimeline,
+  LEXICON_SCENARIOS,
+  LEXICON_STAGES,
   RAG_SCENARIOS,
   RAG_STAGES,
+  TALLY_SCENARIOS,
+  TALLY_STAGES,
   type SimulatorTab,
 } from "@/data/playground";
 import { createAppMatchMedia, EASE, MOTION } from "@/lib/motion";
@@ -61,10 +67,47 @@ const LazyPlaygroundPipeline3D = dynamic(
   }
 );
 
+const SIMULATOR_TABS = [
+  {
+    id: "cinch" as const,
+    label: "Cinch Gateway",
+    href: "/work/cinch",
+    stages: CINCH_STAGES,
+    scenarios: CINCH_SCENARIOS,
+    Icon: Cpu,
+  },
+  {
+    id: "tally" as const,
+    label: "Tally Cost Ledger",
+    href: "/work/tally",
+    stages: TALLY_STAGES,
+    scenarios: TALLY_SCENARIOS,
+    Icon: ChartBar,
+  },
+  {
+    id: "lexicon" as const,
+    label: "Lexicon Text-to-SQL",
+    href: "/work/lexicon",
+    stages: LEXICON_STAGES,
+    scenarios: LEXICON_SCENARIOS,
+    Icon: Database,
+  },
+  {
+    id: "rag" as const,
+    label: "RAG Refusal Gate",
+    href: "/work/nexus-researcher",
+    stages: RAG_STAGES,
+    scenarios: RAG_SCENARIOS,
+    Icon: GitBranch,
+  },
+] as const;
+
 export function SystemsPlayground() {
   const { canRender3D } = useCanRender3D();
   const [tab, setTab] = useState<SimulatorTab>("cinch");
   const [cinchId, setCinchId] = useState(CINCH_SCENARIOS[0].id);
+  const [tallyId, setTallyId] = useState(TALLY_SCENARIOS[0].id);
+  const [lexiconId, setLexiconId] = useState(LEXICON_SCENARIOS[0].id);
   const [ragId, setRagId] = useState(RAG_SCENARIOS[0].id);
   const [cameraPreset, setCameraPreset] = useState<PlaygroundCameraPreset>("isometric");
   const [presetTrigger, setPresetTrigger] = useState<number>(0);
@@ -84,9 +127,17 @@ export function SystemsPlayground() {
   const hasTelemetryChangedRef = useRef(false);
   const appReduced = useAppReducedMotion();
 
-  const scenarios = tab === "cinch" ? CINCH_SCENARIOS : RAG_SCENARIOS;
-  const stages = tab === "cinch" ? CINCH_STAGES : RAG_STAGES;
-  const rawScenarioId = tab === "cinch" ? cinchId : ragId;
+  const activeTabMeta =
+    SIMULATOR_TABS.find((t) => t.id === tab) ?? SIMULATOR_TABS[0];
+  const scenarios = activeTabMeta.scenarios;
+  const stages = activeTabMeta.stages;
+  const selectedByTab: Record<SimulatorTab, string> = {
+    cinch: cinchId,
+    tally: tallyId,
+    lexicon: lexiconId,
+    rag: ragId,
+  };
+  const rawScenarioId = selectedByTab[tab];
   const activeScenario =
     scenarios.find((s) => s.id === rawScenarioId) ?? scenarios[0];
 
@@ -279,13 +330,16 @@ export function SystemsPlayground() {
   };
 
   const effectiveStages = activeScenario.activeStages.filter((id) => {
-    if (!piiGuardEnabled && id === "pii") return false;
-    if (!semanticCacheEnabled && id === "cache") return false;
+    if (tab === "cinch" && !piiGuardEnabled && id === "pii") return false;
+    if (tab === "cinch" && !semanticCacheEnabled && id === "cache") return false;
     return true;
   });
 
-  const effectiveSpans = useMemo(() => {
-    return activeScenario.traceSpans.map((span) => {
+  const { recordedTotalMs, spanTimeline } = useMemo(() => {
+    const tabMeta = SIMULATOR_TABS.find((t) => t.id === tab) ?? SIMULATOR_TABS[0];
+    const scenario =
+      tabMeta.scenarios.find((s) => s.id === rawScenarioId) ?? tabMeta.scenarios[0];
+    const effectiveSpans = scenario.traceSpans.map((span) => {
       const piiBypassed = tab === "cinch" && !piiGuardEnabled && span.stageId === "pii";
       const cacheBypassed =
         tab === "cinch" && !semanticCacheEnabled && span.stageId === "cache";
@@ -309,12 +363,8 @@ export function SystemsPlayground() {
       }
       return span;
     });
-  }, [activeScenario.traceSpans, piiGuardEnabled, semanticCacheEnabled, tab]);
-
-  const { recordedTotalMs, spanTimeline } = useMemo(
-    () => computeTraceSpanTimeline(effectiveSpans),
-    [effectiveSpans]
-  );
+    return computeTraceSpanTimeline(effectiveSpans);
+  }, [tab, rawScenarioId, piiGuardEnabled, semanticCacheEnabled]);
 
   const activeStepSpan =
     replayStepIdx >= 0 && replayStepIdx < spanTimeline.length
@@ -353,6 +403,10 @@ export function SystemsPlayground() {
     setFocusedStageId(null);
     if (tab === "cinch") {
       setCinchId(id);
+    } else if (tab === "tally") {
+      setTallyId(id);
+    } else if (tab === "lexicon") {
+      setLexiconId(id);
     } else {
       setRagId(id);
     }
@@ -394,9 +448,27 @@ export function SystemsPlayground() {
   };
 
   const handleTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+    const idx = SIMULATOR_TABS.findIndex((t) => t.id === tab);
+    if (idx < 0) return;
+
+    let nextIdx: number | null = null;
+    if (e.key === "ArrowRight") {
+      nextIdx = (idx + 1) % SIMULATOR_TABS.length;
+    } else if (e.key === "ArrowLeft") {
+      nextIdx = (idx - 1 + SIMULATOR_TABS.length) % SIMULATOR_TABS.length;
+    } else if (e.key === "Home") {
+      nextIdx = 0;
+    } else if (e.key === "End") {
+      nextIdx = SIMULATOR_TABS.length - 1;
+    }
+
+    if (nextIdx !== null) {
       e.preventDefault();
-      selectTab(tab === "cinch" ? "rag" : "cinch");
+      const nextTab = SIMULATOR_TABS[nextIdx].id;
+      selectTab(nextTab);
+      window.requestAnimationFrame(() => {
+        document.getElementById(`tab-${nextTab}`)?.focus();
+      });
     }
   };
 
@@ -408,7 +480,7 @@ export function SystemsPlayground() {
     >
       <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
         <SectionReveal>
-          <div className="relative flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 lg:flex-row lg:items-end">
+          <div className="relative flex flex-col justify-between gap-6 border-b border-[rgba(240,246,252,0.08)] pb-8 xl:flex-row xl:items-end">
             <span
               data-section-rule
               aria-hidden="true"
@@ -437,12 +509,12 @@ export function SystemsPlayground() {
               role="tablist"
               aria-label="Choose pipeline architecture to simulate"
               onKeyDown={handleTabKeyDown}
-              className="relative inline-flex rounded-full border border-[rgba(240,246,252,0.12)] bg-[#161B22] p-1"
+              className="relative flex w-full max-w-full flex-wrap items-center gap-1 rounded-2xl border border-[rgba(240,246,252,0.12)] bg-[#161B22] p-1 sm:w-auto sm:rounded-full"
             >
               {tabPillReady && tabPillRect && (
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute left-0 top-0 rounded-full bg-[#38BDF8] transition-[transform,width,height] duration-300 ease-[var(--ease-editorial)]"
+                  className="pointer-events-none absolute left-0 top-0 rounded-xl bg-[#38BDF8] transition-[transform,width,height] duration-300 ease-[var(--ease-editorial)] sm:rounded-full"
                   style={{
                     width: tabPillRect.width,
                     height: tabPillRect.height,
@@ -450,44 +522,31 @@ export function SystemsPlayground() {
                   }}
                 />
               )}
-              <button
-                ref={registerTabItem("cinch")}
-                type="button"
-                role="tab"
-                id="tab-cinch"
-                aria-selected={tab === "cinch"}
-                aria-controls="panel-simulator"
-                onClick={() => selectTab("cinch")}
-                className={`relative z-10 inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] transition-colors ${
-                  tab === "cinch"
-                    ? tabPillReady
-                      ? "font-semibold text-[#0D1117]"
-                      : "bg-[#38BDF8] font-semibold text-[#0D1117]"
-                    : "text-[#9DA7B3] hover:text-[#E6EDF3]"
-                }`}
-              >
-                <Cpu className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
-                <span>Cinch Gateway</span>
-              </button>
-              <button
-                ref={registerTabItem("rag")}
-                type="button"
-                role="tab"
-                id="tab-rag"
-                aria-selected={tab === "rag"}
-                aria-controls="panel-simulator"
-                onClick={() => selectTab("rag")}
-                className={`relative z-10 inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 py-2 font-mono text-xs uppercase tracking-[0.12em] transition-colors ${
-                  tab === "rag"
-                    ? tabPillReady
-                      ? "font-semibold text-[#0D1117]"
-                      : "bg-[#38BDF8] font-semibold text-[#0D1117]"
-                    : "text-[#9DA7B3] hover:text-[#E6EDF3]"
-                }`}
-              >
-                <GitBranch className="h-3.5 w-3.5" weight="regular" aria-hidden="true" />
-                <span>RAG Refusal Gate</span>
-              </button>
+              {SIMULATOR_TABS.map(({ id, label, Icon }) => {
+                const selected = tab === id;
+                return (
+                  <button
+                    key={id}
+                    ref={registerTabItem(id)}
+                    type="button"
+                    role="tab"
+                    id={`tab-${id}`}
+                    aria-selected={selected}
+                    aria-controls="panel-simulator"
+                    onClick={() => selectTab(id)}
+                    className={`relative z-10 inline-flex min-h-[44px] flex-1 basis-[calc(50%-0.25rem)] items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-2 font-mono text-[11px] uppercase tracking-[0.06em] transition-colors sm:flex-none sm:basis-auto sm:gap-2 sm:rounded-full sm:px-3.5 sm:text-xs sm:tracking-[0.11em] ${
+                      selected
+                        ? tabPillReady
+                          ? "font-semibold text-[#0D1117]"
+                          : "bg-[#38BDF8] font-semibold text-[#0D1117]"
+                        : "text-[#9DA7B3] hover:text-[#E6EDF3]"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" weight="regular" aria-hidden="true" />
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </SectionReveal>
@@ -497,7 +556,7 @@ export function SystemsPlayground() {
             ref={simShellRef}
             id="panel-simulator"
             role="tabpanel"
-            aria-labelledby={tab === "cinch" ? "tab-cinch" : "tab-rag"}
+            aria-labelledby={`tab-${tab}`}
             onPointerDownCapture={() => {
               if (bootTlRef.current && bootTlRef.current.progress() < 0.99) {
                 bootTlRef.current.progress(1);
@@ -663,6 +722,7 @@ export function SystemsPlayground() {
                   stages={stages}
                   activeStages={effectiveStages}
                   statusColor={activeScenario.statusColor}
+                  shortCircuitMode={activeScenario.shortCircuitMode}
                   cameraPreset={cameraPreset}
                   presetTrigger={presetTrigger}
                   focusedStageId={focusedStageId}
@@ -676,6 +736,7 @@ export function SystemsPlayground() {
                   stages={stages}
                   activeStages={effectiveStages}
                   statusColor={activeScenario.statusColor}
+                  shortCircuitMode={activeScenario.shortCircuitMode}
                   focusedStageId={focusedStageId}
                   rpsMultiplier={rpsMultiplier}
                   onSelectStage={toggleStageFocus}
@@ -798,11 +859,13 @@ export function SystemsPlayground() {
                     const barColor =
                       span.status === "SKIP"
                         ? "#6E7681"
-                        : span.status === "TRIP" || span.status === "DENY"
+                        : span.status === "DENY"
                           ? "#EF4444"
-                          : span.status === "PAUSE"
-                            ? "#F59E0B"
-                            : activeScenario.statusColor;
+                          : span.status === "TRIP"
+                            ? activeScenario.statusColor
+                            : span.status === "PAUSE"
+                              ? "#F59E0B"
+                              : activeScenario.statusColor;
 
                     return (
                       <button
@@ -956,7 +1019,7 @@ export function SystemsPlayground() {
                   </p>
                   <div className="pt-1">
                     <TransitionLink
-                      href={tab === "cinch" ? "/work/cinch" : "/work/nexus-researcher"}
+                      href={activeTabMeta.href}
                       className="group inline-flex min-h-[44px] items-center gap-1.5 font-mono text-xs uppercase tracking-[0.12em] text-[#38BDF8] hover:text-[#7DD3FC]"
                     >
                       <span>Open full architecture notes</span>
@@ -989,8 +1052,12 @@ export function SystemsPlayground() {
                             }
                           : null,
                         stream_rate_multiplier: Number(rpsMultiplier.toFixed(1)),
-                        pii_guard: piiGuardEnabled,
-                        semantic_cache: semanticCacheEnabled,
+                        ...(tab === "cinch"
+                          ? {
+                              pii_guard: piiGuardEnabled,
+                              semantic_cache: semanticCacheEnabled,
+                            }
+                          : {}),
                       },
                       null,
                       2

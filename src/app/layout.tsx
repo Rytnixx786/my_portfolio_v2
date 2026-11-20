@@ -75,8 +75,12 @@ export const metadata: Metadata = {
     "RAG",
     "MLOps",
     "Cinch",
+    "Tally",
+    "Lexicon",
     "Nexus Researcher",
     "ARES",
+    "dbt Telemetry",
+    "sqlglot",
   ],
   openGraph: {
     title: siteTitle,

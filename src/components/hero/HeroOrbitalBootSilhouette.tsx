@@ -114,11 +114,24 @@ export function HeroOrbitalBootSilhouette({
           strokeLinecap="round"
         />
 
-        {/* Static orbital anchor nodes tinted with the 4 flagship hues */}
-        <circle cx="386" cy="212" r="5" fill={HERO_ORBIT_HUES[0]} fillOpacity="0.8" />
-        <circle cx="96" cy="242" r="4" fill={HERO_ORBIT_HUES[1]} fillOpacity="0.65" />
-        <circle cx="88" cy="146" r="4" fill={HERO_ORBIT_HUES[2]} fillOpacity="0.6" />
-        <circle cx="338" cy="130" r="4" fill={HERO_ORBIT_HUES[3]} fillOpacity="0.6" />
+        {/* Static orbital anchor nodes tinted with the flagship hues */}
+        <g transform="translate(220 194) rotate(-10)">
+          {HERO_ORBIT_HUES.map((hue, idx) => {
+            const angle = 0.42 + (idx * Math.PI * 2) / HERO_ORBIT_HUES.length;
+            const cx = Number((Math.cos(angle) * 186).toFixed(1));
+            const cy = Number((Math.sin(angle) * 76).toFixed(1));
+            return (
+              <circle
+                key={`${hue}-${idx}`}
+                cx={cx}
+                cy={cy}
+                r={idx === 0 ? 5 : 4}
+                fill={hue}
+                fillOpacity={idx === 0 ? 0.8 : 0.62}
+              />
+            );
+          })}
+        </g>
       </svg>
     </div>
   );

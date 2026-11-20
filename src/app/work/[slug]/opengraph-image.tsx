@@ -52,7 +52,7 @@ export default async function CaseStudyOGImage({
             fontFamily: "monospace",
           }}
         >
-          <span>SYSTEM 0{idx} · {project.category}</span>
+          <span>SYSTEM {String(idx).padStart(2, "0")} · {project.category}</span>
           <span style={{ color: "#8B949E" }}>{profile.name}</span>
         </div>
 

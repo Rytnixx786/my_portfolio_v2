@@ -54,7 +54,7 @@ const LazyProjectTopology3D = dynamic(
   }
 );
 
-const SCULPTURE_SLUGS = new Set(["cinch", "nexus-researcher", "ares"]);
+const SCULPTURE_SLUGS = new Set(["cinch", "tally", "lexicon", "nexus-researcher", "ares"]);
 
 interface ProjectPreviewPlateProps {
   project: Project;
@@ -93,11 +93,15 @@ export function ProjectPreviewPlate({
     const wave =
       project.slug === "cinch"
         ? Math.sin(t * Math.PI * 2.2) * 34
-        : project.slug === "nexus-researcher"
-          ? (i % 2 === 0 ? -24 : 26) + Math.cos(t * Math.PI) * 12
-          : project.slug === "ares"
-            ? Math.cos(t * Math.PI * 2) * 30
-            : Math.sin(t * Math.PI * 1.6 + 0.6) * 26;
+        : project.slug === "tally"
+          ? Math.sin(t * Math.PI * 2.6) * 24 + (0.5 - t) * 26
+          : project.slug === "lexicon"
+            ? (0.5 - t) * 40 + Math.sin(t * Math.PI * 3) * 16
+            : project.slug === "nexus-researcher"
+              ? (i % 2 === 0 ? -24 : 26) + Math.cos(t * Math.PI) * 12
+              : project.slug === "ares"
+                ? Math.cos(t * Math.PI * 2) * 30
+                : Math.sin(t * Math.PI * 1.6 + 0.6) * 26;
 
     const y = svgHeight * 0.5 + wave;
     return { ...node, x, y, index: i };

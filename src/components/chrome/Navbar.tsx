@@ -232,9 +232,7 @@ export function Navbar() {
 
             <span
               aria-hidden="true"
-              className={`hidden items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-xs tabular-nums text-[#8B949E] ${
-                isScrolled && !mobileOpen ? "sm:inline-flex lg:hidden xl:inline-flex" : "sm:inline-flex"
-              }`}
+              className="hidden items-center gap-1.5 rounded-full border border-[rgba(240,246,252,0.1)] bg-[#161B22]/90 px-2.5 py-0.5 font-mono text-xs tabular-nums text-[#8B949E] sm:inline-flex lg:hidden xl:inline-flex"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-[#38BDF8]" />
               <span className="text-[#E6EDF3]">{telemetryCode}</span>

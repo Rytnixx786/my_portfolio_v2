@@ -20,9 +20,9 @@ import { TransitionLink } from "@/components/chrome/TransitionLink";
 
 const SUGGESTIONS = [
   "How does Cinch achieve 4.12ms?",
-  "What did Mehedi build at FlyRank?",
+  "How did Tally prove 10,276x cost savings?",
+  "How does Lexicon enforce 0/90 SQLi & ARES gates?",
   "Explain Nexus Researcher's 91% refusal",
-  "How does MindStack enforce groundedness?",
 ] as const;
 
 export function CommandPalette() {
@@ -37,7 +37,7 @@ export function CommandPalette() {
   const { query, setQuery, loading, history, submitQuestion } = useQueryConsole([
     {
       q: "sys.status",
-      a: "Connected to grounded /api/query index. Ask about benchmarks, architecture tradeoffs, or jump to any case study.",
+      a: "Connected to grounded /api/query index. Ask about Cinch, Tally, Lexicon, Nexus, ARES, or jump to any case study.",
       citations: [{ label: "Recruiter Brief", href: "/brief" }],
     },
   ]);
@@ -159,7 +159,7 @@ export function CommandPalette() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask about Cinch, Nexus, ARES, benchmarks..."
+              placeholder="Ask about Cinch, Tally, Lexicon, Nexus, ARES..."
               className="min-w-0 w-full bg-transparent font-sans text-sm text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none"
             />
             <button

@@ -152,6 +152,222 @@ class CircuitBreaker:
       "Add GPU-node sidecar Redis vector cache syncing for multi-node cluster scaling and benchmark AWQ Marlin against FP8 on RTX 4090.",
   },
   {
+    slug: "tally",
+    name: "Tally",
+    featured: true,
+    category: "MLOps & Security" as ProjectCategory,
+    year: "2026",
+    role: "Sole Author · LLM FinOps Telemetry & Data Warehouse",
+    timeline: "3 weeks",
+    statusLabel: "Open-source · 46/46 dbt green",
+    services: ["Cost Accounting", "OTLP Strip Proxy", "dbt Warehouse Contracts"],
+    eyebrow: "Cost-per-correct-outcome telemetry warehouse",
+    description:
+      "An empirical LLM evaluation and OpenTelemetry FinOps warehouse measuring cost per correct outcome (sigma cost / # correct) across 26,872 MinHash-deduplicated support tickets, proving calibrated TF-IDF (99.8%) beats local Qwen2.5-7B-AWQ (90.5%) at 10,276x lower cost while catching a 99.6%-hit semantic cache bug.",
+    impact:
+      "99.8% TF-IDF vs 90.5% Qwen2.5-7B accuracy (p50 0.046ms vs 1,298ms; McNemar p = 3.36e-142) at 10,276x lower cost ($3.01e-07 vs $0.00309 per 1k correct on RTX 3060 Ti), 46/46 passing dbt contracts, and 83 pytest tests.",
+    methodology:
+      "Clustered 26,872 Bitext tickets into 22,037 MinHash LSH (Jaccard >= 0.8) families and split 60/20/20 via StratifiedGroupKFold (n = 5,373 held-out test pairs). Paired nvidia-smi 0.5s power sampling against prefix-renormalized Qwen2.5-7B-AWQ logprobs routed through Cinch into OTel Collector, FastAPI ingest, and Postgres dbt marts.",
+    reproduceCmd: "uv run pytest -m 'not integration' && uv run tally reproduce",
+    constraints: [
+      "Prevent paraphrase and duplicate ticket text leakage across dev/tune/test splits via MinHash LSH + StratifiedGroupKFold",
+      "Never store raw user prompts or completions in warehouse telemetry (OTel attributes/strip_content defense in depth)",
+      "Compute cost-per-correct strictly as ratio-of-sums on paired decisions rather than naive mean-of-ratios",
+    ],
+    tradeoffs: [
+      "Built client-side deterministic span IDs (trace_id from decision_id) ahead of OTel Collector instead of patching Cinch upstream, keeping the gateway image unmodified while preserving end-to-end call attribution.",
+      "Implemented temperature calibration and confidence escalation client-side in Tally so cascade fallbacks can route cleanly to hosted APIs when quota budgets allow.",
+    ],
+    failures: [
+      "Enabling Cinch's default semantic cache yielded 99.6% hits but only 3.3% precision, collapsing Qwen2.5-7B accuracy from 90.5% to 3.7% because whole-prompt hashing including the 1,500-token system header hit unrelated intents.",
+      "Gemini OpenAI-compatible API rejected seed parameters (HTTP 400) and free-tier quotas (20 req/day) blocked full hosted sweeps; disabled Setup C/D via ADR-015 while keeping replay and unit coverage at >=85%.",
+    ],
+    evalSeries: [
+      { label: "Test Accuracy", baseline: 90.5, current: 99.8, unit: "% (n=5373)" },
+      { label: "Cache Hit Prec.", baseline: 3.3, current: 99.8, unit: "% (bug->fix)" },
+      { label: "Cost Ratio B/A", baseline: 10276, current: 1.0, unit: "x relative" },
+    ] satisfies ReadonlyArray<EvalSeriesPoint>,
+    highlightMetrics: [
+      { value: "99.8% vs 90.5%", label: "TF-IDF vs Qwen-7B Acc" },
+      { value: "10,276x", label: "Cost / Correct Ratio" },
+      { value: "46 / 46", label: "dbt Contract Tests" },
+      { value: "83", label: "Pytest Suite (81+2 Int)" },
+    ],
+    tech: ["Python 3.12", "Postgres 16", "dbt-postgres", "OpenTelemetry", "FastAPI", "vLLM", "scikit-learn", "MinHash LSH", "Streamlit", "Plotly"],
+    href: "https://github.com/Rytnixx786/Tally",
+    sourceRef: "src/tally/llm/logprobs.py",
+    codeLabel: "Prefix-Renormalized Logprobs",
+    challenge:
+      "Teams default to expensive LLM inference without measuring total decision economics: amortized hardware power, misroute penalties, cache false-positives, and evaluation split leakage distort accuracy and ROI claims.",
+    approach:
+      "Built Tally as an empirical warehouse pairing Setup A (char/word TF-IDF + LogisticRegression) against Setup B (local Qwen2.5-7B-Instruct-AWQ via Cinch) over leakage-proof MinHash splits. Instrumented GPU power, prefix-renormalized logprobs, privacy-stripped OTLP trace ingestion, and 46 dbt contract checks backed by an 8-tab Streamlit observatory.",
+    architecture: {
+      nodes: [
+        { id: "bitext_dedup", label: "MinHash + GroupSplit", desc: "26,872 tickets clustered into 22,037 LSH families (60/20/20 split)" },
+        { id: "setup_router", label: "Setup A / B Harness", desc: "Evaluates TF-IDF (0.046ms) vs Qwen2.5-7B AWQ guided_choice" },
+        { id: "power_cost", label: "nvidia-smi Cost Engine", desc: "Samples 0.5s board wattage and apportions cap-ex + kWh by token share" },
+        { id: "otel_strip_guard", label: "OTel Privacy Strip", desc: "Collector drops prompt/completion attributes before JSONB export" },
+        { id: "ingest_api", label: "FastAPI /v1/traces", desc: "Sanitizes NaN/Inf floats and writes idempotently into raw.otel_spans" },
+        { id: "dbt_marts_db", label: "dbt Marts (46/46)", desc: "Contracted fct_outcomes and mart_cost_per_outcome via lexicon_ro" },
+      ],
+      connections: [
+        { from: "bitext_dedup", to: "setup_router", label: "Clean Splits" },
+        { from: "setup_router", to: "power_cost", label: "Logprobs + Power" },
+        { from: "power_cost", to: "otel_strip_guard", label: "Client Spans" },
+        { from: "otel_strip_guard", to: "ingest_api", label: "Stripped OTLP" },
+        { from: "ingest_api", to: "dbt_marts_db", label: "46/46 Contracts" },
+      ],
+    },
+    lessons: [
+      "Cost per correct outcome reverses token pricing intuition: on closed-set triage, tuned TF-IDF beats 7B INT4 LLMs by +9.3 accuracy points at 10,276x lower cost ($14,908/mo vs $9,800/mo modeled net ROI).",
+      "Prefix-tree logprob renormalization removes length and guided_choice masking bias when calibrating multi-token intent confidence.",
+      "Warehouse singular tests asserting split boundaries and price-book completeness catch silent prompt leakage before reports ship.",
+    ],
+    codeLanguage: "python",
+    codeSnippet: `# Tally: Prefix-Tree Label Logprob Renormalization (src/tally/llm/logprobs.py)
+def label_confidence(
+    token_logprobs: Sequence[TokenLogprob] | None,
+    labels: Sequence[str],
+    chosen: str | None,
+) -> float | None:
+    if not token_logprobs or chosen is None:
+        return None
+    label_set = list(labels)
+    prefix = ""
+    conf = 1.0
+    for tl in token_logprobs:
+        cands: dict[str, float] = dict(tl.top)
+        cands[tl.token] = tl.logprob
+
+        def extends(tok: str, prefix: str = prefix) -> bool:
+            s = (prefix + tok).lstrip()
+            return bool(s) and any(lab.startswith(s) for lab in label_set)
+
+        valid = {tok: lp for tok, lp in cands.items() if extends(tok)}
+        if tl.token not in valid:
+            if not (prefix + tl.token).strip():
+                prefix += tl.token
+                continue
+            break
+        denom = sum(math.exp(lp) for lp in valid.values())
+        conf *= math.exp(tl.logprob) / denom
+        prefix += tl.token
+        if prefix.strip() == chosen:
+            break
+    return min(max(conf, 0.0), 1.0)`,
+    nextSteps:
+      "Execute Setup C (hosted escalation) and Setup D (confidence cascade tau sweep) once hosted API budget tier is unlocked, then generate calibrated reliability diagrams.",
+  },
+  {
+    slug: "lexicon",
+    name: "Lexicon",
+    featured: true,
+    category: "Agents & RAG" as ProjectCategory,
+    year: "2026",
+    role: "Sole Author · LangGraph Text-to-SQL & Safety Architecture",
+    timeline: "4 weeks",
+    statusLabel: "Open-source · Live ARES CI gates",
+    services: ["LangGraph Text-to-SQL", "sqlglot AST Security", "Semantic Context Ablation"],
+    eyebrow: "Context-engineered LangGraph SQL analyst",
+    description:
+      "A schema-grounded LangGraph text-to-SQL agent over Tally's warehouse marts and support lifecycle tables, proving across a 3-model x 4-context-level ablation that structured semantics (+36.2 pts CI) outperform model scaling (+18.4 pts), protected by 2-layer sqlglot AST + read-only Postgres guards (0/90 red-team bypasses) and ARES CI gates.",
+    impact:
+      "+36.2 pts L3-vs-L0 context effect (95% CI +27.9 to +44.6; LR chi2 = 146.3) vs +18.4 pts model scaling across 120 golden queries, 99.0% hybrid RRF recall, 0/90 red-team SQLi bypasses (100% sql_guard branch cov), 172 pytest tests, and $0.000242/query live Tally cost.",
+    methodology:
+      "Executed a pre-registered 3-model (Qwen2.5-3B AWQ, Qwen2.5-7B AWQ, Qwen2.5-Coder-7B AWQ) x 4-context-level (L0 DDL to L3 + verified SQL) factorial ablation over 120 frozen snapshot questions with 2,000-resample paired bootstraps, plus 90 red-team AST/DB injection probes and 3-seed ARES gate evaluations.",
+    reproduceCmd: "uv run pytest -m 'not integration' && uv run lexicon report",
+    constraints: [
+      "Zero write, DDL, system catalog (pg_catalog / sqlite_master), or arbitrary table-function execution even if the LLM attempts injection",
+      "Strict ablation isolation: L2/L3 business rules and disambiguation must never leak into L0/L1 baselines",
+      "Live GPU runs guarded by 75C / 160W thermal throttling and deterministic replay hashes for zero-spend CI",
+    ],
+    tradeoffs: [
+      "Enforced a strict sqlglot 28-node AST + 19-function allowlist (100% branch coverage) paired with Postgres lexicon_ro read-only roles and 5s statement timeouts rather than relying on prompt instructions.",
+      "Selected fast local model2vec + BM25 RRF (k=60) retrieval over live LLM query rewriting, achieving 99.0% retrieval recall across all 12 ablation cells at near-zero latency.",
+    ],
+    failures: [
+      "Removing a single rule (R-RESOLVED-IS-STATUS) in PR #1 silently degraded should_refuse recall (0.800 -> 0.750) while raw execution accuracy ticked up +5.0 pts; lexicon-ares-gate automatically blocked the merge.",
+      "Unthrottled batching initially drove GPU VRAM to 92% and stalled generation; added a rolling nvidia-smi GpuGuard enforcing duty=0.6 cooldowns across 120W power caps (ADR-017/021).",
+    ],
+    evalSeries: [
+      { label: "Coder-7B L0->L3", baseline: 15.0, current: 60.0, unit: "% strict EX" },
+      { label: "Qwen-3B L0->L3", baseline: 6.2, current: 46.2, unit: "% strict EX" },
+      { label: "Context vs Model", baseline: 18.4, current: 36.2, unit: "pts lift" },
+    ] satisfies ReadonlyArray<EvalSeriesPoint>,
+    highlightMetrics: [
+      { value: "+36.2 pts", label: "Context Lift (L3-L0)" },
+      { value: "0 / 90", label: "Red-Team SQLi Bypasses" },
+      { value: "99.0%", label: "Hybrid RRF Recall" },
+      { value: "172", label: "Pytest Suite (100% AST)" },
+    ],
+    tech: ["Python 3.12", "LangGraph", "sqlglot", "PostgreSQL 16", "vLLM", "BM25", "model2vec", "Pydantic v2", "OpenTelemetry", "Streamlit"],
+    href: "https://github.com/Rytnixx786/Lexicon",
+    sourceRef: "src/lexicon/sql_guard.py",
+    codeLabel: "sqlglot AST Safety Shield",
+    challenge:
+      "Giving smaller quantized LLMs direct SQL database access commonly fails on two fronts: stripped schema DDL hallucinates joins across undocumented columns, while unguarded queries invite destructive writes, catalog exfiltration, or multi-statement injection.",
+    approach:
+      "Built a 9-node LangGraph workflow pairing BM25 + model2vec RRF retrieval (99.0% recall) with deterministic rule injection, logprob-calibrated classification, and human-in-the-loop clarification interrupts. Guarded generated SQL through an 8-step sqlglot AST sanitizer (100% statement/branch coverage) and read-only Postgres role, while exporting live GenAI cost spans back to Tally ($0.000242/q) and enforcing PR gates via lexicon-ares-gate.",
+    architecture: {
+      nodes: [
+        { id: "hybrid_rrf", label: "BM25 + model2vec RRF", desc: "Glossary-expanded hybrid retrieval (99.0% recall, rules auto-attached)" },
+        { id: "route_gate", label: "Logprob Route Gate", desc: "Guided-choice classifier with zero-LLM deterministic safety refusals" },
+        { id: "ambiguity_gate", label: "L2+ Clarify Interrupt", desc: "Detects vague time/metrics & pauses cleanly via LangGraph interrupt()" },
+        { id: "qwen_sql", label: "L0-L3 SQL Synthesizer", desc: "Self-correcting generation loop (<= 2 retries) via Cinch/vLLM" },
+        { id: "sqlglot_guard", label: "sqlglot AST Shield", desc: "Blocks 28 write/DDL nodes, 19 functions, catalogs; clamps LIMIT 1000" },
+        { id: "lexicon_ro_db", label: "Postgres lexicon_ro", desc: "BEGIN READ ONLY + 5s statement_timeout over Tally marts.*" },
+        { id: "ares_otlp", label: "ARES Gate + OTLP", desc: "3-seed PR gate plugin (#1/#2 blocked) + live Tally cost publish" },
+      ],
+      connections: [
+        { from: "hybrid_rrf", to: "route_gate", label: "99.0% Recall" },
+        { from: "route_gate", to: "ambiguity_gate", label: "Answerable / Ambiguous" },
+        { from: "ambiguity_gate", to: "qwen_sql", label: "Resolved Intent" },
+        { from: "qwen_sql", to: "sqlglot_guard", label: "Candidate SQL" },
+        { from: "sqlglot_guard", to: "qwen_sql", label: "Violation Retry" },
+        { from: "sqlglot_guard", to: "lexicon_ro_db", label: "0/46 Bypass" },
+        { from: "lexicon_ro_db", to: "ares_otlp", label: "$0.000242/q" },
+      ],
+    },
+    lessons: [
+      "Small 3B-AWQ models given curated semantic context (L3: 46.2% EX) outperformed uncontexted 7B models at L0 (15.0% EX) by +31.2 pts (LR chi2 = 146.3 vs 44.5).",
+      "Deterministic safety gates beat prompt engineering: 0 of 46 AST attacks and 0 of 44 direct DB-layer probes bypassed the dual sqlglot + lexicon_ro perimeter.",
+      "Single-scalar EX metrics hide silent safety regressions; 3-seed protected-bucket gating in ARES caught both real PR regressions before merge.",
+    ],
+    codeLanguage: "python",
+    codeSnippet: `# Lexicon: 8-Step AST SQL Allowlist Validator (src/lexicon/sql_guard.py)
+def check(
+    sql_text: str,
+    allowed_tables: set[str],
+    *,
+    dialect: str = "postgres",
+    columns: Mapping[str, Mapping[str, str]] | None = None,
+    max_rows: int = MAX_ROWS,
+) -> GuardReport:
+    v: list[Violation] = []
+    statements = [s for s in sqlglot.parse(sql_text.strip().rstrip(";"), dialect=dialect) if s]
+    if len(statements) != 1:
+        return GuardReport(False, None, [Violation("multiple_statements", "expected 1 statement")])
+    tree = statements[0]
+    while isinstance(tree, exp.Subquery) and isinstance(tree.this, exp.Query):
+        tree = tree.this
+    if not isinstance(tree, (exp.Select, exp.SetOperation)):
+        v.append(Violation("not_select", "only SELECT queries are allowed"))
+    for node in tree.walk():
+        if isinstance(node, _FORBIDDEN_NODES):
+            v.append(Violation("forbidden_statement", f"{type(node).__name__.upper()} blocked"))
+        elif isinstance(node, exp.Func):
+            name = _func_name(node)
+            if name in _DENY_EXACT or name.startswith(_DENY_PREFIX):
+                v.append(Violation("forbidden_function", f"{name}() blocked"))
+    if v:
+        return GuardReport(False, None, v)
+    # Table allowlist (CTE-aware), system catalog denial, optional column qualification
+    # and mandatory outermost LIMIT 1000 clamp omitted for brevity
+    return GuardReport(True, tree.sql(dialect=dialect), [], used, added)`,
+    nextSteps:
+      "Expand golden-v2 coverage across mart_cost_per_outcome and dim_prompt_version to match the 5-per-table design target and connect LangGraph multi-turn memory in live UI.",
+  },
+  {
     slug: "nexus-researcher",
     name: "Nexus Researcher",
     featured: true,

@@ -13,7 +13,7 @@ import { useSlidingIndicator } from "@/components/motion/useSlidingIndicator";
 
 gsap.registerPlugin(useGSAP);
 
-const FLAGSHIP_SLUGS = ["cinch", "nexus-researcher", "ares", "mindstack"] as const;
+const FLAGSHIP_SLUGS = ["cinch", "tally", "lexicon", "nexus-researcher", "ares"] as const;
 
 interface HeroSystemSwitcherProps {
   className?: string;
@@ -110,7 +110,7 @@ export function HeroSystemSwitcher({
       {/* Top Segmented System Rail with GPU Sliding Indicator */}
       <div
         ref={railRef}
-        className="relative flex flex-nowrap items-center gap-1 rounded-xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117]/85 p-1"
+        className="relative grid grid-cols-3 gap-1 rounded-xl border border-[rgba(240,246,252,0.08)] bg-[#0D1117]/85 p-1 sm:flex sm:flex-nowrap sm:items-center"
       >
         {pillReady && pillRect && (
           <span
@@ -152,7 +152,7 @@ export function HeroSystemSwitcher({
                     }
                   : undefined
               }
-              className={`relative z-10 inline-flex min-h-[44px] flex-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-transparent px-1.5 py-1 text-center font-mono text-xs transition-colors sm:px-2.5 ${
+              className={`relative z-10 inline-flex min-h-[44px] flex-auto items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-transparent px-1.5 py-1 text-center font-mono text-xs transition-colors lg:px-1 xl:px-2 ${
                 isCurrent
                   ? "font-semibold"
                   : "text-[#8B949E] hover:text-[#E6EDF3]"
@@ -183,7 +183,7 @@ export function HeroSystemSwitcher({
               className="whitespace-nowrap font-semibold uppercase tracking-[0.1em]"
               style={{ color: hue.labelText }}
             >
-              {String(safeIndex + 1).padStart(2, "0")}/04
+              {String(safeIndex + 1).padStart(2, "0")}/{String(deck.length).padStart(2, "0")}
             </span>
             <span className="text-[#8B949E]">·</span>
             <span className="whitespace-nowrap uppercase tracking-[0.08em] text-[#E6EDF3]">
@@ -242,16 +242,20 @@ export function HeroSystemSwitcher({
 
       {/* Bottom Action & Controls Row */}
       <div className="flex items-center justify-between gap-2 px-0.5">
-        <div data-switcher-slide className="flex min-w-0 items-center gap-2">
+        <div data-switcher-slide className="flex min-w-0 flex-1 items-center gap-2">
           <span className="whitespace-nowrap font-mono text-xs text-[#8B949E] sm:hidden">
-            {String(safeIndex + 1).padStart(2, "0")}/04 · {current.name.split(" ")[0]}
+            {String(safeIndex + 1).padStart(2, "0")}/{String(deck.length).padStart(2, "0")} · {current.name.split(" ")[0]}
           </span>
           <div className="hidden min-w-0 flex-1 items-center gap-1.5 overflow-hidden sm:flex">
             {current.tech.slice(0, 3).map((tag, idx) => (
               <span
                 key={tag}
                 className={`shrink-0 whitespace-nowrap rounded-md border border-[rgba(240,246,252,0.08)] bg-[#0D1117]/80 px-2 py-0.5 font-mono text-xs text-[#9DA7B3] ${
-                  idx === 2 ? "hidden xl:inline-flex" : "inline-flex"
+                  idx === 0
+                    ? "inline-flex"
+                    : idx === 1
+                      ? "hidden xl:inline-flex"
+                      : "hidden 2xl:inline-flex"
                 }`}
               >
                 {tag}

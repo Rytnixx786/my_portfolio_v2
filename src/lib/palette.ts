@@ -77,9 +77,10 @@ export const CATEGORY_HUES: Record<ProjectCategory, CategoryHueSpec> = {
 
 export const HERO_ORBIT_HUES = [
   CATEGORY_HUES["Inference & Serving"].hex,
-  CATEGORY_HUES["Agents & RAG"].hex,
   CATEGORY_HUES["MLOps & Security"].hex,
   CATEGORY_HUES["Agents & RAG"].hex,
+  CATEGORY_HUES["Agents & RAG"].hex,
+  CATEGORY_HUES["MLOps & Security"].hex,
 ] as const;
 
 export function getCategoryHue(category: string): CategoryHueSpec {
